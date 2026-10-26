@@ -33,12 +33,44 @@ Without a session, `GET /account/device` returns `401 Unauthorized`.
 - **Logs come in pages of 500.** `GET /account/transaction/{DeviceUUID}/{SinceSyncID}` returns at most 500 transactions. Logs longer than that need repeated reads from the highest number returned, until a read comes back short or reaches `LastSyncID`.
 - **Signing in doesn't join the sync group.** A `POST /session` with a new `DeviceUUID` succeeds, but that device doesn't appear in `/account/device`. On a fresh test account, the iPad appeared (with `LastSyncID` 1) only after it posted its first transaction. A device seems to join the group by posting, which suggests a read-only client stays invisible in the device list.
 - A full probe of 5 devices (about 4,300 transactions) took about 4 seconds.
+- **A device joins by posting, with no confirmation step** (2026-10-26, test account, `--write-test-diaper`). The new dev device was absent from `/account/device` until its first `POST /account/transaction` (SyncID 1, a diaper add), then listed at once with `LastSyncID` 1, then 2 after a delete. Reading an unlisted device's log returns `[]`. The posted transaction came back byte-identical in the device's own log.
 
 ## OPCodes
 
-- `0`: add (observed)
-- `2`: delete (observed; the payload is the full record)
-- `1`: probably update (not yet observed)
+- `0`: add.
+- `1`: update. The payload is the full record with a newer `timestamp` and `newFlage` set to `"false"`.
+- `2`: delete. The payload is the full record as last saved, and its `timestamp` is **not** bumped.
+
+All three were observed in captures on 2026-10-26.
+
+## Timers
+
+Captured on the test account on 2026-10-26, with the sync screen opened while each timer was running.
+
+- **Sleep timers sync while running.** Starting a sleep posts an **add** right away with `duration` 0 and `time` set to the start. Stopping it posts an **update** to the same `objectID` with the final `duration`. Each later edit, such as adding a note, posts another update. A sleep with `duration` 0 is therefore a sleep in progress.
+- **Nursing timers don't sync while running.** Nothing was posted when the timer started, when it switched from left to right, or while the sync screen was open. When the timer stopped, one **add** arrived with `leftDuration`, `rightDuration`, `finishSide` (the side last nursed, 1 = right), `isDetailed` "true", and `state` 5. That fits the absence of a "last synced" update during nursing. HA can't see a nursing timer running on a phone. It can only keep its own timer and write the finished entry at the stop.
+- Durations are whole minutes. About 30 seconds per side was stored as 1.
+
+## Payloads by type
+
+Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `timestamp`, `timezone`, `note`, `newFlage`, `pictureLoaded`, `pictureNote`, `baby`):
+
+| Type | Fields |
+|---|---|
+| `Formula` | `amount` |
+| `Pumped` (a bottle of pumped milk) | `amount` |
+| `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` |
+| `Nursing` | `leftDuration`, `rightDuration`, `bothDuration`, `finishSide`, `isDetailed`, `pairSessionState`, `state` |
+| `Sleep` | `duration` (minutes; 0 while running) |
+| `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |
+
+**Volumes aren't plain numbers.** Each amount is an object: `{"BCObjectType": "VolumeMeasure", "englishMeasure": "true", "value": 4}`, where `englishMeasure` "true" means ounces. The local database's flat `Amount` and `IsEnglishScale` columns don't match the sync format.
+
+Anonymized fixtures for all nine captured transactions are in the library's `tests/fixtures/captured_payloads.json`.
+
+## Other endpoints seen
+
+- `POST /account/trial_start`, with body `{"TrialStartTime": <unix seconds>}`. The app sent this once during the capture, apparently starting a Plus trial. Home Assistant must never call it.
 
 ## Transaction payload
 
@@ -78,6 +110,6 @@ Without a session, `GET /account/device` returns `401 Unauthorized`.
 
 ## Open questions
 
-- When Home Assistant's first post makes it appear in the device list, is there a confirmation step or a device limit? Confirm on the test account in the first write ticket.
+- Is there a limit on how many devices an account can have? Joining takes no confirmation step (see Probe findings).
 - In the capture, the pull from another device returned a delete matching ours (SyncID 1602). Does the server echo deletes, or did that device send its own copy?
-- Payloads for `Nursing`, `Formula`, `Sleep` (start, stop, in-progress), and `Pump` still need to be captured. Their tables suggest the fields.
+- What do the remaining types (growth, medicine, temperature, and so on) look like on the wire? They're read-only for now, and kept raw if their shape surprises the library.
