@@ -12,7 +12,7 @@ This version only reads. Writing records, timers, and today's counts come in lat
 - Four timestamp sensors on each baby: **Last diaper**, **Last feed**, **Last pump**, and
   **Last sleep**. The state is when it happened. The details are attributes:
   - Diaper: `type` (`wet`, `dirty`, or `mixed`) and `note`.
-  - Feed: `kind` (`nursing`, `formula`, or `pumped`), `amount` and `unit` (`oz` or `mL`) for
+  - Feed: `kind` (`nursing`, `formula`, or `pumped`), `amount` and `unit` (`fl. oz.` or `mL`) for
     bottles, nursing durations in minutes, `finish_side`, and `note`. The newest of nursing,
     formula, and pumped milk counts as the last feed.
   - Pump: `amount`, `unit`, `left_amount`, `right_amount`, durations in minutes, `sides`, and

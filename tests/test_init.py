@@ -6,6 +6,7 @@ import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
@@ -198,6 +199,18 @@ async def test_an_options_change_applies_without_a_reload(
     assert setup_entry.runtime_data is coordinator
     assert coordinator.update_interval == timedelta(minutes=10)
     assert len(server.clients) == clients
+
+
+async def test_a_shorter_interval_takes_effect_right_away(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {CONF_SCAN_INTERVAL: 1})
+    await hass.async_block_till_done()
+    calls = server.device_list_calls
+
+    await tick(hass, minutes=1)  # well before the old five-minute schedule
+    assert server.device_list_calls == calls + 1
 
 
 async def test_engine_use_is_serialized_behind_one_lock(
@@ -472,3 +485,79 @@ async def test_volumes_in_the_sync_format_do_not_break_a_sync(
     await tick(hass)
     assert setup_entry.state is ConfigEntryState.LOADED
     assert hass.states.get("sensor.baby_one_last_feed").state == at(15).isoformat()
+
+
+# Saved state from the older library
+
+
+async def test_saved_state_from_the_earlier_library_version_still_loads(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
+) -> None:
+    from .factories import record_payload
+
+    def saved(object_id: str, status: int, minutes: float, sync_id: int) -> dict[str, Any]:
+        payload = record_payload(
+            "Diaper", object_id, when=at(minutes), baby=BABY_ONE, status=status
+        )
+        stamp = at(minutes).timestamp()
+        return {
+            "version": {"timestamp": stamp, "rank": 0, "device": DEVICE_A, "sync_id": sync_id},
+            "payload": payload,
+        }
+
+    key = _storage_key(config_entry)
+    state = {
+        "version": 3,
+        "last_seen": {DEVICE_A: 2},
+        "records": [
+            saved("D0000000-0000-4000-8000-000000000001", 0, 0, 1),
+            saved("D0000000-0000-4000-8000-000000000002", 1, 10, 2),
+        ],
+        "tombstones": [],
+    }
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": state}
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert server.transaction_reads == []
+    assert hass.states.get(DIAPER).state == at(10).isoformat()
+
+
+# A failing save must not hide the sync error
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_state", "reauth"),
+    [
+        (BabyTrackerConnectionError("down"), ConfigEntryState.SETUP_RETRY, False),
+        (AuthenticationError("rejected"), ConfigEntryState.SETUP_ERROR, True),
+    ],
+    ids=["connection", "auth"],
+)
+async def test_a_failing_save_does_not_replace_the_sync_error(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    server: FakeServer,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    expected_state: ConfigEntryState,
+    reauth: bool,
+) -> None:
+    # Device A syncs (so there is progress to save), then device B fails.
+    server.add_record(DEVICE_B, "Diaper", "D9000000-0000-4000-8000-000000000001", when=at(5))
+    server.read_errors[DEVICE_B] = error
+    config_entry.add_to_hass(hass)
+
+    with patch("homeassistant.helpers.storage.Store.async_save", side_effect=OSError("disk full")):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert config_entry.state is expected_state
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert bool(flows) is reauth
+    assert "disk full" in caplog.text

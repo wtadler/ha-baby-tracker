@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CONF_DEVICE_UUID,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
@@ -85,7 +86,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         )
         self.client = client
         self.session = session
-        self.engine = SyncEngine()
+        self._device_uuid: str = entry.data[CONF_DEVICE_UUID]
+        self.engine = SyncEngine(self._device_uuid)
         # Everything that uses the engine takes this lock, so a later write path can share it.
         self.lock = asyncio.Lock()
         self._store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
@@ -101,7 +103,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         if saved is None:
             return
         try:
-            self.engine = SyncEngine.from_dict(saved)
+            self.engine = SyncEngine.from_dict(saved, self._device_uuid)
         except (KeyError, TypeError, ValueError, AttributeError, BabyTrackerError) as err:
             _LOGGER.warning(
                 "The saved sync state couldn't be read (%r); loading all history again", err
@@ -119,8 +121,15 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             finally:
                 # Keep progress even when a later device failed.
                 if dict(self.engine.last_seen) != before:
-                    await self._store.async_save(self.engine.to_dict())
+                    await self._async_save()
             return self._snapshot()
+
+    async def _async_save(self) -> None:
+        """Save the engine state. A failed save is logged, and never hides a sync error."""
+        try:
+            await self._store.async_save(self.engine.to_dict())
+        except Exception:
+            _LOGGER.exception("Couldn't save the sync state; it will be saved after the next sync")
 
     def _snapshot(self) -> dict[str, BabyData]:
         for baby_id, baby in self.engine.babies().items():

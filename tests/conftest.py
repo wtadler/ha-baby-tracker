@@ -56,6 +56,7 @@ class FakeServer:
         self.names: dict[str, str] = {}
         self.sign_in_error: Exception | None = None
         self.request_error: Exception | None = None
+        self.read_errors: dict[str, Exception] = {}
         self.clients: list[FakeClient] = []
         self.sign_ins: list[dict[str, str]] = []
         self.device_list_calls = 0
@@ -159,6 +160,8 @@ class FakeClient:
         self, device_uuid: str, since_sync_id: int = 0
     ) -> list[RawTransaction]:
         await self._ensure_session()
+        if device_uuid in self.server.read_errors:
+            raise self.server.read_errors[device_uuid]
         self.server.transaction_reads.append((device_uuid, since_sync_id))
         entries = [e for e in self.server.logs.get(device_uuid, []) if e["SyncID"] > since_sync_id]
         return [

@@ -84,7 +84,9 @@ async def test_unique_ids_are_built_from_the_baby_id(
 ) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
     assert len(entries) == 8
-    assert all(BABY_ONE_ID in e.unique_id or BABY_TWO_ID in e.unique_id for e in entries)
+    assert {e.unique_id for e in entries} == {
+        f"{baby}_{key}" for baby in (BABY_ONE_ID, BABY_TWO_ID) for key in KEYS
+    }
 
 
 async def test_the_sensors_are_timestamps(
@@ -249,7 +251,7 @@ async def test_a_formula_feed_shows_its_amount_in_ounces(
     state = _state(hass, "baby_one", "last_feed")
     assert state.attributes["kind"] == "formula"
     assert state.attributes["amount"] == 4
-    assert state.attributes["unit"] == "oz"
+    assert state.attributes["unit"] == "fl. oz."
 
 
 async def test_a_pumped_bottle_in_milliliters_shows_its_unit(
@@ -321,7 +323,7 @@ async def test_the_last_pump_shows_amounts_and_durations(
     state = _state(hass, "baby_one", "last_pump")
     assert state.state == at(45).isoformat()
     assert state.attributes["amount"] == 5
-    assert state.attributes["unit"] == "oz"
+    assert state.attributes["unit"] == "fl. oz."
     assert state.attributes["left_amount"] == 2
     assert state.attributes["right_amount"] == 3
     assert state.attributes["left_duration_minutes"] == 10
@@ -495,3 +497,22 @@ async def test_babies_are_restored_from_saved_state_after_a_restart(
 
     for baby in ("baby_one", "baby_two", "baby_three"):
         assert _state(hass, baby, "last_diaper").state != "unknown"
+
+
+async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    payload = {
+        "BCObjectType": "Formula",
+        "objectID": _object_id(80),
+        "time": at(500).strftime("%Y-%m-%d %H:%M:%S %z"),
+        "timestamp": "not a time",
+        "amount": volume(4),
+        "baby": BABY_ONE,
+    }
+    server.add_payload(DEVICE_A, payload)
+    await tick(hass)
+    assert setup_entry.state is ConfigEntryState.LOADED
+    state = _state(hass, "baby_one", "last_feed")
+    assert state.state == "unknown"  # a raw record carries no baby, so it isn't shown
+    assert "amount" not in state.attributes

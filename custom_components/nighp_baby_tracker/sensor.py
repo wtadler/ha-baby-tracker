@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
-from .helpers import record_field, volume_of
+from .helpers import volume_parts
 from .pybabytracker import Record
 
 PARALLEL_UPDATES = 0
@@ -34,13 +34,13 @@ def _present(attributes: dict[str, Any]) -> dict[str, Any]:
 
 
 def _note(record: Record) -> str | None:
-    note = record_field(record, "note")
+    note = getattr(record, "note", None)
     return note if isinstance(note, str) and note else None
 
 
 def _diaper_attributes(record: Record) -> dict[str, Any]:
     return _present(
-        {"type": DIAPER_TYPES.get(record_field(record, "status")), "note": _note(record)}
+        {"type": DIAPER_TYPES.get(getattr(record, "status", None)), "note": _note(record)}
     )
 
 
@@ -48,34 +48,34 @@ def _feed_attributes(record: Record) -> dict[str, Any]:
     kind = FEED_KINDS.get(record.record_type)
     attributes: dict[str, Any] = {"kind": kind}
     if kind == "nursing":
-        attributes["left_duration_minutes"] = record_field(record, "left_duration")
-        attributes["right_duration_minutes"] = record_field(record, "right_duration")
-        attributes["both_duration_minutes"] = record_field(record, "both_duration")
-        attributes["finish_side"] = SIDES.get(record_field(record, "finish_side"))
+        attributes["left_duration_minutes"] = getattr(record, "left_duration", None)
+        attributes["right_duration_minutes"] = getattr(record, "right_duration", None)
+        attributes["both_duration_minutes"] = getattr(record, "both_duration", None)
+        attributes["finish_side"] = SIDES.get(getattr(record, "finish_side", None))
     else:
-        attributes["amount"], attributes["unit"] = volume_of(record)
+        attributes["amount"], attributes["unit"] = volume_parts(getattr(record, "volume", None))
     attributes["note"] = _note(record)
     return _present(attributes)
 
 
 def _pump_attributes(record: Record) -> dict[str, Any]:
-    amount, unit = volume_of(record)
+    amount, unit = volume_parts(getattr(record, "volume", None))
     return _present(
         {
             "amount": amount,
             "unit": unit,
-            "left_amount": volume_of(record, "left_amount")[0],
-            "right_amount": volume_of(record, "right_amount")[0],
-            "left_duration_minutes": record_field(record, "left_duration"),
-            "right_duration_minutes": record_field(record, "right_duration"),
-            "sides": record_field(record, "sides"),
+            "left_amount": volume_parts(getattr(record, "left_volume", None))[0],
+            "right_amount": volume_parts(getattr(record, "right_volume", None))[0],
+            "left_duration_minutes": getattr(record, "left_duration", None),
+            "right_duration_minutes": getattr(record, "right_duration", None),
+            "sides": getattr(record, "sides", None),
             "note": _note(record),
         }
     )
 
 
 def _sleep_attributes(record: Record) -> dict[str, Any]:
-    return _present({"duration_minutes": record_field(record, "duration"), "note": _note(record)})
+    return _present({"duration_minutes": getattr(record, "duration", None), "note": _note(record)})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -156,8 +156,8 @@ class BabyTrackerSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity)
         super().__init__(coordinator)
         self.entity_description = description
         self._baby_id = baby_id
-        entry_id = coordinator.config_entry.entry_id
-        self._attr_unique_id = f"{entry_id}_{baby_id}_{description.key}"
+        # Same scope as the device identifier: the baby's ID. One baby is in one sync group.
+        self._attr_unique_id = f"{baby_id}_{description.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, baby_id)},
             name=coordinator.data[baby_id].name or "Baby",

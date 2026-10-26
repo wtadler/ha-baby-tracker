@@ -23,9 +23,11 @@ BRONZE_RULES = [
     "config-flow",
     "dependency-transparency",
     "docs-actions",
+    "docs-conditions",
     "docs-high-level-description",
     "docs-installation-instructions",
     "docs-removal-instructions",
+    "docs-triggers",
     "entity-event-setup",
     "entity-unique-id",
     "has-entity-name",
@@ -93,12 +95,12 @@ def test_the_quality_scale_marks_every_bronze_rule() -> None:
         if entry == "done":
             continue
         assert isinstance(entry, dict), rule
-        assert entry["status"] in ("done", "exempt"), rule
-        if entry["status"] == "exempt":
+        assert entry["status"] in ("done", "exempt", "todo"), rule
+        if entry["status"] != "done":
             assert entry["comment"].strip(), rule
 
 
-@pytest.mark.parametrize("rule", ["reauth-flow", "config-entry-unloading"])
+@pytest.mark.parametrize("rule", ["reauthentication-flow", "config-entry-unloading"])
 def test_the_quality_scale_marks_the_silver_rules_built_in_this_ticket(rule: str) -> None:
     scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
     assert scale[rule] == "done"
@@ -127,3 +129,21 @@ def test_the_readme_covers_install_and_removal() -> None:
     readme = (ROOT / "README.md").read_text().lower()
     for heading in ("installation", "removal", "configuration"):
         assert heading in readme
+
+
+def test_dependency_transparency_is_a_todo_until_the_library_is_published() -> None:
+    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
+    entry = scale["dependency-transparency"]
+    assert entry["status"] == "todo"
+    assert entry["comment"] == "library bundled while private; PyPI at go-public (#12)"
+
+
+@pytest.mark.parametrize("rule", ["docs-triggers", "docs-conditions"])
+def test_trigger_and_condition_docs_are_exempt_with_a_reason(rule: str) -> None:
+    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
+    assert scale[rule]["status"] == "exempt"
+    assert scale[rule]["comment"].strip()
+
+
+def test_claude_worktrees_are_gitignored() -> None:
+    assert ".claude/" in (ROOT / ".gitignore").read_text().splitlines()

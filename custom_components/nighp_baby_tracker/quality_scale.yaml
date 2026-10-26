@@ -11,14 +11,20 @@ rules:
   config-flow-test-coverage: done
   config-flow: done
   dependency-transparency:
-    status: done
-    comment: The library is bundled in pybabytracker/ with its source commit in VENDORED_FROM until it is published to PyPI.
+    status: todo
+    comment: library bundled while private; PyPI at go-public (#12)
   docs-actions:
     status: exempt
     comment: This version registers no actions.
+  docs-conditions:
+    status: exempt
+    comment: The integration registers no device conditions.
   docs-high-level-description: done
   docs-installation-instructions: done
   docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: The integration registers no device triggers.
   entity-event-setup:
     status: exempt
     comment: Entities read the coordinator's data and subscribe to no events of their own.
@@ -30,4 +36,4 @@ rules:
   unique-config-entry: done
   # Silver, built with this ticket
   config-entry-unloading: done
-  reauth-flow: done
+  reauthentication-flow: done

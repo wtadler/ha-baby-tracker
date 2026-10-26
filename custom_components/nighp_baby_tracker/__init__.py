@@ -44,8 +44,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Apply a new sync interval without reloading the entry."""
-    entry.runtime_data.update_interval = scan_interval(entry)
+    """Apply a new sync interval right away, without reloading the entry."""
+    coordinator = entry.runtime_data
+    interval = scan_interval(entry)
+    if interval != coordinator.update_interval:
+        coordinator.update_interval = interval
+        # The setter doesn't reschedule, so refresh now: that also schedules the next one.
+        await coordinator.async_request_refresh()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
