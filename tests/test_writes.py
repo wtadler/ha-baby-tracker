@@ -295,6 +295,34 @@ async def test_a_log_diaper_retry_with_the_same_object_id_does_not_post_twice(
     assert [n for n, _, _ in posted(server)] == [1]
 
 
+@pytest.mark.parametrize("bad", ["retry-1", "", "1234", "7E57ED00-0000-4000-8000-00000000000Z"])
+async def test_log_diaper_rejects_an_object_id_that_is_not_a_uuid(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, bad: str
+) -> None:
+    with pytest.raises(vol.Invalid):
+        await log_diaper(hass, BABY_ONE_ID, "wet", object_id=bad)
+    assert server.posted == []
+
+
+async def test_log_diaper_accepts_a_lowercase_uuid_and_posts_it_in_uppercase(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    await log_diaper(hass, BABY_ONE_ID, "wet", object_id="7e57ed00-0000-4000-8000-00000000000a")
+
+    [(_, _, record)] = posted(server)
+    assert record.object_id == "7E57ED00-0000-4000-8000-0000000000" + "0A"
+
+
+async def test_other_value_errors_are_not_reported_as_an_id_in_use(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    with (
+        patch.object(SyncEngine, "add_diaper", side_effect=ValueError("some other refusal")),
+        pytest.raises(ValueError, match="some other refusal"),
+    ):
+        await log_diaper(hass, BABY_ONE_ID, "wet")
+
+
 async def test_a_log_diaper_object_id_belonging_to_another_record_is_an_error(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:

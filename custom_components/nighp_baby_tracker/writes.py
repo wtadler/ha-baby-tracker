@@ -81,8 +81,6 @@ async def _write[T](
         raise _reauth(coordinator) from err
     except SyncBeforeWriteError as err:
         raise _error("sync_failed", error=str(err)) from err
-    except ValueError as err:  # the engine's refusal of an object_id another record holds
-        raise validation_error("object_id_in_use") from err
     except UnknownBabyError as err:
         raise validation_error("baby_not_found") from err
     except WriteOutcomeUnknownError as err:
@@ -129,15 +127,21 @@ async def async_log_diaper(
     moment, offset = _in_home_assistant_time(time)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient) -> object:
-        return await engine.add_diaper(
-            client,
-            baby_id,
-            DIAPER_STATUS[kind],
-            time=moment,
-            timezone_offset=offset,
-            note=note,
-            object_id=object_id,
-        )
+        try:
+            return await engine.add_diaper(
+                client,
+                baby_id,
+                DIAPER_STATUS[kind],
+                time=moment,
+                timezone_offset=offset,
+                note=note,
+                object_id=object_id,
+            )
+        except ValueError as err:
+            if object_id is None:
+                raise
+            # The engine refuses an object_id that another record already holds.
+            raise validation_error("object_id_in_use") from err
 
     await _write(coordinator, add)
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -19,13 +21,22 @@ ATTR_NOTE = "note"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_OBJECT_ID = "object_id"
 
+
+def _uuid_upper(value: object) -> str:
+    """A UUID, in the uppercase form the app uses for record IDs."""
+    try:
+        return str(uuid.UUID(str(value))).upper()
+    except ValueError as err:
+        raise vol.Invalid("must be a UUID") from err
+
+
 LOG_DIAPER_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_BABY): cv.string,
         vol.Required(ATTR_TYPE): vol.In(list(DIAPER_STATUS)),
         vol.Optional(ATTR_TIME): cv.datetime,
         vol.Optional(ATTR_NOTE, default=""): cv.string,
-        vol.Optional(ATTR_OBJECT_ID): cv.string,
+        vol.Optional(ATTR_OBJECT_ID): _uuid_upper,
     }
 )
 

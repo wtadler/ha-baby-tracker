@@ -68,8 +68,8 @@ Two actions do the same and more:
   deletes the next older Home Assistant entry, and so on, until none are left. If you give both
   `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
   made.
-- `log_diaper` also takes an optional `object_id` (an ID you make up). Send the same one to retry a
-  write that may have landed: it's added once, never twice.
+- `log_diaper` also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
+  Send the same one to retry a write that may have landed: it's added once, never twice.
 
 Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from
 the service, the next one says "the last entry is still being confirmed"; try again in a minute. If

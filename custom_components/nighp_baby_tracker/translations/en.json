@@ -114,7 +114,7 @@
         },
         "object_id": {
           "name": "Record ID",
-          "description": "An ID you make up, to retry safely. If a write with this ID already landed, nothing is added again. Leave it empty for a new diaper each time."
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new diaper each time."
         }
       }
     },
