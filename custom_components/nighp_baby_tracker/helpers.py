@@ -13,7 +13,7 @@ _UNITS = {
 
 
 def volume_parts(volume: Volume | None) -> tuple[float | None, str | None]:
-    """A library volume as (value, unit), with the unit named by Home Assistant's constants."""
+    """Return a library volume as (value, unit), with Home Assistant's unit names."""
     if volume is None:
         return None, None
     return volume.value, _UNITS.get(volume.unit)

@@ -91,15 +91,18 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
+        """Set up the flow with a fresh device ID."""
         # Generated once per flow, and kept in the entry: this is Home Assistant's device ID.
         self._device_uuid = str(uuid4()).upper()
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> BabyTrackerOptionsFlow:
+        """Return the options flow."""
         return BabyTrackerOptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Ask for the account's email and password, then create the entry."""
         errors: dict[str, str] = {}
         if user_input is not None:
             email = user_input[CONF_EMAIL].strip()
@@ -125,11 +128,13 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """Start reauthentication when the saved password stops working."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Ask for the account's password again and update the entry."""
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -159,6 +164,7 @@ class BabyTrackerOptionsFlow(OptionsFlow):
     """Adjust how often Home Assistant checks for new records, and what the Bottle button logs."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Show and save the options."""
         if user_input is not None:
             return self.async_create_entry(
                 data={

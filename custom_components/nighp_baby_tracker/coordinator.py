@@ -66,14 +66,17 @@ class BabyData:
 
 
 def storage_key(entry_id: str) -> str:
+    """Return the storage key for an entry's sync state."""
     return f"{DOMAIN}.{entry_id}"
 
 
 def nursing_storage_key(entry_id: str) -> str:
+    """Return the storage key for an entry's nursing timers."""
     return f"{DOMAIN}.{entry_id}.nursing"
 
 
 def scan_interval(entry: ConfigEntry) -> timedelta:
+    """Return the sync interval an entry's options configure."""
     return timedelta(minutes=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES))
 
 
@@ -102,6 +105,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         client: BabyTrackerClient,
         session: aiohttp.ClientSession,
     ) -> None:
+        """Set up the coordinator for one account."""
         super().__init__(
             hass,
             _LOGGER,
@@ -127,8 +131,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         )
 
     async def _async_setup(self) -> None:
-        """Load the saved sync state, so a restart fetches only what's newer, and any running
-        nursing timers."""
+        """Load the saved sync state and any running nursing timers.
+
+        A restart then fetches only what's newer.
+        """
         # Today's counts change at local midnight even when nothing syncs.
         self.config_entry.async_on_unload(
             async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
@@ -212,8 +218,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         return result
 
     def wanted_interval(self, data: dict[str, BabyData] | None = None) -> timedelta:
-        """One minute while any sleep (synced) or nursing timer (Home Assistant's) runs, and the
-        configured interval otherwise."""
+        """Return the sync interval: one minute while a timer runs, else the configured one.
+
+        A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running.
+        """
         babies = data if data is not None else self.data or {}
         if any(baby_id in babies for baby_id in self.nursing) or any(
             baby.running_sleep is not None for baby in babies.values()
@@ -222,9 +230,11 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         return scan_interval(self.config_entry)
 
     def exclusive(self) -> asyncio.Lock:
-        """The lock syncs and writes take, for a caller that needs several steps with neither
-        running in between (a nursing timer change). Pass ``locked=True`` to ``async_write``
-        while holding it."""
+        """Return the lock that syncs and writes take.
+
+        Use it when several steps must run with neither a sync nor a write in between (a nursing
+        timer change). Pass ``locked=True`` to ``async_write`` while holding it.
+        """
         return self.lock
 
     async def async_set_nursing(self, baby_id: str, timer: NursingTimer | None) -> None:

@@ -66,7 +66,7 @@ ATTR_SIDE = "side"
 
 
 def _uuid_upper(value: object) -> str:
-    """A UUID, in the uppercase form the app uses for record IDs."""
+    """Return a UUID in the uppercase form the app uses for record IDs."""
     try:
         return str(uuid.UUID(str(value))).upper()
     except ValueError as err:
@@ -208,8 +208,11 @@ def _loaded(entry: BabyTrackerConfigEntry | None) -> BabyTrackerCoordinator:
 
 
 def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str, bool]:
-    """The coordinator that owns one of the integration's devices, the device's identifier, and
-    whether it is an account's device (rather than a baby's)."""
+    """Return the coordinator that owns one of the integration's devices.
+
+    Also returns the device's identifier and whether it is an account's device (rather than a
+    baby's).
+    """
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
         raise validation_error("baby_not_found")
@@ -225,8 +228,10 @@ def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordi
 
 
 def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:
-    """The coordinator that owns a baby's device, and the baby's ID. An account's device isn't a
-    baby."""
+    """Return the coordinator that owns a baby's device, and the baby's ID.
+
+    An account's device isn't a baby.
+    """
     coordinator, baby_id, is_account = _from_device(hass, device_id)
     if is_account:
         raise validation_error("baby_not_found")
@@ -234,8 +239,11 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
 
 
 def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
-    """The account a pump goes to: the named config entry, or the entry that owns the named
-    device (a baby's or the account's)."""
+    """Return the account a pump goes to.
+
+    That is the named config entry, or the entry that owns the named device (a baby's or the
+    account's).
+    """
     if ATTR_CONFIG_ENTRY_ID in call.data:
         return _loaded(call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID]))
     return _from_device(call.hass, call.data.get(ATTR_DEVICE) or call.data[ATTR_BABY])[0]

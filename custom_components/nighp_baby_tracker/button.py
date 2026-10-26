@@ -104,6 +104,7 @@ class BabyTrackerButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity)
         description: BabyTrackerButtonDescription,
         baby_id: str,
     ) -> None:
+        """Set up a button that acts on one baby."""
         super().__init__(coordinator)
         self.entity_description = description
         self._baby_id = baby_id
@@ -118,7 +119,9 @@ class BabyTrackerButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity)
 
     @property
     def available(self) -> bool:
+        """Return whether the baby is still on the account."""
         return super().available and self._baby_id in self.coordinator.data
 
     async def async_press(self) -> None:
+        """Run the button's action for its baby."""
         await self.entity_description.press_fn(self.coordinator, self._baby_id)

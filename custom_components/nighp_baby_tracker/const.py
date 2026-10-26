@@ -25,10 +25,12 @@ ACCOUNT_SUFFIX = "_account"
 
 
 def account_identifier(entry_id: str) -> str:
+    """Return the identifier of an account's device."""
     return f"{entry_id}{ACCOUNT_SUFFIX}"
 
 
 def is_account_identifier(identifier: str) -> bool:
+    """Return whether an identifier belongs to an account's device."""
     return identifier.endswith(ACCOUNT_SUFFIX)
 
 

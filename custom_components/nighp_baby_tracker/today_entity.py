@@ -19,6 +19,7 @@ class BabyTrackerBabyEntity(CoordinatorEntity[BabyTrackerCoordinator]):
         description: EntityDescription,
         baby_id: str,
     ) -> None:
+        """Set up an entity that reports one baby's day."""
         super().__init__(coordinator)
         self.entity_description = description
         self._baby_id = baby_id
@@ -38,4 +39,5 @@ class BabyTrackerBabyEntity(CoordinatorEntity[BabyTrackerCoordinator]):
 
     @property
     def available(self) -> bool:
+        """Return whether the baby is on the account."""
         return super().available and self._baby is not None
