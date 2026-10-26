@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect your Baby Tracker account",
+        "description": "Sign in with the email and password you use in the Baby Tracker app. Home Assistant joins your account's sync group as its own device.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "data_description": {
+          "email": "The email address of your Baby Tracker account.",
+          "password": "The password of your Baby Tracker account."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Baby Tracker again",
+        "description": "Home Assistant can no longer sign in. Enter the account's current email and password.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "data_description": {
+          "email": "The email address of the account this entry was set up with.",
+          "password": "The current password of your Baby Tracker account."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The email or password is wrong.",
+      "cannot_connect": "Couldn't reach the Baby Tracker service. Check your connection and try again.",
+      "unknown": "Something unexpected went wrong. Check the logs for details."
+    },
+    "abort": {
+      "already_configured": "This Baby Tracker account is already set up.",
+      "reauth_successful": "Signed in again. Syncing resumes.",
+      "wrong_account": "That is a different account than the one this entry was set up with. Add it as a new entry instead."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Baby Tracker options",
+        "data": {
+          "scan_interval": "Sync interval (minutes)"
+        },
+        "data_description": {
+          "scan_interval": "How often Home Assistant checks for new records. The minimum is 1 minute."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_diaper": {
+        "name": "Last diaper"
+      },
+      "last_feed": {
+        "name": "Last feed"
+      },
+      "last_pump": {
+        "name": "Last pump"
+      },
+      "last_sleep": {
+        "name": "Last sleep"
+      }
+    }
+  }
+}

@@ -1,0 +1,648 @@
+"""The sync engine: merges every device's log into the current set of records.
+
+Rules:
+
+- Records are keyed by ``objectID``. An add or update (opcodes 0 and 1) stores the record. A
+  delete (opcode 2) removes it and leaves a tombstone, so a delete that arrives before the add
+  it targets still wins.
+- Each stored record and tombstone carries a version: the record's ``timestamp``, the op rank
+  (add 0, update 1, delete 2), the device, and the sync number. The rank breaks a tie at an
+  equal timestamp, because an update or delete necessarily comes after the add it follows.
+  Within one device's log, later numbers always win (log order). Across devices the result
+  doesn't depend on which device the engine fetched first:
+
+  - An add or update replaces a stored record if its ``(timestamp, rank, device, number)`` is
+    newer.
+  - A delete removes a stored record unless the record's timestamp is newer than the delete's.
+  - An add or update from another device brings a deleted record back only with a strictly
+    newer timestamp than the tombstone.
+
+- A transaction that can't be decoded, has an unknown opcode, or has no ``objectID`` is
+  skipped with a warning and never stops the sync. A record of an unknown type, or of a known
+  type with values the models don't understand, is kept raw.
+- The engine tracks the highest number seen per device, counting skipped transactions, and
+  only fetches devices whose ``LastSyncID`` is ahead of that. The service returns at most 500
+  transactions per read, so ``sync`` keeps reading each device from its highest number until it
+  reaches the device's ``LastSyncID`` (as listed at the start of the sync), a read comes back
+  empty, or a read brings nothing new (a warning, so a stuck server can't loop forever). A
+  fresh ``SyncEngine`` replays every log, so it recovers skipped payloads once a library fix ships.
+
+Writes (``add_diaper``, ``delete_record``) post as this engine's own device:
+
+- A write needs a completed sync (for the baby record and this device's numbers) and a client
+  signed in as the engine's ``device_uuid``. Otherwise it's refused before any request.
+- Numbers are at-most-once. The next number is one more than the highest of: this device's
+  ``LastSyncID`` on the server, the highest number of this device's log already applied, and
+  the last number this engine posted. Before choosing, the engine applies any of its own log it
+  hasn't seen, so its own log stays contiguous. If that log is shorter than ``LastSyncID``, the
+  write is refused (``ProtocolError``) rather than skipping the missing entries.
+- The outgoing transaction is held as "pending" until the post is confirmed. If a post fails,
+  the engine reads its own log entry at that number: if the exact same transaction is there, the
+  post landed and the write succeeds. If not, the error is raised and the post stays pending.
+  The next write settles it first, catching up through whatever now holds that number:
+  - After a definite HTTP error, a number nothing holds is free and is reused.
+  - After no answer at all (``NoResponseError``: a timeout or dropped connection), the post may
+    still land, so the number is reused only once ``unknown_outcome_grace`` seconds have passed
+    since the failure with nothing under it. Until then a write raises
+    ``WriteOutcomeUnknownError`` without posting.
+  A post is never resent blindly.
+- A retry of the same logical add can pass the same ``object_id``. If the earlier attempt
+  landed after all, the existing record is returned instead of posting a second copy.
+- A confirmed write is applied to local state at once, under its own number, so the next sync
+  sees nothing new from this device and doesn't fetch or reapply it.
+- Writes and syncs share one lock, so concurrent writes get consecutive numbers.
+- Only records this device created can be deleted. Every add in this device's log counts,
+  whether it was applied locally or read back by a sync. Like the app, a delete sends the
+  record exactly as last saved, with only ``newFlage`` set to ``"false"``: its timestamp is not
+  bumped.
+
+What the caller must do:
+
+- Save ``to_dict()`` after every write, including one that raised: the pending post lives only
+  in that state. If the process dies mid-post without saving, recovery falls back on the
+  server's ``LastSyncID``, which can lag.
+- Use one device ID per running process (one per Home Assistant config entry). Two processes
+  writing as the same device can collide on a number while ``LastSyncID`` lags; the settle
+  check narrows that window but can't close it.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time as _time
+import uuid
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
+from typing import Any, Protocol
+
+from .client import Device, RawTransaction
+from .exceptions import (
+    AuthenticationError,
+    BabyTrackerError,
+    NoResponseError,
+    NotOwnRecordError,
+    NotSyncedError,
+    ProtocolError,
+    RecordNotFoundError,
+    TransactionDecodeError,
+    UnknownBabyError,
+    WriteOutcomeUnknownError,
+)
+from .models import (
+    DIAPER_DIRTY,
+    DIAPER_MIXED,
+    DIAPER_WET,
+    OP_ADD,
+    OP_DELETE,
+    OP_UPDATE,
+    RECORD_TYPES,
+    Baby,
+    Diaper,
+    Record,
+    UnknownRecord,
+    decode_payload,
+    decode_transaction,
+    encode_transaction,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+STATE_VERSION = 4
+
+_RANK_ADD, _RANK_UPDATE, _RANK_DELETE = 0, 1, 2
+_OP_RANKS = {OP_ADD: _RANK_ADD, OP_UPDATE: _RANK_UPDATE, OP_DELETE: _RANK_DELETE}
+
+
+class SyncSource(Protocol):
+    """What the engine needs from a client. ``BabyTrackerClient`` satisfies it."""
+
+    async def get_devices(self) -> list[Device]: ...
+
+    async def get_transactions(
+        self, device_uuid: str, since_sync_id: int
+    ) -> list[RawTransaction]: ...
+
+
+class WriteTarget(SyncSource, Protocol):
+    """What the engine needs to write. ``BabyTrackerClient`` satisfies it."""
+
+    @property
+    def device_uuid(self) -> str: ...
+
+    async def post_transaction(self, op_code: int, sync_id: int, transaction: str) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class _Pending:
+    """A transaction posted, or about to be, whose landing isn't confirmed yet."""
+
+    sync_id: int
+    op_code: int
+    transaction: str
+    # Unix time the post went unanswered; None after a definite HTTP error (or before posting).
+    unknown_since: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sync_id": self.sync_id,
+            "op_code": self.op_code,
+            "transaction": self.transaction,
+            "unknown_since": self.unknown_since,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> _Pending:
+        since = data.get("unknown_since")
+        return cls(
+            int(data["sync_id"]),
+            int(data["op_code"]),
+            str(data["transaction"]),
+            float(since) if since is not None else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _Version:
+    timestamp: float
+    rank: int
+    device_uuid: str
+    sync_id: int
+
+    def key(self) -> tuple[float, int, str, int]:
+        return (self.timestamp, self.rank, self.device_uuid, self.sync_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "rank": self.rank,
+            "device": self.device_uuid,
+            "sync_id": self.sync_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any], default_rank: int) -> _Version:
+        """Version 2 state has no rank; ``default_rank`` stands in for it."""
+        return cls(
+            float(data["timestamp"]),
+            int(data.get("rank", default_rank)),
+            str(data["device"]),
+            int(data["sync_id"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ApplyResult:
+    applied: int = 0
+    skipped: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class SyncResult:
+    devices_fetched: int = 0
+    transactions_applied: int = 0
+    transactions_skipped: int = 0
+
+
+class SyncEngine:
+    """Merged state of every device's log, plus this device's outgoing writes.
+
+    ``device_uuid`` is the device this engine writes as. It must match the client's. An engine
+    without one can sync but not write. ``unknown_outcome_grace`` is how long, in seconds, a
+    post that got no answer blocks reuse of its number; make it a few times the client's request
+    timeout.
+    """
+
+    def __init__(
+        self, device_uuid: str | None = None, *, unknown_outcome_grace: float = 90.0
+    ) -> None:
+        self._device_uuid = device_uuid
+        self._unknown_outcome_grace = unknown_outcome_grace
+        self._records: dict[str, Record] = {}
+        self._versions: dict[str, _Version] = {}
+        self._tombstones: dict[str, _Version] = {}
+        self._last_seen: dict[str, int] = {}
+        self._synced = False
+        self._last_posted = 0
+        self._pending: _Pending | None = None
+        self._created: set[str] = set()
+        self._lock = asyncio.Lock()
+
+    @property
+    def device_uuid(self) -> str | None:
+        return self._device_uuid
+
+    @property
+    def records(self) -> Mapping[str, Record]:
+        """Current state: every surviving record, by ``objectID``."""
+        return self._records
+
+    @property
+    def last_seen(self) -> Mapping[str, int]:
+        """The highest transaction number seen, per device."""
+        return self._last_seen
+
+    @property
+    def created_ids(self) -> frozenset[str]:
+        """IDs of every record this device added. Only these can be deleted."""
+        return frozenset(self._created)
+
+    async def add_diaper(
+        self,
+        target: WriteTarget,
+        baby_id: str,
+        status: int,
+        *,
+        time: datetime | None = None,
+        timezone_offset: int | None = None,
+        note: str = "",
+        object_id: str | None = None,
+    ) -> Diaper:
+        """Post a new diaper for a baby known from sync, and apply it locally.
+
+        ``status`` is ``DIAPER_WET``, ``DIAPER_DIRTY``, or ``DIAPER_MIXED``. ``time`` (aware)
+        defaults to now. ``timezone_offset`` (seconds east of UTC) defaults to ``time``'s offset.
+        ``object_id`` defaults to a new uppercase UUID4. Pass the same one to retry a write that
+        raised: if that write landed after all, its record is returned and nothing is posted.
+        """
+        if status not in (DIAPER_WET, DIAPER_DIRTY, DIAPER_MIXED):
+            raise ValueError(f"unknown diaper status: {status!r}")
+        if time is not None and time.utcoffset() is None:
+            raise ValueError("time must be timezone-aware")
+        if object_id is not None:
+            object_id = object_id.upper()
+        async with self._lock:
+            self._check_can_write(target)
+            baby = self.babies().get(baby_id)
+            if baby is None:
+                raise UnknownBabyError(f"no baby {baby_id} is known from sync")
+            number = await self._prepare(target)
+            if object_id is not None:
+                if object_id in self._created:
+                    existing = self._records.get(object_id)
+                    if isinstance(existing, Diaper):
+                        return existing  # an earlier attempt of this write landed
+                    raise RecordNotFoundError(f"record {object_id} was added and then deleted")
+                if object_id in self._records or object_id in self._tombstones:
+                    raise ValueError(f"object_id {object_id} belongs to another record")
+            event = time if time is not None else datetime.now().astimezone()
+            offset = event.utcoffset()
+            assert offset is not None
+            diaper = Diaper(
+                object_id=object_id or str(uuid.uuid4()).upper(),
+                time=event.astimezone(UTC).replace(microsecond=0),
+                timestamp=_now(),
+                timezone=(
+                    timezone_offset if timezone_offset is not None else int(offset.total_seconds())
+                ),
+                status=status,
+                note=note,
+                picture_note=[],
+                new_flag="true",
+                picture_loaded="true",
+                baby=baby,
+                # What the app filled in on the captured add (PROTOCOL.md) with only a type set.
+                amount=2,
+                pee_color=5,
+                poo_color=5,
+                texture=5,
+                flag=0,
+            )
+            await self._send(target, number, OP_ADD, encode_transaction(diaper))
+            return diaper
+
+    async def delete_record(self, target: WriteTarget, object_id: str) -> None:
+        """Post a delete of a record this device created, carrying the full record.
+
+        The payload is the record exactly as last saved with ``newFlage`` set to ``"false"``;
+        like the app, the timestamp is not bumped. Raises ``NotOwnRecordError`` for a record
+        another device created (or one never seen), and ``RecordNotFoundError`` if this
+        device's record is already deleted.
+        """
+        async with self._lock:
+            self._check_can_write(target)
+            if object_id not in self._created:
+                raise NotOwnRecordError(f"record {object_id} wasn't created by this device")
+            if object_id not in self._records:
+                raise RecordNotFoundError(f"record {object_id} is already deleted")
+            number = await self._prepare(target)
+            record = self._records.get(object_id)
+            if record is None:
+                raise RecordNotFoundError(f"record {object_id} is already deleted")
+            payload = record.to_payload()
+            payload["newFlage"] = "false"
+            await self._send(target, number, OP_DELETE, encode_transaction(decode_payload(payload)))
+
+    def _check_can_write(self, target: WriteTarget) -> None:
+        if self._device_uuid is None:
+            raise ValueError("this engine has no device_uuid, so it can't write")
+        if target.device_uuid != self._device_uuid:
+            raise ValueError("the client's device ID doesn't match the engine's device_uuid")
+        if not self._synced:
+            raise NotSyncedError("sync at least once before writing")
+
+    async def _prepare(self, target: WriteTarget) -> int:
+        """Settle any earlier failed post, catch up on this device's log, and choose the next
+        number. Hold the lock."""
+        own = self._require_device()
+        server_last = await self._server_last(target)
+        pending = self._pending
+        if pending is not None:
+            # If anything now holds the pending number (that post, landed late, or another
+            # process's), catch up through it even if LastSyncID lags, so it can't be reused.
+            entry = await self._own_entry(target, pending.sync_id)
+            if entry is not None:
+                if self._matches_pending(entry):
+                    _LOGGER.info("An earlier post (number %s) did land", entry.sync_id)
+                server_last = max(server_last, entry.sync_id)
+            elif (
+                pending.unknown_since is not None
+                and _time.time() - pending.unknown_since < self._unknown_outcome_grace
+            ):
+                raise WriteOutcomeUnknownError(
+                    f"the previous write's outcome isn't known yet (number {pending.sync_id} "
+                    "got no answer and may still land); try again shortly"
+                )
+            self._pending = None
+        await self._catch_up_own(target, server_last)
+        return max(server_last, self._last_seen.get(own, 0), self._last_posted) + 1
+
+    async def _send(self, target: WriteTarget, number: int, op_code: int, transaction: str) -> None:
+        """Post under ``number``, confirm, and apply locally. Hold the lock."""
+        own = self._require_device()
+        self._pending = _Pending(number, op_code, transaction)
+        try:
+            await target.post_transaction(op_code, number, transaction)
+        except AuthenticationError:
+            self._pending = None  # rejected outright: nothing landed
+            raise
+        except BabyTrackerError as err:
+            # Did it land anyway? Only the exact transaction under this number counts.
+            try:
+                entry = await self._own_entry(target, number)
+            except BabyTrackerError:
+                entry = None
+            if entry is None or not self._matches_pending(entry):
+                if isinstance(err, NoResponseError):
+                    self._pending = replace(self._pending, unknown_since=_time.time())
+                raise
+        self._pending = None
+        self._last_posted = max(self._last_posted, number)
+        self.apply(own, [RawTransaction(number, op_code, transaction)])
+
+    async def _server_last(self, target: WriteTarget) -> int:
+        own = self._require_device()
+        for device in await target.get_devices():
+            if device.device_uuid == own:
+                return device.last_sync_id
+        return 0  # the service lists a device only after its first post
+
+    async def _own_entry(self, target: WriteTarget, sync_id: int) -> RawTransaction | None:
+        """This device's log entry under ``sync_id``, if the service has one."""
+        entries = await target.get_transactions(self._require_device(), sync_id - 1)
+        return next((e for e in entries if e.sync_id == sync_id), None)
+
+    def _matches_pending(self, entry: RawTransaction) -> bool:
+        pending = self._pending
+        assert pending is not None
+        if entry.op_code == pending.op_code and entry.transaction == pending.transaction:
+            return True
+        _LOGGER.warning(
+            "Number %s in this device's log holds a different transaction; "
+            "another process may be using the same device ID",
+            entry.sync_id,
+        )
+        return False
+
+    async def _catch_up_own(self, target: WriteTarget, server_last: int) -> None:
+        """Apply this device's log up to ``server_last``, so local numbering stays contiguous."""
+        own = self._require_device()
+        await self._read_through(target, own, server_last)
+        if (seen := self._last_seen.get(own, 0)) < server_last:
+            raise ProtocolError(
+                f"this device's log stops at {seen} although LastSyncID is {server_last}; "
+                "refusing to write past the missing entries"
+            )
+
+    def _require_device(self) -> str:
+        if self._device_uuid is None:
+            raise ValueError("this engine has no device_uuid, so it can't write")
+        return self._device_uuid
+
+    def devices_to_fetch(self, devices: Iterable[Device]) -> list[Device]:
+        """The devices whose log is ahead of what has been seen, in ``DeviceUUID`` order."""
+        return sorted(
+            (d for d in devices if d.last_sync_id > self._last_seen.get(d.device_uuid, 0)),
+            key=lambda d: d.device_uuid,
+        )
+
+    async def sync(self, source: SyncSource) -> SyncResult:
+        """Fetch and apply what's new. Progress on earlier devices survives a later failure."""
+        async with self._lock:
+            result = await self._sync(source)
+            self._synced = True
+            return result
+
+    async def _sync(self, source: SyncSource) -> SyncResult:
+        devices = self.devices_to_fetch(await source.get_devices())
+        applied = skipped = 0
+        for device in devices:
+            result = await self._read_through(source, device.device_uuid, device.last_sync_id)
+            applied += result.applied
+            skipped += result.skipped
+        return SyncResult(len(devices), applied, skipped)
+
+    async def _read_through(self, source: SyncSource, device_uuid: str, last: int) -> ApplyResult:
+        """Read and apply a device's log page by page from what's been seen, until reaching
+        ``last``, a read comes back empty, or a read brings nothing new (warned, so a stuck
+        server can't loop forever)."""
+        applied = skipped = 0
+        while (since := self._last_seen.get(device_uuid, 0)) < last:
+            transactions = await source.get_transactions(device_uuid, since)
+            result = self.apply(device_uuid, transactions)
+            applied += result.applied
+            skipped += result.skipped
+            if self._last_seen.get(device_uuid, 0) == since:
+                if transactions:
+                    _LOGGER.warning(
+                        "Device %s returned nothing new after number %s; stopping",
+                        device_uuid,
+                        since,
+                    )
+                break
+        return ApplyResult(applied, skipped)
+
+    def apply(self, device_uuid: str, transactions: Iterable[RawTransaction]) -> ApplyResult:
+        """Apply one device's transactions. No I/O."""
+        seen = self._last_seen.get(device_uuid, 0)
+        pending = sorted((t for t in transactions if t.sync_id > seen), key=lambda t: t.sync_id)
+        applied = skipped = 0
+        for transaction in pending:
+            if self._apply_one(device_uuid, transaction):
+                applied += 1
+            else:
+                skipped += 1
+            self._last_seen[device_uuid] = transaction.sync_id
+        return ApplyResult(applied, skipped)
+
+    def _apply_one(self, device_uuid: str, transaction: RawTransaction) -> bool:
+        where = f"device {device_uuid} number {transaction.sync_id}"
+        if transaction.op_code not in (OP_ADD, OP_UPDATE, OP_DELETE):
+            _LOGGER.warning(
+                "Skipping transaction with unknown opcode %s (%s)", transaction.op_code, where
+            )
+            return False
+        try:
+            record = decode_transaction(transaction.transaction)
+        except TransactionDecodeError as err:
+            _LOGGER.warning("Skipping undecodable transaction (%s): %s", where, err)
+            return False
+        if isinstance(record, UnknownRecord) and record.record_type not in RECORD_TYPES:
+            _LOGGER.warning(
+                "Unknown record type %r (%s); keeping the raw payload", record.record_type, where
+            )
+        if device_uuid == self._device_uuid and transaction.op_code == OP_ADD:
+            self._created.add(record.object_id)
+        stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
+        version = _Version(stamp, _OP_RANKS[transaction.op_code], device_uuid, transaction.sync_id)
+        if transaction.op_code == OP_DELETE:
+            self._delete(record.object_id, version)
+        else:
+            self._store(record, version)
+        return True
+
+    def _store(self, record: Record, version: _Version) -> None:
+        object_id = record.object_id
+        tombstone = self._tombstones.get(object_id)
+        if tombstone is not None:
+            same_device = tombstone.device_uuid == version.device_uuid
+            if not same_device and version.timestamp <= tombstone.timestamp:
+                return
+            del self._tombstones[object_id]
+        current = self._versions.get(object_id)
+        if current is not None and not _newer(version, current):
+            return
+        self._records[object_id] = record
+        self._versions[object_id] = version
+
+    def _delete(self, object_id: str, version: _Version) -> None:
+        current = self._versions.get(object_id)
+        if current is not None:
+            same_device = current.device_uuid == version.device_uuid
+            if not same_device and version.timestamp < current.timestamp:
+                return  # the record was edited after this delete
+            del self._records[object_id]
+            del self._versions[object_id]
+        tombstone = self._tombstones.get(object_id)
+        if tombstone is None or _newer(version, tombstone):
+            self._tombstones[object_id] = version
+
+    def babies(self) -> dict[str, Baby]:
+        """Every baby seen, by ID. A ``Baby`` record in the log wins over an embedded copy."""
+        found: dict[str, Baby] = {}
+        for record in self._records.values():
+            if record.baby is not None:
+                found[record.baby.object_id] = record.baby
+        for record in self._records.values():
+            if isinstance(record, Baby):
+                found[record.object_id] = record
+        return found
+
+    def latest_records(self, baby_id: str) -> dict[str, Record]:
+        """The newest record of each type for a baby, by the time it happened."""
+        latest: dict[str, Record] = {}
+        for record in self._records.values():
+            if isinstance(record, Baby) or record.time is None or record.baby_id != baby_id:
+                continue
+            current = latest.get(record.record_type)
+            if current is None or _sort_key(record) > _sort_key(current):
+                latest[record.record_type] = record
+        return latest
+
+    def to_dict(self) -> dict[str, Any]:
+        """A JSON-safe snapshot, for the caller to persist."""
+        return {
+            "version": STATE_VERSION,
+            "device": self._device_uuid,
+            "synced": self._synced,
+            "last_posted": self._last_posted,
+            "pending": self._pending.to_dict() if self._pending is not None else None,
+            "created": sorted(self._created),
+            "last_seen": dict(sorted(self._last_seen.items())),
+            "records": [
+                {"version": self._versions[i].to_dict(), "payload": r.to_payload()}
+                for i, r in sorted(self._records.items())
+            ],
+            "tombstones": [
+                {"object_id": i, "version": v.to_dict()}
+                for i, v in sorted(self._tombstones.items())
+            ],
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: Mapping[str, Any],
+        device_uuid: str | None = None,
+        *,
+        unknown_outcome_grace: float = 90.0,
+    ) -> SyncEngine:
+        """Rebuild an engine from ``to_dict`` output. Versions 1 through 4 load.
+
+        Version 1 has no tombstones. Versions without an op rank in the version dicts (2, and
+        version 3 as saved by an early write-records build) load records as adds and tombstones
+        as deletes. Versions without write state (1, 2, and version 3 as saved by the op-rank
+        build) load with none: pass ``device_uuid`` to write with them. Every newer field is
+        read with a default, so either version 3 shape loads. A ``device_uuid`` that differs
+        from the saved one raises ``ValueError``.
+        """
+        version = data.get("version")
+        if version not in (1, 2, 3, STATE_VERSION):
+            raise ValueError(f"unsupported engine state version: {version!r}")
+        saved_device = data.get("device")
+        if saved_device is not None and device_uuid is not None and saved_device != device_uuid:
+            raise ValueError("the saved state belongs to a different device")
+        engine = cls(
+            device_uuid if device_uuid is not None else saved_device,
+            unknown_outcome_grace=unknown_outcome_grace,
+        )
+        engine._last_seen = {str(k): int(v) for k, v in data["last_seen"].items()}
+        engine._synced = bool(data.get("synced", bool(engine._last_seen)))
+        engine._last_posted = int(data.get("last_posted", 0))
+        pending = data.get("pending")
+        engine._pending = _Pending.from_dict(pending) if pending else None
+        engine._created = {str(i) for i in data.get("created", [])}
+        for entry in data["records"]:
+            if version == 1:
+                record = decode_payload(entry)
+                stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
+                stored = _Version(stamp, _RANK_ADD, "", 0)
+            else:
+                record = decode_payload(entry["payload"])
+                stored = _Version.from_dict(entry["version"], _RANK_ADD)
+            engine._records[record.object_id] = record
+            engine._versions[record.object_id] = stored
+        for entry in data.get("tombstones", []):
+            engine._tombstones[str(entry["object_id"])] = _Version.from_dict(
+                entry["version"], _RANK_DELETE
+            )
+        return engine
+
+
+def _now() -> datetime:
+    """The write time, to the second, as payload timestamps carry it."""
+    return datetime.now(UTC).replace(microsecond=0)
+
+
+def _newer(new: _Version, old: _Version) -> bool:
+    """Whether ``new`` replaces ``old``: log order within a device, version key across devices."""
+    if new.device_uuid == old.device_uuid:
+        return new.sync_id > old.sync_id
+    return new.key() > old.key()
+
+
+def _sort_key(record: Record) -> tuple[float, float]:
+    assert record.time is not None
+    stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
+    return (record.time.timestamp(), stamp)
