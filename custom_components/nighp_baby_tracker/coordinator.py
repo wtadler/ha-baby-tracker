@@ -29,8 +29,10 @@ from .pybabytracker import (
     BabyTrackerClient,
     BabyTrackerError,
     Record,
+    Sleep,
     SyncEngine,
 )
+from .timers import NursingTimer, load_timers
 from .totals import DayTotals, day_totals
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,9 @@ _LOGGER = logging.getLogger(__name__)
 type BabyTrackerConfigEntry = ConfigEntry[BabyTrackerCoordinator]
 
 FEED_TYPES = ("Nursing", "Formula", "Pumped")
+
+# How often to sync while a sleep or nursing timer runs, so a phone's stop shows up quickly.
+TIMER_INTERVAL = timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,10 +56,20 @@ class BabyData:
     pump: Record | None = None
     sleep: Record | None = None
     today: DayTotals = DayTotals()
+    nursing: NursingTimer | None = None
+
+    @property
+    def running_sleep(self) -> Sleep | None:
+        """The newest sleep, if it's still running. The asleep sensor follows the same rule."""
+        return self.sleep if isinstance(self.sleep, Sleep) and self.sleep.is_running else None
 
 
 def storage_key(entry_id: str) -> str:
     return f"{DOMAIN}.{entry_id}"
+
+
+def nursing_storage_key(entry_id: str) -> str:
+    return f"{DOMAIN}.{entry_id}.nursing"
 
 
 def scan_interval(entry: ConfigEntry) -> timedelta:
@@ -101,13 +116,25 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self.lock = asyncio.Lock()
         self._store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
         self._baby_names: dict[str, str | None] = {}
+        # Home Assistant's own nursing timers, by baby ID (see timers.py).
+        self.nursing: dict[str, NursingTimer] = {}
+        self._nursing_store: Store = Store(
+            hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)
+        )
 
     async def _async_setup(self) -> None:
-        """Load the saved sync state, so a restart fetches only what's newer."""
+        """Load the saved sync state, so a restart fetches only what's newer, and any running
+        nursing timers."""
         # Today's counts change at local midnight even when nothing syncs.
         self.config_entry.async_on_unload(
             async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
         )
+        try:
+            self.nursing = load_timers(await self._nursing_store.async_load())
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "The saved nursing timers couldn't be read (%s); starting with none", err
+            )
         try:
             saved = await self._store.async_load()
         except HomeAssistantError as err:
@@ -169,6 +196,28 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             self.async_set_updated_data(self._snapshot())
             return result
 
+    def wanted_interval(self, data: dict[str, BabyData] | None = None) -> timedelta:
+        """One minute while any sleep (synced) or nursing timer (Home Assistant's) runs, and the
+        configured interval otherwise."""
+        babies = (data if data is not None else self.data or {}).values()
+        if self.nursing or any(baby.running_sleep is not None for baby in babies):
+            return TIMER_INTERVAL
+        return scan_interval(self.config_entry)
+
+    async def async_set_nursing(self, baby_id: str, timer: NursingTimer | None) -> None:
+        """Start, change, or (with ``None``) clear a baby's nursing timer, save it, and publish."""
+        if timer is None:
+            self.nursing.pop(baby_id, None)
+        else:
+            self.nursing[baby_id] = timer
+        try:
+            await self._nursing_store.async_save(
+                {baby: saved.to_dict() for baby, saved in self.nursing.items()}
+            )
+        except Exception:
+            _LOGGER.exception("Couldn't save the nursing timers")
+        self.async_set_updated_data(self._snapshot())
+
     @callback
     def _async_midnight(self, _now: datetime) -> None:
         """Start a new day of counts without syncing."""
@@ -194,7 +243,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 pump=latest.get("Pump"),
                 sleep=latest.get("Sleep"),
                 today=day_totals(self.engine.records.values(), baby_id, start, end),
+                nursing=self.nursing.get(baby_id),
             )
+        # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
+        self.update_interval = self.wanted_interval(data)
         return data
 
     async def async_close(self) -> None:

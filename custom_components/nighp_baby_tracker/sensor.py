@@ -1,4 +1,4 @@
-"""Last-activity timestamp sensors, one set per baby."""
+"""Last-activity, today, and timer sensors, one set per baby."""
 
 from __future__ import annotations
 
@@ -145,6 +145,11 @@ async def async_setup_entry(
             for baby_id in new
             for description in TODAY_SENSORS
         )
+        async_add_entities(
+            BabyTrackerTimerSensor(coordinator, description, baby_id)
+            for baby_id in new
+            for description in TIMER_SENSORS
+        )
 
     _add_new_babies()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))
@@ -259,3 +264,65 @@ class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
         baby = self._baby
         attributes_fn = self.entity_description.attributes_fn
         return attributes_fn(baby.today) if baby is not None and attributes_fn else None
+
+
+def _sleep_timer(baby: BabyData) -> tuple[datetime | None, dict[str, Any] | None]:
+    sleep = baby.running_sleep
+    if sleep is None:
+        return None, None
+    return sleep.time, {"object_id": sleep.object_id}
+
+
+def _nursing_timer(baby: BabyData) -> tuple[datetime | None, dict[str, Any] | None]:
+    timer = baby.nursing
+    if timer is None:
+        return None, None
+    return timer.started, {
+        "side": timer.side,
+        "side_started": timer.side_started.isoformat(),
+        "left_seconds": round(timer.left_seconds),
+        "right_seconds": round(timer.right_seconds),
+    }
+
+
+@dataclass(frozen=True, kw_only=True)
+class BabyTrackerTimerSensorDescription(SensorEntityDescription):
+    """A running timer: its start, or unknown when none runs."""
+
+    timer_fn: Callable[[BabyData], tuple[datetime | None, dict[str, Any] | None]]
+
+
+TIMER_SENSORS: tuple[BabyTrackerTimerSensorDescription, ...] = (
+    # The newest sleep while it runs, from any device.
+    BabyTrackerTimerSensorDescription(
+        key="sleep_timer",
+        translation_key="sleep_timer",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        timer_fn=_sleep_timer,
+    ),
+    # Home Assistant's own nursing timer (a phone's doesn't sync until it stops). The attributes
+    # are what a live activity needs: the side now, when it started, and the seconds finished on
+    # each side before it (the current side's time is now minus side_started).
+    BabyTrackerTimerSensorDescription(
+        key="nursing_timer",
+        translation_key="nursing_timer",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        timer_fn=_nursing_timer,
+    ),
+)
+
+
+class BabyTrackerTimerSensor(BabyTrackerBabyEntity, SensorEntity):
+    """When a baby's running sleep or nursing timer started, or unknown when none runs."""
+
+    entity_description: BabyTrackerTimerSensorDescription
+
+    @property
+    def native_value(self) -> datetime | None:
+        baby = self._baby
+        return self.entity_description.timer_fn(baby)[0] if baby is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        baby = self._baby
+        return self.entity_description.timer_fn(baby)[1] if baby is not None else None

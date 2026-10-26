@@ -21,7 +21,7 @@ from .const import (
 from .coordinator import (
     BabyTrackerConfigEntry,
     BabyTrackerCoordinator,
-    scan_interval,
+    nursing_storage_key,
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
@@ -64,9 +64,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Apply a new sync interval right away, without reloading the entry."""
+    """Apply a new sync interval right away, without reloading the entry. While a timer runs,
+    syncing stays at one minute and the new interval takes over when it stops."""
     coordinator = entry.runtime_data
-    interval = scan_interval(entry)
+    interval = coordinator.wanted_interval()
     if interval != coordinator.update_interval:
         coordinator.update_interval = interval
         # The setter doesn't reschedule, so refresh now: that also schedules the next one.
@@ -82,6 +83,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Delete the saved sync state and any repair about this entry."""
+    """Delete the saved sync state, the saved nursing timers, and any repair about this entry."""
     ir.async_delete_issue(hass, DOMAIN, issue_id(entry.entry_id))
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
+    await Store(hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)).async_remove()

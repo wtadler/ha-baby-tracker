@@ -87,6 +87,8 @@ def test_every_sensor_has_a_translated_name() -> None:
         "last_feed": "Last feed",
         "last_pump": "Last pump",
         "last_sleep": "Last sleep",
+        "sleep_timer": "Sleep timer",
+        "nursing_timer": "Nursing timer",
     }
 
 

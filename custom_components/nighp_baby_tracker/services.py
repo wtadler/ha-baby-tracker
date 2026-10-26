@@ -1,4 +1,4 @@
-"""The integration's actions: the log_* actions and undo."""
+"""The integration's actions: the log_* actions, the timer actions, and undo."""
 
 from __future__ import annotations
 
@@ -17,6 +17,11 @@ from .const import (
     SERVICE_LOG_NURSING,
     SERVICE_LOG_PUMP,
     SERVICE_LOG_SLEEP,
+    SERVICE_START_NURSING,
+    SERVICE_START_SLEEP,
+    SERVICE_STOP_NURSING,
+    SERVICE_STOP_SLEEP,
+    SERVICE_SWITCH_NURSING_SIDE,
     SERVICE_UNDO,
 )
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
@@ -31,6 +36,11 @@ from .writes import (
     async_log_nursing,
     async_log_pump,
     async_log_sleep,
+    async_start_nursing,
+    async_start_sleep,
+    async_stop_nursing,
+    async_stop_sleep,
+    async_switch_nursing_side,
     async_undo,
     validation_error,
 )
@@ -52,6 +62,7 @@ ATTR_FINISH_SIDE = "finish_side"
 ATTR_END_TIME = "end_time"
 ATTR_START = "start"
 ATTR_END = "end"
+ATTR_SIDE = "side"
 
 
 def _uuid_upper(value: object) -> str:
@@ -129,6 +140,36 @@ LOG_PUMP_SCHEMA = vol.Schema(
         vol.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
         vol.Optional(ATTR_FINISH_SIDE): vol.In(list(FINISH_SIDES)),
         vol.Optional(ATTR_TIME): cv.datetime,
+    }
+)
+
+START_SLEEP_SCHEMA = vol.Schema(
+    {
+        **_COMMON,
+        vol.Optional(ATTR_START): cv.datetime,
+    }
+)
+
+STOP_SLEEP_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_BABY): cv.string,
+        vol.Optional(ATTR_END): cv.datetime,
+    }
+)
+
+START_NURSING_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_BABY): cv.string,
+        vol.Required(ATTR_SIDE): vol.In(list(FINISH_SIDES)),
+    }
+)
+
+BABY_ONLY_SCHEMA = vol.Schema({vol.Required(ATTR_BABY): cv.string})
+
+STOP_NURSING_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_BABY): cv.string,
+        vol.Optional(ATTR_NOTE, default=""): cv.string,
     }
 )
 
@@ -243,6 +284,37 @@ async def _log_pump(call: ServiceCall) -> None:
     )
 
 
+async def _start_sleep(call: ServiceCall) -> None:
+    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    await async_start_sleep(
+        coordinator,
+        baby_id,
+        start=call.data.get(ATTR_START),
+        note=call.data[ATTR_NOTE],
+        object_id=call.data.get(ATTR_OBJECT_ID),
+    )
+
+
+async def _stop_sleep(call: ServiceCall) -> None:
+    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    await async_stop_sleep(coordinator, baby_id, end=call.data.get(ATTR_END))
+
+
+async def _start_nursing(call: ServiceCall) -> None:
+    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    await async_start_nursing(coordinator, baby_id, call.data[ATTR_SIDE])
+
+
+async def _switch_nursing_side(call: ServiceCall) -> None:
+    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    await async_switch_nursing_side(coordinator, baby_id)
+
+
+async def _stop_nursing(call: ServiceCall) -> None:
+    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    await async_stop_nursing(coordinator, baby_id, note=call.data[ATTR_NOTE])
+
+
 async def _undo(call: ServiceCall) -> None:
     baby_id: str | None = None
     if ATTR_BABY in call.data:
@@ -263,3 +335,16 @@ def async_register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_LOG_SLEEP, _log_sleep, schema=LOG_SLEEP_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_LOG_PUMP, _log_pump, schema=LOG_PUMP_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_UNDO, _undo, schema=UNDO_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_START_SLEEP, _start_sleep, schema=START_SLEEP_SCHEMA
+    )
+    hass.services.async_register(DOMAIN, SERVICE_STOP_SLEEP, _stop_sleep, schema=STOP_SLEEP_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, SERVICE_START_NURSING, _start_nursing, schema=START_NURSING_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SWITCH_NURSING_SIDE, _switch_nursing_side, schema=BABY_ONLY_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_STOP_NURSING, _stop_nursing, schema=STOP_NURSING_SCHEMA
+    )

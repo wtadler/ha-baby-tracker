@@ -1226,6 +1226,11 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "log_nursing",
         "log_sleep",
         "log_pump",
+        "start_sleep",
+        "stop_sleep",
+        "start_nursing",
+        "switch_nursing_side",
+        "stop_nursing",
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
     assert fields["log_bottle"] == {"baby", "kind", "amount", "unit", "time", "note", "object_id"}
