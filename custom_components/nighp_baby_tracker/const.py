@@ -17,4 +17,12 @@ DEVICE_NAME = "Home Assistant"
 STORAGE_VERSION = 1
 
 SERVICE_LOG_DIAPER = "log_diaper"
+SERVICE_LOG_BOTTLE = "log_bottle"
+SERVICE_LOG_NURSING = "log_nursing"
+SERVICE_LOG_SLEEP = "log_sleep"
+SERVICE_LOG_PUMP = "log_pump"
 SERVICE_UNDO = "undo"
+
+CONF_BOTTLE_SIZE = "bottle_size"
+CONF_BOTTLE_UNIT = "bottle_unit"
+CONF_BOTTLE_TYPE = "bottle_type"

@@ -20,12 +20,18 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
 from .const import (
+    CONF_BOTTLE_SIZE,
+    CONF_BOTTLE_TYPE,
+    CONF_BOTTLE_UNIT,
     CONF_DEVICE_UUID,
     CONF_EMAIL,
     CONF_PASSWORD,
@@ -41,8 +47,11 @@ from .pybabytracker import (
     BabyTrackerClient,
     BabyTrackerConnectionError,
 )
+from .writes import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 
 _LOGGER = logging.getLogger(__name__)
+
+MAX_BOTTLE_SIZE = 32  # fluid ounces: more than any bottle
 
 CREDENTIALS_SCHEMA = vol.Schema(
     {
@@ -149,14 +158,20 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class BabyTrackerOptionsFlow(OptionsFlow):
-    """Adjust how often Home Assistant checks for new records."""
+    """Adjust how often Home Assistant checks for new records, and what the Bottle button logs."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(
-                data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
+                data={
+                    CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+                    CONF_BOTTLE_SIZE: float(user_input[CONF_BOTTLE_SIZE]),
+                    CONF_BOTTLE_UNIT: user_input[CONF_BOTTLE_UNIT],
+                    CONF_BOTTLE_TYPE: user_input[CONF_BOTTLE_TYPE],
+                }
             )
         current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES)
+        size, unit, kind = configured_bottle(self.config_entry.options)
         schema = vol.Schema(
             {
                 vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
@@ -167,7 +182,24 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                         mode=NumberSelectorMode.BOX,
                         unit_of_measurement="min",
                     )
-                )
+                ),
+                vol.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0.1, max=MAX_BOTTLE_SIZE, step="any", mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Required(CONF_BOTTLE_UNIT, default=unit): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[OUNCES, MILLILITERS], mode=SelectSelectorMode.DROPDOWN
+                    )
+                ),
+                vol.Required(CONF_BOTTLE_TYPE, default=kind): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(BOTTLE_KINDS),
+                        mode=SelectSelectorMode.DROPDOWN,
+                        translation_key="bottle_type",
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

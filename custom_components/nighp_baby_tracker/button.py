@@ -1,7 +1,8 @@
-"""Wet, dirty, and mixed diaper buttons, one set per baby."""
+"""Diaper buttons and the Bottle button, one set per baby."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
@@ -12,23 +13,40 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
-from .writes import async_log_diaper
+from .writes import async_log_configured_bottle, async_log_diaper
 
 # The coordinator's lock serializes writes, so Home Assistant needn't.
 PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True, kw_only=True)
-class DiaperButtonDescription(ButtonEntityDescription):
-    """A button that logs one kind of diaper."""
+class BabyTrackerButtonDescription(ButtonEntityDescription):
+    """A button that logs one thing for a baby, right now."""
 
-    kind: str
+    press_fn: Callable[[BabyTrackerCoordinator, str], Awaitable[None]]
 
 
-BUTTONS: tuple[DiaperButtonDescription, ...] = (
-    DiaperButtonDescription(key="wet_diaper", translation_key="wet_diaper", kind="wet"),
-    DiaperButtonDescription(key="dirty_diaper", translation_key="dirty_diaper", kind="dirty"),
-    DiaperButtonDescription(key="mixed_diaper", translation_key="mixed_diaper", kind="mixed"),
+def _diaper(kind: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None]]:
+    async def press(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
+        await async_log_diaper(coordinator, baby_id, kind)
+
+    return press
+
+
+BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
+    BabyTrackerButtonDescription(
+        key="wet_diaper", translation_key="wet_diaper", press_fn=_diaper("wet")
+    ),
+    BabyTrackerButtonDescription(
+        key="dirty_diaper", translation_key="dirty_diaper", press_fn=_diaper("dirty")
+    ),
+    BabyTrackerButtonDescription(
+        key="mixed_diaper", translation_key="mixed_diaper", press_fn=_diaper("mixed")
+    ),
+    # Logs the bottle the options describe, read when the button is pressed.
+    BabyTrackerButtonDescription(
+        key="bottle", translation_key="bottle", press_fn=async_log_configured_bottle
+    ),
 )
 
 
@@ -46,7 +64,7 @@ async def async_setup_entry(
         new = [baby_id for baby_id in coordinator.data if baby_id not in known]
         known.update(new)
         async_add_entities(
-            BabyTrackerDiaperButton(coordinator, description, baby_id)
+            BabyTrackerButton(coordinator, description, baby_id)
             for baby_id in new
             for description in BUTTONS
         )
@@ -55,16 +73,16 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))
 
 
-class BabyTrackerDiaperButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity):
-    """Logs a diaper of one kind, right now, for one baby."""
+class BabyTrackerButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity):
+    """Logs one thing, right now, for one baby."""
 
     _attr_has_entity_name = True
-    entity_description: DiaperButtonDescription
+    entity_description: BabyTrackerButtonDescription
 
     def __init__(
         self,
         coordinator: BabyTrackerCoordinator,
-        description: DiaperButtonDescription,
+        description: BabyTrackerButtonDescription,
         baby_id: str,
     ) -> None:
         super().__init__(coordinator)
@@ -84,4 +102,4 @@ class BabyTrackerDiaperButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonE
         return super().available and self._baby_id in self.coordinator.data
 
     async def async_press(self) -> None:
-        await async_log_diaper(self.coordinator, self._baby_id, self.entity_description.kind)
+        await self.entity_description.press_fn(self.coordinator, self._baby_id)
