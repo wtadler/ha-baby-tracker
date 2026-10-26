@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.unit_conversion import VolumeConverter
 
-from .const import ACCOUNT_DEVICE_MODEL, DOMAIN, account_identifier
+from .const import ACCOUNT_DEVICE_MODEL, ACCOUNT_DEVICE_NAME, DOMAIN, account_identifier
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .helpers import volume_parts
 from .pybabytracker import Record
@@ -206,7 +206,7 @@ class BabyTrackerLastPumpSensor(CoordinatorEntity[BabyTrackerCoordinator], Senso
     """When the account's last pump happened, with its details.
 
     A pump belongs to the account, not a baby, so this sits on an account-level device (one per
-    config entry, named for the entry) and shows the newest pump whoever logged it.
+    config entry) and shows the newest pump whoever logged it.
     """
 
     _attr_has_entity_name = True
@@ -218,7 +218,7 @@ class BabyTrackerLastPumpSensor(CoordinatorEntity[BabyTrackerCoordinator], Senso
         self._attr_unique_id = f"{entry.entry_id}_{LAST_PUMP.key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, account_identifier(entry.entry_id))},
-            name=entry.title,
+            name=ACCOUNT_DEVICE_NAME,
             manufacturer="Nighp",
             model=ACCOUNT_DEVICE_MODEL,
             entry_type=DeviceEntryType.SERVICE,

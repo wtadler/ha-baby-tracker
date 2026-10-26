@@ -144,6 +144,8 @@ LOG_PUMP_SCHEMA = vol.All(
             **_PUMP_COMMON,
             vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
             vol.Optional(ATTR_DEVICE): cv.string,
+            # Kept as an alias of ``device``, so a caller that used ``baby`` still works.
+            vol.Optional(ATTR_BABY): cv.string,
             vol.Optional(ATTR_LEFT_AMOUNT): vol.Coerce(float),
             vol.Optional(ATTR_RIGHT_AMOUNT): vol.Coerce(float),
             vol.Optional(ATTR_UNIT): _UNIT,
@@ -153,8 +155,8 @@ LOG_PUMP_SCHEMA = vol.All(
             vol.Optional(ATTR_TIME): cv.datetime,
         }
     ),
-    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE),
-    cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE),
+    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
+    cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
 )
 
 START_SLEEP_SCHEMA = vol.Schema(
@@ -244,7 +246,7 @@ def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
     device (a baby's or the account's)."""
     if ATTR_CONFIG_ENTRY_ID in call.data:
         return _loaded(call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID]))
-    return _from_device(call.hass, call.data[ATTR_DEVICE])[0]
+    return _from_device(call.hass, call.data.get(ATTR_DEVICE) or call.data[ATTR_BABY])[0]
 
 
 async def _log_diaper(call: ServiceCall) -> None:

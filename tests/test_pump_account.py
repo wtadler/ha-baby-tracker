@@ -46,7 +46,7 @@ from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a
 )
 
 # The live service's Pump keys: shape only.
-REAL_PUMP_KEYS = {
+PER_SIDE_PUMP_KEYS = {
     "BCObjectType",
     "amount",
     "finishSide",
@@ -105,10 +105,20 @@ async def test_last_pump_is_one_sensor_on_an_account_device_named_for_the_entry(
 ) -> None:
     device = account_device(hass, setup_entry)
 
-    assert device.name == setup_entry.title == EMAIL
+    assert device.name == "Baby Tracker account"
     assert device.model == "Account"
     assert device.config_entries == {setup_entry.entry_id}
-    assert state_of(hass, setup_entry).attributes["friendly_name"] == f"{EMAIL} Last pump"
+    assert state_of(hass, setup_entry).attributes["friendly_name"] == (
+        "Baby Tracker account Last pump"
+    )
+
+
+async def test_the_account_email_is_nowhere_in_the_entity_id_or_the_device(
+    hass: HomeAssistant, setup_entry: MockConfigEntry
+) -> None:
+    assert pump_entity(hass, setup_entry) == "sensor.baby_tracker_account_last_pump"
+    device = account_device(hass, setup_entry)
+    assert EMAIL not in str(device.name) + str(device.model) + str(device.configuration_url)
 
 
 def state_of(hass: HomeAssistant, entry: MockConfigEntry):
@@ -287,7 +297,9 @@ async def test_two_entries_each_have_their_own_account_device_and_sensor(
     first, second = account_device(hass, setup_entry), account_device(hass, second_entry)
 
     assert first.id != second.id
-    assert (first.name, second.name) == (EMAIL, EMAIL_TWO)
+    assert first.name == second.name == "Baby Tracker account"
+    assert pump_entity(hass, setup_entry) == "sensor.baby_tracker_account_last_pump"
+    assert pump_entity(hass, second_entry) == "sensor.baby_tracker_account_last_pump_2"
     assert first.config_entries == {setup_entry.entry_id}
     assert second.config_entries == {second_entry.entry_id}
     assert pump_entity(hass, setup_entry) != pump_entity(hass, second_entry)
@@ -351,7 +363,7 @@ async def test_log_pump_by_config_entry_id_writes_a_pump_with_no_baby_and_the_re
     record = only_pump(server)
     payload = record.to_payload()
     assert "baby" not in payload
-    assert set(payload) == REAL_PUMP_KEYS
+    assert set(payload) == PER_SIDE_PUMP_KEYS
     assert record.volume == Volume(7, "oz")
     assert record.baby is None
 
@@ -440,16 +452,42 @@ async def test_log_pump_takes_one_of_config_entry_id_and_device_not_both(
     assert server.posted == []  # type: ignore[attr-defined]
 
 
-async def test_log_pump_no_longer_takes_a_baby(
+async def test_log_pump_still_accepts_baby_as_an_alias_of_device(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    with pytest.raises(vol.Invalid, match="baby"):
-        await log_pump(
-            hass,
-            config_entry_id=setup_entry.entry_id,
-            baby=device_id(hass, BABY_ONE_ID),
-            left_amount=3,
-        )
+    await log_pump(hass, baby=device_id(hass, BABY_ONE_ID), left_amount=3, unit="fl. oz.")
+
+    assert "baby" not in only_pump(server).to_payload()
+
+
+async def test_the_baby_alias_resolves_a_second_accounts_baby_to_that_account(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    second_entry: MockConfigEntry,
+    server: FakeServer,
+    second_server: FakeServer,
+) -> None:
+    await log_pump(hass, baby=device_id(hass, BABY_THREE_ID), left_amount=3, unit="fl. oz.")
+
+    assert server.posted == []  # type: ignore[attr-defined]
+    only_pump(second_server)
+
+
+async def test_the_baby_alias_for_an_unknown_device_is_a_validation_error(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    with pytest.raises(ServiceValidationError) as raised:
+        await log_pump(hass, baby="nope", left_amount=3)
+    assert raised.value.translation_key == "baby_not_found"
+
+
+@pytest.mark.parametrize("other", ["device", "config_entry_id"])
+async def test_baby_with_device_or_an_account_is_refused_as_two_targets(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, other: str
+) -> None:
+    value = account_device(hass, setup_entry).id if other == "device" else setup_entry.entry_id
+    with pytest.raises(vol.Invalid, match="at most one"):
+        await log_pump(hass, baby=device_id(hass, BABY_ONE_ID), left_amount=3, **{other: value})
     assert server.posted == []  # type: ignore[attr-defined]
 
 

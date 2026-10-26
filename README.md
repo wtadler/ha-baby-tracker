@@ -9,8 +9,8 @@ timers. See
 
 ## What you get
 
-- One Home Assistant device per baby, and one account device per config entry (named for the
-  entry's title, model "Account").
+- One Home Assistant device per baby, and one account device per config entry ("Baby Tracker account", model
+  "Account"; a second entry's sensor ends `_2`).
 - Three timestamp sensors on each baby: **Last diaper**, **Last feed**, and **Last sleep**. The
   state is when it happened. The details are attributes:
   - Diaper: `type` (`wet`, `dirty`, or `mixed`) and `note`.
@@ -112,7 +112,8 @@ The actions do the same and more:
   and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
   than 1.
 - `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account) or `device` (the account's
-  device, or a baby's, which resolves to its account; give one, not both), `left_amount` and/or
+  device, or a baby's, which resolves to its account; `baby` still works as an alias of `device`; give
+  one of the three), `left_amount` and/or
   `right_amount`, an optional `unit`, `left_minutes` and `right_minutes`, an optional
   `finish_side`, an optional `time` (the start; default now), and an optional `note`. The total is
   the sum of the two sides. A pump belongs to the account, so no baby is saved with it.

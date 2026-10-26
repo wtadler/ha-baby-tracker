@@ -59,7 +59,7 @@ RETRY_ID = "7E57ED00-0000-4000-8000-000000000001"
 
 BOTTLE_BUTTON = "button.baby_one_bottle"
 LAST_FEED = "sensor.baby_one_last_feed"
-LAST_PUMP = "sensor.parent_example_com_last_pump"  # the account's, named for the entry title
+LAST_PUMP = "sensor.baby_tracker_account_last_pump"  # the account's
 LAST_SLEEP = "sensor.baby_one_last_sleep"
 FEEDS_TODAY = "sensor.baby_one_feeds_today"
 BOTTLE_TODAY = "sensor.baby_one_bottle_volume_today"
