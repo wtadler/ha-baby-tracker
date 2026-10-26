@@ -35,7 +35,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 
 from .conftest import BABY_ONE, BABY_TWO, FakeServer
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, record_payload
-from .helpers import tick
+from .helpers import get_baby_device, tick
 from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
     NOW,
     device_id,
@@ -137,7 +137,7 @@ async def test_each_baby_gets_sleep_and_nurse_buttons_and_two_timer_sensors(
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        device = devices.async_get_device(identifiers={(DOMAIN, baby_id)})
+        device = get_baby_device(devices, baby_id)
         assert device is not None
         keys = {
             e.translation_key

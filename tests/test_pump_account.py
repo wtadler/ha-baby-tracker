@@ -33,7 +33,7 @@ from .factories import (
     baby_payload,
     volume,
 )
-from .helpers import tick
+from .helpers import get_baby_device, tick
 from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
     EMAIL_TWO,
     device_id,
@@ -107,7 +107,7 @@ async def test_last_pump_is_one_sensor_on_an_account_device_named_for_the_entry(
 
     assert device.name == "Baby Tracker account"
     assert device.model == "Account"
-    assert device.config_entries == {setup_entry.entry_id}
+    assert device.config_entry_id == setup_entry.entry_id
     assert state_of(hass, setup_entry).attributes["friendly_name"] == (
         "Baby Tracker account Last pump"
     )
@@ -282,7 +282,7 @@ async def test_an_old_style_pump_that_carries_a_baby_creates_no_baby_and_is_not_
     server.add_record(DEVICE_A, "Pump", _id(12), when=at(80), baby=None, amount=volume(2))
     await tick(hass)
 
-    assert dr.async_get(hass).async_get_device(identifiers={(DOMAIN, BABY_THREE_ID)}) is None
+    assert get_baby_device(dr.async_get(hass), BABY_THREE_ID) is None
     assert hass.states.get("sensor.ghost_baby_last_diaper") is None
     assert state_of(hass, setup_entry).state == at(80).isoformat()
     assert hass.states.get("sensor.baby_one_feeds_today").state == "0"
@@ -300,8 +300,8 @@ async def test_two_entries_each_have_their_own_account_device_and_sensor(
     assert first.name == second.name == "Baby Tracker account"
     assert pump_entity(hass, setup_entry) == "sensor.baby_tracker_account_last_pump"
     assert pump_entity(hass, second_entry) == "sensor.baby_tracker_account_last_pump_2"
-    assert first.config_entries == {setup_entry.entry_id}
-    assert second.config_entries == {second_entry.entry_id}
+    assert first.config_entry_id == setup_entry.entry_id
+    assert second.config_entry_id == second_entry.entry_id
     assert pump_entity(hass, setup_entry) != pump_entity(hass, second_entry)
 
 

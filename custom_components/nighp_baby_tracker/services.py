@@ -218,18 +218,12 @@ def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordi
     identifier = next((ident for domain, ident in device.identifiers if domain == DOMAIN), None)
     if identifier is None:
         raise validation_error("baby_not_found")
-    loaded: list[BabyTrackerConfigEntry] = []
-    found_any = False
-    for entry_id in device.config_entries:
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is None or entry.domain != DOMAIN:
-            continue
-        found_any = True
-        if entry.state is ConfigEntryState.LOADED:
-            loaded.append(entry)
-    if loaded:
-        return loaded[0].runtime_data, identifier, is_account_identifier(identifier)
-    raise validation_error("entry_not_loaded" if found_any else "baby_not_found")
+    entry = hass.config_entries.async_get_entry(device.config_entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        raise validation_error("baby_not_found")
+    if entry.state is not ConfigEntryState.LOADED:
+        raise validation_error("entry_not_loaded")
+    return entry.runtime_data, identifier, is_account_identifier(identifier)
 
 
 def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:

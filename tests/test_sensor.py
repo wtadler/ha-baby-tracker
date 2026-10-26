@@ -23,7 +23,7 @@ from .factories import (
     baby_payload,
     volume,
 )
-from .helpers import tick
+from .helpers import get_baby_device, tick
 
 KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
 # The counts and the asleep sensor are covered in test_today.py; each baby also has these four.
@@ -58,7 +58,7 @@ async def test_two_babies_make_two_devices_each_with_their_own_sensors(
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     for baby_id, name in ((BABY_ONE_ID, "Baby One"), (BABY_TWO_ID, "Baby Two")):
-        device = devices.async_get_device(identifiers={(DOMAIN, baby_id)})
+        device = get_baby_device(devices, baby_id)
         assert device is not None
         assert device.name == name
         sensors = [
@@ -357,7 +357,7 @@ async def test_a_baby_with_no_records_yet_still_gets_a_device_and_sensors(
     await hass.async_block_till_done()
 
     assert config_entry.state is ConfigEntryState.LOADED
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, BABY_THREE_ID)})
+    device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
     assert device is not None
     assert device.name == "Baby Three"
     for key in KEYS:
@@ -440,7 +440,7 @@ async def test_a_baby_that_appears_later_is_added_without_a_reload(
     assert len(server.clients) == clients
     assert _state(hass, "baby_three", "last_diaper").state == at(300).isoformat()
     assert _state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, BABY_THREE_ID)})
+    device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
     assert device is not None
     entries = er.async_entries_for_device(er.async_get(hass), device.id)
     assert len([e for e in entries if e.domain in READINGS]) == PER_BABY

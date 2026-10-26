@@ -39,6 +39,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 
 from .conftest import FakeServer
 from .factories import BABY_ONE_ID, BABY_TWO_ID
+from .helpers import get_baby_device
 from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
     NOW,
     OTHER_DEVICES_RECORD,
@@ -918,7 +919,7 @@ async def test_each_baby_gets_a_bottle_button(
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        device = devices.async_get_device(identifiers={(DOMAIN, baby_id)})
+        device = get_baby_device(devices, baby_id)
         assert device is not None
         bottle = [
             e
