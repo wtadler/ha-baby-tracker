@@ -171,7 +171,7 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                 }
             )
         current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES)
-        size, unit, kind = configured_bottle(self.hass, self.config_entry.options)
+        size, unit, kind = configured_bottle(self.config_entry.options)
         schema = vol.Schema(
             {
                 vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(

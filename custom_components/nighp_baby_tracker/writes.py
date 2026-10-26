@@ -15,7 +15,6 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.const import UnitOfVolume
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -61,7 +60,6 @@ FINISH_SIDES = {"left": SIDE_LEFT, "right": SIDE_RIGHT}
 
 DEFAULT_BOTTLE_KIND = "formula"
 DEFAULT_BOTTLE_OUNCES = 4
-DEFAULT_BOTTLE_MILLILITERS = 120
 
 
 def _error(key: str, **placeholders: str) -> HomeAssistantError:
@@ -137,20 +135,15 @@ def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
     return time, int(offset.total_seconds())
 
 
-def default_volume_unit(hass: HomeAssistant) -> str:
-    """Fluid ounces for a US customary setup, milliliters otherwise."""
-    # Home Assistant's US customary system measures volume in gallons: too big for a bottle.
-    return OUNCES if hass.config.units.volume_unit == UnitOfVolume.GALLONS else MILLILITERS
+def default_bottle() -> tuple[float, str, str]:
+    """The bottle size, unit, and type used until the options say otherwise.
+
+    Fluid ounces in every unit system: milliliter writes aren't supported yet.
+    """
+    return DEFAULT_BOTTLE_OUNCES, OUNCES, DEFAULT_BOTTLE_KIND
 
 
-def default_bottle(hass: HomeAssistant) -> tuple[float, str, str]:
-    """The bottle size, unit, and type used until the options say otherwise."""
-    unit = default_volume_unit(hass)
-    size = DEFAULT_BOTTLE_OUNCES if unit == OUNCES else DEFAULT_BOTTLE_MILLILITERS
-    return size, unit, DEFAULT_BOTTLE_KIND
-
-
-def configured_bottle(hass: HomeAssistant, options: Mapping[str, Any]) -> tuple[float, str, str]:
+def configured_bottle(options: Mapping[str, Any]) -> tuple[float, str, str]:
     """The bottle the options describe. Saved options that don't make sense (any one of the
     three) give the defaults."""
     size = options.get(CONF_BOTTLE_SIZE)
@@ -165,12 +158,15 @@ def configured_bottle(hass: HomeAssistant, options: Mapping[str, Any]) -> tuple[
         and kind in BOTTLE_KINDS
     ):
         return size, unit, kind
-    return default_bottle(hass)
+    return default_bottle()
 
 
-def _volume(amount: float, unit: str | None, hass: HomeAssistant) -> Volume:
-    """An amount in a Home Assistant unit (default: the unit system's) as a library volume."""
-    chosen = unit if unit is not None else default_volume_unit(hass)
+def _volume(amount: float, unit: str | None) -> Volume:
+    """An amount in a Home Assistant unit (default fl. oz.) as a library volume."""
+    chosen = unit if unit is not None else OUNCES
+    if chosen == MILLILITERS:
+        # The library refuses metric writes until the app's metric format is confirmed.
+        raise validation_error("metric_not_supported")
     if chosen not in VOLUME_UNITS:
         raise validation_error("invalid_unit")
     return Volume(amount, VOLUME_UNITS[chosen])
@@ -243,11 +239,11 @@ async def async_log_bottle(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a formula or pumped-milk bottle. ``unit`` is fl. oz. or mL (default: the unit
-    system's); ``time`` defaults to now."""
+    """Add a formula or pumped-milk bottle. ``unit`` is fl. oz. (the default); mL is refused for
+    now (``metric_not_supported``). ``time`` defaults to now."""
     if kind not in BOTTLE_KINDS:
         raise validation_error("invalid_bottle_kind")
-    volume = _volume(_checked_amount(amount), unit, coordinator.hass)
+    volume = _volume(_checked_amount(amount), unit)
     moment, offset = _in_home_assistant_time(time)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
@@ -267,7 +263,7 @@ async def async_log_bottle(
 
 async def async_log_configured_bottle(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
     """Log the bottle the options describe, right now (the Bottle button)."""
-    size, unit, kind = configured_bottle(coordinator.hass, coordinator.config_entry.options)
+    size, unit, kind = configured_bottle(coordinator.config_entry.options)
     await async_log_bottle(coordinator, baby_id, kind, size, unit=unit)
 
 
@@ -359,8 +355,8 @@ async def async_log_pump(
     _checked_amount((left_amount or 0) + (right_amount or 0))
     if finish_side is not None and finish_side not in FINISH_SIDES:
         raise validation_error("invalid_finish_side")
-    left = _volume(left_amount, unit, coordinator.hass) if left_amount is not None else None
-    right = _volume(right_amount, unit, coordinator.hass) if right_amount is not None else None
+    left = _volume(left_amount, unit) if left_amount is not None else None
+    right = _volume(right_amount, unit) if right_amount is not None else None
     moment, offset = _in_home_assistant_time(time)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:

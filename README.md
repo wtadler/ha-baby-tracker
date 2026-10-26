@@ -48,8 +48,10 @@ identity. It doesn't appear in the app's device list until a later version write
 and the minimum is 1 minute. Changing it takes effect without a reload.
 
 **Bottle size**, **Bottle unit**, and **Bottle type** set what each baby's **Bottle** button logs.
-They start at 4 fl. oz. of formula when your Home Assistant uses US customary units, and 120 mL of
-formula otherwise. A change applies to the next press, with no reload. Options that don't make
+They start at 4 fl. oz. of formula in every unit system. Metric isn't supported yet: the app's
+metric format hasn't been confirmed, so a bottle or pump in mL is refused with an error and the
+button does the same if its unit is mL. Today's bottle volume still shows in your unit system.
+A change applies to the next press, with no reload. Options that don't make
 sense fall back to those defaults.
 
 ### If your password changes
@@ -69,8 +71,7 @@ The actions do the same and more:
   `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
   zone), and an optional `note`.
 - `nighp_baby_tracker.log_bottle` takes `baby`, `kind` (`formula` or `pumped`), `amount` (more than
-  zero), an optional `unit` (`fl. oz.` or `mL`; default `fl. oz.` for US customary units, `mL`
-  otherwise), an optional `time`, and an optional `note`.
+  zero), an optional `unit` (`fl. oz.`; `mL` is refused for now), an optional `time`, and an optional `note`.
 - `nighp_baby_tracker.log_nursing` takes `baby`, `left_minutes` and `right_minutes` (whole
   minutes; at least one above zero), an optional `finish_side` (`left` or `right`; default the last
   side used, right when both), an optional `end_time` (default now), and an optional `note`. The

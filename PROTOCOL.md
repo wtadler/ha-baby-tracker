@@ -64,6 +64,8 @@ Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `tim
 | `Sleep` | `duration` (minutes; 0 while running) |
 | `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |
 
+**Metric writes aren't supported yet.** Only an ounce amount (`englishMeasure` "true") has been captured, so the library refuses to write milliliters until a metric record is captured on the test iPad (#20). Reading one still works.
+
 **Volumes aren't plain numbers.** Each amount is an object: `{"BCObjectType": "VolumeMeasure", "englishMeasure": "true", "value": 4}`, where `englishMeasure` "true" means ounces. The local database's flat `Amount` and `IsEnglishScale` columns don't match the sync format.
 
 Anonymized fixtures for all nine captured transactions are in the library's `tests/fixtures/captured_payloads.json`.

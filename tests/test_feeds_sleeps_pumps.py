@@ -192,25 +192,38 @@ async def test_log_bottle_writes_formula_or_pumped_by_kind(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(hass, "log_bottle", kind="formula", amount=4, unit="fl. oz.")
-    await call(hass, "log_bottle", kind="pumped", amount=90, unit="mL")
+    await call(hass, "log_bottle", kind="pumped", amount=3, unit="fl. oz.")
 
     [(_, _, first), (_, _, second)] = posted(server)
     assert isinstance(first, Formula)
     assert isinstance(second, Pumped)
     assert first.volume == Volume(4, "oz")
-    assert second.volume == Volume(90, "ml")
+    assert second.volume == Volume(3, "oz")
 
 
-async def test_log_bottle_in_milliliters_writes_a_metric_volume_measure(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+@pytest.mark.parametrize(
+    ("action", "data"),
+    [
+        ("log_bottle", {"kind": "formula", "amount": 120}),
+        ("log_bottle", {"kind": "pumped", "amount": 90}),
+        ("log_pump", {"left_amount": 60, "right_amount": 75}),
+        ("log_pump", {"left_amount": 60}),
+    ],
+    ids=["formula", "pumped", "pump", "pump-one-side"],
+)
+async def test_a_milliliter_write_is_refused_with_a_translated_error_and_no_request(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    server: FakeServer,
+    action: str,
+    data: dict[str, Any],
 ) -> None:
-    await call(hass, "log_bottle", kind="formula", amount=120, unit="mL")
-
-    assert only_record(server).to_payload()["amount"] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "false",
-        "value": 120,
-    }
+    sent = len(server.calls)  # type: ignore[attr-defined]
+    with pytest.raises(ServiceValidationError) as raised:
+        await call(hass, action, unit="mL", **data)
+    assert raised.value.translation_key == "metric_not_supported"
+    assert server.posted == []  # type: ignore[attr-defined]
+    assert len(server.calls) == sent  # type: ignore[attr-defined]  # not even a sync
 
 
 async def test_log_bottle_in_ounces_writes_english_measure_true(
@@ -229,11 +242,11 @@ async def test_log_bottle_in_ounces_writes_english_measure_true(
     ("units", "unit", "expected"),
     [
         (US_CUSTOMARY_SYSTEM, "fl. oz.", Volume(5, "oz")),
-        (METRIC_SYSTEM, "mL", Volume(5, "ml")),
+        (METRIC_SYSTEM, "fl. oz.", Volume(5, "oz")),
     ],
     ids=["us-customary", "metric"],
 )
-async def test_log_bottle_without_a_unit_uses_the_unit_systems_bottle_unit(
+async def test_log_bottle_without_a_unit_uses_fluid_ounces_in_any_unit_system(
     hass: HomeAssistant,
     setup_entry: MockConfigEntry,
     server: FakeServer,
@@ -342,18 +355,18 @@ async def test_log_pump_totals_the_two_sides_and_decodes_back(
     await call(
         hass,
         "log_pump",
-        left_amount=60,
-        right_amount=75,
-        unit="mL",
+        left_amount=6,
+        right_amount=7.5,
+        unit="fl. oz.",
         left_minutes=10,
         right_minutes=12,
     )
 
     record = only_record(server)
     assert isinstance(record, Pump)
-    assert record.volume == Volume(135, "ml")
-    assert record.left_volume == Volume(60, "ml")
-    assert record.right_volume == Volume(75, "ml")
+    assert record.volume == Volume(13.5, "oz")
+    assert record.left_volume == Volume(6, "oz")
+    assert record.right_volume == Volume(7.5, "oz")
     assert (record.left_duration, record.right_duration) == (10, 12)
 
 
@@ -393,7 +406,7 @@ async def test_log_bottle_with_a_non_positive_or_non_finite_amount_is_a_validati
 ) -> None:
     sent = len(server.calls)  # type: ignore[attr-defined]
     with pytest.raises(ServiceValidationError) as raised:
-        await call(hass, "log_bottle", kind="formula", amount=amount, unit="mL")
+        await call(hass, "log_bottle", kind="formula", amount=amount, unit="fl. oz.")
     assert key_of(raised) == "invalid_amount"
     assert server.posted == []  # type: ignore[attr-defined]
     assert len(server.calls) == sent  # type: ignore[attr-defined]  # not even a sync
@@ -403,7 +416,7 @@ async def test_log_bottle_with_a_negative_amount_gives_the_translated_amount_err
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
-        await call(hass, "log_bottle", kind="formula", amount=-1, unit="mL")
+        await call(hass, "log_bottle", kind="formula", amount=-1, unit="fl. oz.")
     assert key_of(raised) == "invalid_amount"
 
 
@@ -669,24 +682,27 @@ async def test_a_sleep_updates_the_last_sleep_sensor_and_leaves_the_baby_awake(
 async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
+    # Metric display: the sensor still shows today's volume in mL, converted from the ounces.
     hass.config.units = METRIC_SYSTEM
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
     assert hass.states.get(FEEDS_TODAY).state == "0"
     assert float(hass.states.get(BOTTLE_TODAY).state) == 0
 
-    await call(hass, "log_bottle", kind="formula", amount=120, unit="mL")
+    await call(hass, "log_bottle", kind="formula", amount=4, unit="fl. oz.")
     assert hass.states.get(FEEDS_TODAY).state == "1"
-    assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(120, abs=0.1)
+    state = hass.states.get(BOTTLE_TODAY)
+    assert state.attributes["unit_of_measurement"] == "mL"
+    assert float(state.state) == pytest.approx(4 * 29.5735, abs=0.1)
 
-    await call(hass, "log_bottle", kind="pumped", amount=4, unit="fl. oz.")
+    await call(hass, "log_bottle", kind="pumped", amount=2, unit="fl. oz.")
     assert hass.states.get(FEEDS_TODAY).state == "2"
-    assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(120 + 4 * 29.5735, abs=0.1)
+    assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(6 * 29.5735, abs=0.1)
     assert hass.states.get("sensor.baby_two_feeds_today").state == "0"
 
     await undo(hass, baby=device_id(hass, BABY_ONE_ID))
     assert hass.states.get(FEEDS_TODAY).state == "1"
-    assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(120, abs=0.1)
+    assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(4 * 29.5735, abs=0.1)
 
 
 async def test_nursing_counts_as_a_feed_today_and_adds_no_bottle_volume(
@@ -707,7 +723,7 @@ async def test_a_pump_and_a_sleep_are_not_feeds_today(
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
 
-    await call(hass, "log_pump", left_amount=3, unit="mL", time="2026-10-26T14:00:00+00:00")
+    await call(hass, "log_pump", left_amount=3, unit="fl. oz.", time="2026-10-26T14:00:00+00:00")
     await call(
         hass, "log_sleep", start="2026-10-26T12:00:00+00:00", end="2026-10-26T13:00:00+00:00"
     )
@@ -814,10 +830,10 @@ async def test_a_bottle_press_with_a_4_oz_formula_option_logs_a_4_oz_formula_bot
 
 @pytest.mark.parametrize(
     ("units", "volume"),
-    [(US_CUSTOMARY_SYSTEM, Volume(4, "oz")), (METRIC_SYSTEM, Volume(120, "ml"))],
+    [(US_CUSTOMARY_SYSTEM, Volume(4, "oz")), (METRIC_SYSTEM, Volume(4, "oz"))],
     ids=["us-customary", "metric"],
 )
-async def test_a_bottle_press_with_no_options_logs_the_unit_systems_default_formula_bottle(
+async def test_a_bottle_press_with_no_options_logs_a_4_oz_formula_bottle_in_any_unit_system(
     hass: HomeAssistant,
     setup_entry: MockConfigEntry,
     server: FakeServer,
@@ -840,7 +856,7 @@ async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
     await set_options(
         hass,
         setup_entry,
-        **{CONF_BOTTLE_SIZE: 150, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "pumped"},
+        **{CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
     await press(hass, BOTTLE_BUTTON)
     await set_options(
@@ -852,7 +868,7 @@ async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
 
     [(_, _, first), (_, _, second), (_, _, third)] = posted(server)
     assert isinstance(first, Formula)
-    assert (type(second), second.volume) == (Pumped, Volume(150, "ml"))
+    assert (type(second), second.volume) == (Pumped, Volume(5, "oz"))
     assert (type(third), third.volume) == (Formula, Volume(6, "oz"))
 
 
@@ -884,7 +900,7 @@ async def test_a_bottle_press_is_for_its_own_baby_and_counts_in_todays_totals(
     assert hass.states.get("sensor.baby_two_feeds_today").state == "1"
     assert hass.states.get(FEEDS_TODAY).state == "0"
     assert float(hass.states.get("sensor.baby_two_bottle_volume_today").state) == pytest.approx(
-        120, abs=0.1
+        4 * 29.5735, abs=0.1
     )
 
 
@@ -901,7 +917,25 @@ async def test_a_bottle_press_with_bad_saved_options_falls_back_to_the_defaults(
 
     record = only_record(server)
     assert isinstance(record, Formula)
-    assert record.volume == Volume(120, "ml")
+    assert record.volume == Volume(4, "oz")
+
+
+async def test_a_bottle_press_with_milliliter_options_is_refused_with_a_translated_error(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    await set_options(
+        hass,
+        setup_entry,
+        **{CONF_BOTTLE_SIZE: 120, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
+    )
+    sent = len(server.calls)  # type: ignore[attr-defined]
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await press(hass, BOTTLE_BUTTON)
+
+    assert raised.value.translation_key == "metric_not_supported"
+    assert server.posted == []  # type: ignore[attr-defined]
+    assert len(server.calls) == sent  # type: ignore[attr-defined]
 
 
 async def test_a_failed_bottle_press_raises_a_translated_error_and_changes_no_sensor(
@@ -939,11 +973,11 @@ def schema_defaults(result: Any) -> dict[str, Any]:
     ("units", "expected"),
     [
         (US_CUSTOMARY_SYSTEM, (4, "fl. oz.", "formula")),
-        (METRIC_SYSTEM, (120, "mL", "formula")),
+        (METRIC_SYSTEM, (4, "fl. oz.", "formula")),
     ],
     ids=["us-customary", "metric"],
 )
-async def test_options_default_the_bottle_to_the_unit_systems_size(
+async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
     hass: HomeAssistant, setup_entry: MockConfigEntry, units: Any, expected: tuple[Any, ...]
 ) -> None:
     hass.config.units = units
@@ -1004,8 +1038,8 @@ async def test_saving_only_the_interval_still_saves_the_default_bottle(
     await set_options(hass, setup_entry, **{CONF_SCAN_INTERVAL: 7})
 
     assert setup_entry.options[CONF_SCAN_INTERVAL] == 7
-    assert setup_entry.options[CONF_BOTTLE_SIZE] == 120
-    assert setup_entry.options[CONF_BOTTLE_UNIT] == "mL"
+    assert setup_entry.options[CONF_BOTTLE_SIZE] == 4
+    assert setup_entry.options[CONF_BOTTLE_UNIT] == "fl. oz."
     assert setup_entry.options[CONF_BOTTLE_TYPE] == "formula"
 
 
@@ -1112,12 +1146,17 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
 
 def test_the_new_actions_errors_options_and_button_are_translated() -> None:
     strings = json.loads((INTEGRATION / "strings.json").read_text())
-    assert {"invalid_amount", "end_before_start", "no_duration", "no_amount"} <= set(
-        strings["exceptions"]
-    )
+    assert {
+        "invalid_amount",
+        "end_before_start",
+        "no_duration",
+        "no_amount",
+        "metric_not_supported",
+    } <= set(strings["exceptions"])
     assert "bottle" in strings["entity"]["button"]
     options = strings["options"]["step"]["init"]
     for key in (CONF_BOTTLE_SIZE, CONF_BOTTLE_UNIT, CONF_BOTTLE_TYPE):
         assert options["data"][key] and options["data_description"][key]
+    assert "metric isn't supported yet" in options["data_description"][CONF_BOTTLE_UNIT].lower()
     assert {"formula", "pumped"} <= set(strings["selector"]["bottle_type"]["options"])
     assert strings == json.loads((INTEGRATION / "translations" / "en.json").read_text())

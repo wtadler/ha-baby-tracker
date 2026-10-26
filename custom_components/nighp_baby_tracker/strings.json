@@ -49,8 +49,8 @@
         },
         "data_description": {
           "scan_interval": "How often Home Assistant checks for new records. The minimum is 1 minute.",
-          "bottle_size": "How much the Bottle button logs for each press.",
-          "bottle_unit": "The unit of the bottle size. New installs start with the unit your Home Assistant unit system uses.",
+          "bottle_size": "How much the Bottle button logs for each press. New installs start at 4 fl. oz. of formula.",
+          "bottle_unit": "The unit of the bottle size. Only fl. oz. works for now: metric isn't supported yet, and pressing the button with mL shows an error.",
           "bottle_type": "Whether the Bottle button logs formula or pumped milk."
         }
       }
@@ -163,7 +163,7 @@
         },
         "unit": {
           "name": "Unit",
-          "description": "The unit of the amount: fl. oz. or mL. Defaults to what your Home Assistant unit system uses for bottles."
+          "description": "The unit of the amount. Defaults to fl. oz. mL is accepted but refused for now, because metric isn't supported yet."
         },
         "time": {
           "name": "Time",
@@ -257,7 +257,7 @@
         },
         "unit": {
           "name": "Unit",
-          "description": "The unit of the amount: fl. oz. or mL. Defaults to what your Home Assistant unit system uses for bottles."
+          "description": "The unit of the amounts. Defaults to fl. oz. mL is accepted but refused for now, because metric isn't supported yet."
         },
         "left_minutes": {
           "name": "Left side (minutes)",
@@ -373,6 +373,9 @@
     },
     "no_amount": {
       "message": "Give the amount for at least one side."
+    },
+    "metric_not_supported": {
+      "message": "Metric amounts aren't supported yet, because the app's metric format hasn't been confirmed. Use fl. oz."
     }
   },
   "issues": {
