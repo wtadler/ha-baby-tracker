@@ -1,0 +1,51 @@
+log_diaper:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    type:
+      required: true
+      example: wet
+      selector:
+        select:
+          translation_key: diaper_type
+          options:
+            - wet
+            - dirty
+            - mixed
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Rash cream applied
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000002
+      selector:
+        text:
+
+undo:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: nighp_baby_tracker
+    baby:
+      required: false
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000001
+      selector:
+        text:

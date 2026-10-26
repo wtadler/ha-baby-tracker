@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -67,6 +68,10 @@ def _newest(records: list[Record]) -> Record | None:
         return (record.time.timestamp(), stamp)
 
     return max(records, key=key, default=None)
+
+
+class SyncBeforeWriteError(BabyTrackerError):
+    """The sync that precedes every write failed, so nothing was written."""
 
 
 class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
@@ -138,6 +143,31 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             await self._store.async_save(self.engine.to_dict())
         except Exception:
             _LOGGER.exception("Couldn't save the sync state; it will be saved after the next sync")
+
+    async def async_write[T](
+        self, operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]]
+    ) -> T:
+        """Run a write under the lock: sync first, call ``operation``, save, then publish.
+
+        The engine state is saved after every attempt, failed ones included, because the engine's
+        pending post and its grace window live only in that state. The new data reaches the
+        entities at once, without waiting for the next poll, but only after a success. Library
+        errors propagate as they are; a failed sync before the write is wrapped in
+        ``SyncBeforeWriteError`` (an authentication error passes through as itself).
+        """
+        async with self.lock:
+            try:
+                try:
+                    await self.engine.sync(self.client)
+                except AuthenticationError:
+                    raise
+                except BabyTrackerError as err:
+                    raise SyncBeforeWriteError(str(err)) from err
+                result = await operation(self.engine, self.client)
+            finally:
+                await self._async_save()
+            self.async_set_updated_data(self._snapshot())
+            return result
 
     @callback
     def _async_midnight(self, _now: datetime) -> None:

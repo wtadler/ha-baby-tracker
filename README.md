@@ -3,7 +3,7 @@
 A custom integration for the Nighp "Baby Tracker" app. Home Assistant signs in to your account's
 sync service and shows each baby's last diaper, feed, pump, and sleep.
 
-This version only reads. Writing records, timers, and today's counts come in later versions. See
+This version reads, and logs diapers. Timers and today's counts come in later versions. See
 `PROTOCOL.md` for how the sync service works and `GLOSSARY.md` for the terms used here.
 
 ## What you get
@@ -51,6 +51,30 @@ and the minimum is 1 minute. Changing it takes effect without a reload.
 
 Home Assistant asks you to sign in again. Enter the account's current password. If you enter a
 different account's email, the sign-in is refused.
+
+## Buttons and actions
+
+Each baby has **Wet diaper**, **Dirty diaper**, and **Mixed diaper** buttons. Pressing one logs
+that diaper for that baby, right now, as Home Assistant's own device in your account.
+
+Two actions do the same and more:
+
+- `nighp_baby_tracker.log_diaper` takes `baby` (the baby's device), `type` (`wet`, `dirty`, or
+  `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
+  zone), and an optional `note`.
+- `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `baby` or
+  `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
+  recent record Home Assistant created (for that baby, if you gave `baby`). Run it again and it
+  deletes the next older Home Assistant entry, and so on, until none are left. If you give both
+  `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
+  made.
+- `log_diaper` also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
+  Send the same one to retry a write that may have landed: it's added once, never twice.
+
+Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from
+the service, the next one says "the last entry is still being confirmed"; try again in a minute. If
+Home Assistant's own log in your account can't be read back, writing pauses and a repair appears in
+**Settings > System > Repairs**. A rejected login starts the sign-in flow again.
 
 ## Removal
 

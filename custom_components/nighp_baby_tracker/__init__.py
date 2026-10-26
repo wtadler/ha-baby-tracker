@@ -4,10 +4,20 @@ from __future__ import annotations
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_DEVICE_UUID, CONF_EMAIL, CONF_PASSWORD, DEVICE_NAME, STORAGE_VERSION
+from .const import (
+    CONF_DEVICE_UUID,
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    DEVICE_NAME,
+    DOMAIN,
+    STORAGE_VERSION,
+)
 from .coordinator import (
     BabyTrackerConfigEntry,
     BabyTrackerCoordinator,
@@ -15,8 +25,18 @@ from .coordinator import (
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
+from .services import async_register_services
+from .writes import issue_id
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the actions, which belong to the integration rather than to one entry."""
+    async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
@@ -62,5 +82,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Delete the saved sync state."""
+    """Delete the saved sync state and any repair about this entry."""
+    ir.async_delete_issue(hass, DOMAIN, issue_id(entry.entry_id))
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()

@@ -56,6 +56,17 @@
         "name": "Asleep"
       }
     },
+    "button": {
+      "wet_diaper": {
+        "name": "Wet diaper"
+      },
+      "dirty_diaper": {
+        "name": "Dirty diaper"
+      },
+      "mixed_diaper": {
+        "name": "Mixed diaper"
+      }
+    },
     "sensor": {
       "diapers_today": {
         "name": "Diapers today"
@@ -78,6 +89,108 @@
       "last_sleep": {
         "name": "Last sleep"
       }
+    }
+  },
+  "services": {
+    "log_diaper": {
+      "name": "Log diaper",
+      "description": "Adds a diaper record for a baby, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "type": {
+          "name": "Type",
+          "description": "What kind of diaper it was."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the diaper."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new diaper each time."
+        }
+      }
+    },
+    "undo": {
+      "name": "Undo",
+      "description": "Deletes a record Home Assistant created. Without a record ID, it deletes the most recent one, and running it again deletes the next older one. Records made by the phones can't be deleted here.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "The Baby Tracker account to undo in. Use this or a baby."
+        },
+        "baby": {
+          "name": "Baby",
+          "description": "A baby's device. With no object ID, only that baby's most recent record is deleted."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "The ID of the record to delete. Defaults to the most recent record Home Assistant created."
+        }
+      }
+    }
+  },
+  "selector": {
+    "diaper_type": {
+      "options": {
+        "wet": "Wet",
+        "dirty": "Dirty",
+        "mixed": "Mixed"
+      }
+    }
+  },
+  "exceptions": {
+    "baby_not_found": {
+      "message": "That isn't a Baby Tracker baby. Pick a baby's device."
+    },
+    "entry_not_found": {
+      "message": "No Baby Tracker account matches that ID."
+    },
+    "entry_not_loaded": {
+      "message": "That Baby Tracker account isn't loaded right now. Check its status in the integration's settings."
+    },
+    "nothing_to_undo": {
+      "message": "Home Assistant hasn't created any record to undo."
+    },
+    "not_own_record": {
+      "message": "Home Assistant didn't create that record, so it can't delete it. Delete it in the Baby Tracker app instead."
+    },
+    "record_not_found": {
+      "message": "That record is already deleted."
+    },
+    "write_outcome_unknown": {
+      "message": "The last entry is still being confirmed. Try again in a minute."
+    },
+    "own_log_gap": {
+      "message": "Home Assistant's own log in this account has entries it can't read back, so it won't write. See the repair in Settings."
+    },
+    "auth_failed": {
+      "message": "The service rejected the sign-in. Sign in again from the integration's settings."
+    },
+    "sync_failed": {
+      "message": "Couldn't sync with the service before writing: {error}"
+    },
+    "write_failed": {
+      "message": "Couldn't save to Baby Tracker: {error}"
+    },
+    "object_id_in_use": {
+      "message": "That record ID already belongs to a different record. Use a new ID."
+    },
+    "record_not_for_baby": {
+      "message": "That record belongs to a different baby."
+    }
+  },
+  "issues": {
+    "own_log_gap": {
+      "title": "Baby Tracker can't write for {account}",
+      "description": "The service says Home Assistant's own log for {account} is longer than what Home Assistant can read back, so writing is paused to avoid skipping or overwriting entries. This may be a short delay on the service's side that clears after the next successful write. If it persists for more than an hour, remove this integration entry and add it again. That reloads the account's history, and Home Assistant appears as a new device in the Baby Tracker app, while the old Home Assistant device stays in its list."
     }
   }
 }
