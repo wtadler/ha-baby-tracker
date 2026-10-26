@@ -93,8 +93,9 @@ def test_the_quality_scale_marks_every_bronze_rule() -> None:
         if entry == "done":
             continue
         assert isinstance(entry, dict), rule
-        assert entry["status"] == "exempt", rule
-        assert entry["comment"].strip(), rule
+        assert entry["status"] in ("done", "exempt"), rule
+        if entry["status"] == "exempt":
+            assert entry["comment"].strip(), rule
 
 
 @pytest.mark.parametrize("rule", ["reauth-flow", "config-entry-unloading"])

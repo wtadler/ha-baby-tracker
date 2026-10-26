@@ -155,7 +155,9 @@ class FakeClient:
             for uuid, log in self.server.logs.items()
         ]
 
-    async def get_transactions(self, device_uuid: str, since_sync_id: int = 0) -> list[RawTransaction]:
+    async def get_transactions(
+        self, device_uuid: str, since_sync_id: int = 0
+    ) -> list[RawTransaction]:
         await self._ensure_session()
         self.server.transaction_reads.append((device_uuid, since_sync_id))
         entries = [e for e in self.server.logs.get(device_uuid, []) if e["SyncID"] > since_sync_id]

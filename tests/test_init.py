@@ -120,6 +120,7 @@ async def test_setup_retries_and_then_loads_once_the_server_is_back(
 
     server.sign_in_error = None
     await tick(hass, minutes=2)
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert config_entry.state is ConfigEntryState.LOADED
 
 

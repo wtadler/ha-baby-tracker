@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.const import DOMAIN
 
-from .conftest import BABY_ONE, BABY_TWO, FakeServer
+from .conftest import BABY_ONE, FakeServer
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -87,7 +87,9 @@ async def test_unique_ids_are_built_from_the_baby_id(
     assert all(BABY_ONE_ID in e.unique_id or BABY_TWO_ID in e.unique_id for e in entries)
 
 
-async def test_the_sensors_are_timestamps(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
+async def test_the_sensors_are_timestamps(
+    hass: HomeAssistant, setup_entry: MockConfigEntry
+) -> None:
     for key in KEYS:
         assert _state(hass, "baby_one", key).attributes["device_class"] == "timestamp"
 
@@ -99,10 +101,13 @@ async def test_the_last_diaper_shows_when_it_happened(
     assert _state(hass, "baby_two", "last_diaper").state == at(10).isoformat()
 
 
-async def test_babies_do_not_share_records(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
-    assert _state(hass, "baby_one", "last_diaper").state != _state(
-        hass, "baby_two", "last_diaper"
-    ).state
+async def test_babies_do_not_share_records(
+    hass: HomeAssistant, setup_entry: MockConfigEntry
+) -> None:
+    assert (
+        _state(hass, "baby_one", "last_diaper").state
+        != _state(hass, "baby_two", "last_diaper").state
+    )
 
 
 # Last diaper
@@ -121,7 +126,11 @@ async def test_a_newer_diaper_from_another_device_updates_the_sensor_with_its_ty
 
 @pytest.mark.parametrize(("status", "expected"), [(0, "wet"), (1, "dirty"), (2, "mixed")])
 async def test_the_diaper_type_names_the_status(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, status: int, expected: str
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    server: FakeServer,
+    status: int,
+    expected: str,
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", _object_id(2), when=at(40), status=status)
     await tick(hass)
