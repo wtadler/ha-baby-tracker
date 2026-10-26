@@ -30,6 +30,7 @@ from custom_components.nighp_baby_tracker.const import (
 from custom_components.nighp_baby_tracker.pybabytracker import (
     OP_ADD,
     OP_DELETE,
+    OP_UPDATE,
     AuthenticationError,
     BabyTrackerConnectionError,
     Diaper,
@@ -705,6 +706,42 @@ async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
 
     deleted = [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
     assert deleted == [ids[5], ids[4]]
+
+
+@pytest.mark.parametrize("scope", ["baby", "account"])
+async def test_undo_deletes_the_newest_ha_write_even_after_a_phone_edited_it(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    server: FakeServer,
+    freezer: Any,
+    scope: str,
+) -> None:
+    freezer.move_to(NOW)
+    await press(hass, button("baby_one", "wet"))  # A
+    freezer.move_to(datetime(2026, 10, 26, 15, 5, 0, tzinfo=UTC))
+    await press(hass, button("baby_one", "wet"))  # B
+    first, second = (record.object_id for _, _, record in posted(server))
+    # A phone edits B (wet to dirty), so B's current version came from the phone.
+    server.add_record(
+        DEVICE_A,
+        "Diaper",
+        second,
+        when=datetime(2026, 10, 26, 15, 5, 0, tzinfo=UTC),
+        changed=datetime(2026, 10, 26, 15, 6, 0, tzinfo=UTC),
+        op=OP_UPDATE,
+        status=1,
+    )
+
+    target = (
+        {"baby": device_id(hass, BABY_ONE_ID)}
+        if scope == "baby"
+        else {"config_entry_id": setup_entry.entry_id}
+    )
+    await undo(hass, **target)
+
+    deleted = [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
+    assert deleted == [second]
+    assert first != second
 
 
 async def test_undo_follows_write_order_not_the_time_of_the_diaper(

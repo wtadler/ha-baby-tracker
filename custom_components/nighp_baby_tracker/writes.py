@@ -26,7 +26,6 @@ from .pybabytracker import (
     BabyTrackerError,
     NotOwnRecordError,
     ProtocolError,
-    Record,
     RecordNotFoundError,
     SyncEngine,
     UnknownBabyError,
@@ -144,29 +143,15 @@ async def async_log_diaper(
 
 
 def _most_recent_own(engine: SyncEngine, baby_id: str | None) -> str | None:
-    candidates = [
-        record
-        for object_id in engine.created_ids
-        if (record := engine.records.get(object_id)) is not None
-        and (baby_id is None or (record.baby is not None and record.baby.object_id == baby_id))
-    ]
-    if not candidates:
-        return None
-    # Order by this device's own log number (the order of its writes), which the saved state
-    # carries per record. A record another device has since edited carries that device's
-    # number, so it sorts first (-1) and falls back on its timestamp.
-    own = engine.device_uuid
-    numbers = {
-        entry["payload"]["objectID"]: entry["version"]["sync_id"]
-        for entry in engine.to_dict()["records"]
-        if entry["version"]["device"] == own
-    }
-
-    def order(record: Record) -> tuple[int, float]:
-        stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
-        return (numbers.get(record.object_id, -1), stamp)
-
-    return max(candidates, key=order).object_id
+    # This device's adds, oldest first by the number of its own add: edits by a phone don't move
+    # a record, and two writes in the same second keep their order.
+    for object_id, _number in reversed(engine.own_writes()):
+        record = engine.records.get(object_id)
+        if record is not None and (
+            baby_id is None or (record.baby is not None and record.baby.object_id == baby_id)
+        ):
+            return object_id
+    return None
 
 
 async def async_undo(
