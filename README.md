@@ -47,6 +47,11 @@ identity. It doesn't appear in the app's device list until a later version write
 **Sync interval** sets how often Home Assistant checks for new records. The default is 5 minutes
 and the minimum is 1 minute. Changing it takes effect without a reload.
 
+**Bottle size**, **Bottle unit**, and **Bottle type** set what each baby's **Bottle** button logs.
+They start at 4 fl. oz. of formula when your Home Assistant uses US customary units, and 120 mL of
+formula otherwise. A change applies to the next press, with no reload. Options that don't make
+sense fall back to those defaults.
+
 ### If your password changes
 
 Home Assistant asks you to sign in again. Enter the account's current password. If you enter a
@@ -54,21 +59,35 @@ different account's email, the sign-in is refused.
 
 ## Buttons and actions
 
-Each baby has **Wet diaper**, **Dirty diaper**, and **Mixed diaper** buttons. Pressing one logs
-that diaper for that baby, right now, as Home Assistant's own device in your account.
+Each baby has **Wet diaper**, **Dirty diaper**, **Mixed diaper**, and **Bottle** buttons.
+Pressing one logs that diaper, or the bottle your options describe, for that baby, right now, as
+Home Assistant's own device in your account.
 
-Two actions do the same and more:
+The actions do the same and more:
 
 - `nighp_baby_tracker.log_diaper` takes `baby` (the baby's device), `type` (`wet`, `dirty`, or
   `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
   zone), and an optional `note`.
+- `nighp_baby_tracker.log_bottle` takes `baby`, `kind` (`formula` or `pumped`), `amount` (more than
+  zero), an optional `unit` (`fl. oz.` or `mL`; default `fl. oz.` for US customary units, `mL`
+  otherwise), an optional `time`, and an optional `note`.
+- `nighp_baby_tracker.log_nursing` takes `baby`, `left_minutes` and `right_minutes` (whole
+  minutes; at least one above zero), an optional `finish_side` (`left` or `right`; default the last
+  side used, right when both), an optional `end_time` (default now), and an optional `note`. The
+  record starts at the end time minus the total minutes.
+- `nighp_baby_tracker.log_sleep` takes `baby`, `start` and `end` (the end must be after the start),
+  and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
+  than 1.
+- `nighp_baby_tracker.log_pump` takes `baby`, `left_amount` and/or `right_amount`, an optional
+  `unit`, `left_minutes` and `right_minutes`, an optional `finish_side`, an optional `time` (the
+  start; default now), and an optional `note`. The total is the sum of the two sides.
 - `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `baby` or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
   recent record Home Assistant created (for that baby, if you gave `baby`). Run it again and it
   deletes the next older Home Assistant entry, and so on, until none are left. If you give both
   `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
   made.
-- `log_diaper` also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
+- Every `log_*` action also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
   Send the same one to retry a write that may have landed: it's added once, never twice.
 
 Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from

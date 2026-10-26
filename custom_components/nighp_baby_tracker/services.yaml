@@ -31,6 +31,205 @@ log_diaper:
       selector:
         text:
 
+log_bottle:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    kind:
+      required: true
+      example: formula
+      selector:
+        select:
+          translation_key: bottle_kind
+          options:
+            - formula
+            - pumped
+    amount:
+      required: true
+      example: 4
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: any
+    unit:
+      required: false
+      example: fl. oz.
+      selector:
+        select:
+          options:
+            - fl. oz.
+            - mL
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Fussy at the end
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:
+
+log_nursing:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    left_minutes:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: min
+    right_minutes:
+      required: false
+      example: 8
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: min
+    finish_side:
+      required: false
+      example: right
+      selector:
+        select:
+          translation_key: finish_side
+          options:
+            - left
+            - right
+    end_time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Fussy at the end
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:
+
+log_sleep:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    start:
+      required: true
+      selector:
+        datetime:
+    end:
+      required: true
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Fussy at the end
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:
+
+log_pump:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    left_amount:
+      required: false
+      example: 2
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: any
+    right_amount:
+      required: false
+      example: 3
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: any
+    unit:
+      required: false
+      example: fl. oz.
+      selector:
+        select:
+          options:
+            - fl. oz.
+            - mL
+    left_minutes:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: min
+    right_minutes:
+      required: false
+      example: 12
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: min
+    finish_side:
+      required: false
+      example: right
+      selector:
+        select:
+          translation_key: finish_side
+          options:
+            - left
+            - right
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Fussy at the end
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:
+
 undo:
   fields:
     config_entry_id:

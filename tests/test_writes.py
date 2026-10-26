@@ -150,7 +150,7 @@ def reauth_flows(hass: HomeAssistant) -> list[str]:
 # Buttons
 
 
-async def test_each_baby_gets_wet_dirty_and_mixed_buttons(
+async def test_each_baby_gets_wet_dirty_mixed_and_bottle_buttons(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     devices = dr.async_get(hass)
@@ -165,8 +165,9 @@ async def test_each_baby_gets_wet_dirty_and_mixed_buttons(
             "wet_diaper",
             "dirty_diaper",
             "mixed_diaper",
+            "bottle",
         }
-        assert len({b.unique_id for b in buttons}) == 3
+        assert len({b.unique_id for b in buttons}) == 4
     assert hass.states.get(button("baby_one", "wet")) is not None
     assert hass.states.get(button("baby_two", "mixed")) is not None
 
@@ -1019,11 +1020,18 @@ async def test_buttons_for_each_account_post_to_their_own_account(
 # Metadata
 
 
-def test_services_yaml_describes_both_actions_and_their_fields() -> None:
+def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() -> None:
     import yaml
 
     services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
-    assert set(services) == {"log_diaper", "undo"}
+    assert set(services) == {
+        "log_diaper",
+        "undo",
+        "log_bottle",
+        "log_nursing",
+        "log_sleep",
+        "log_pump",
+    }
     assert set(services["log_diaper"]["fields"]) == {"baby", "type", "time", "note", "object_id"}
     assert set(services["undo"]["fields"]) == {"config_entry_id", "baby", "object_id"}
     baby = services["log_diaper"]["fields"]["baby"]

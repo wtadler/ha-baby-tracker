@@ -254,7 +254,7 @@ async def test_options_default_to_five_minutes(hass: HomeAssistant, setup_entry)
     result = await hass.config_entries.options.async_init(setup_entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
-    (key,) = result["data_schema"].schema
+    key = next(k for k in result["data_schema"].schema if k == CONF_SCAN_INTERVAL)
     assert key.default() == 5
 
 
@@ -290,5 +290,5 @@ async def test_options_show_the_saved_interval(hass: HomeAssistant, config_entry
     config_entry.add_to_hass(hass)
     hass.config_entries.async_update_entry(config_entry, options={CONF_SCAN_INTERVAL: 15})
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
-    (key,) = result["data_schema"].schema
+    key = next(k for k in result["data_schema"].schema if k == CONF_SCAN_INTERVAL)
     assert key.default() == 15

@@ -42,10 +42,16 @@
       "init": {
         "title": "Baby Tracker options",
         "data": {
-          "scan_interval": "Sync interval (minutes)"
+          "scan_interval": "Sync interval (minutes)",
+          "bottle_size": "Bottle size",
+          "bottle_unit": "Bottle unit",
+          "bottle_type": "Bottle type"
         },
         "data_description": {
-          "scan_interval": "How often Home Assistant checks for new records. The minimum is 1 minute."
+          "scan_interval": "How often Home Assistant checks for new records. The minimum is 1 minute.",
+          "bottle_size": "How much the Bottle button logs for each press.",
+          "bottle_unit": "The unit of the bottle size. New installs start with the unit your Home Assistant unit system uses.",
+          "bottle_type": "Whether the Bottle button logs formula or pumped milk."
         }
       }
     }
@@ -65,6 +71,9 @@
       },
       "mixed_diaper": {
         "name": "Mixed diaper"
+      },
+      "bottle": {
+        "name": "Bottle"
       }
     },
     "sensor": {
@@ -135,6 +144,146 @@
           "description": "The ID of the record to delete. Defaults to the most recent record Home Assistant created."
         }
       }
+    },
+    "log_bottle": {
+      "name": "Log bottle",
+      "description": "Adds a formula or pumped-milk bottle for a baby, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "Formula or pumped milk."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "How much the baby had. Must be more than zero."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "The unit of the amount: fl. oz. or mL. Defaults to what your Home Assistant unit system uses for bottles."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When the bottle was given. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the record."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new record each time."
+        }
+      }
+    },
+    "log_nursing": {
+      "name": "Log nursing",
+      "description": "Adds a finished nursing session for a baby. Give the minutes on one side or both.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "left_minutes": {
+          "name": "Left side (minutes)",
+          "description": "Whole minutes on the left side."
+        },
+        "right_minutes": {
+          "name": "Right side (minutes)",
+          "description": "Whole minutes on the right side."
+        },
+        "finish_side": {
+          "name": "Finished on",
+          "description": "The side the session ended on. Defaults to the last side used, or right when both were."
+        },
+        "end_time": {
+          "name": "End time",
+          "description": "When the session ended. Defaults to now. It starts that many minutes earlier, the total of both sides. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the record."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new record each time."
+        }
+      }
+    },
+    "log_sleep": {
+      "name": "Log sleep",
+      "description": "Adds a finished sleep for a baby. The length is rounded to whole minutes.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "start": {
+          "name": "Start",
+          "description": "When the sleep began. A time without an offset is read in Home Assistant's time zone."
+        },
+        "end": {
+          "name": "End",
+          "description": "When the sleep ended. It must be after the start."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the record."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new record each time."
+        }
+      }
+    },
+    "log_pump": {
+      "name": "Log pump",
+      "description": "Adds a pumping session for a baby. Give the amount for one side or both; the total is their sum.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "left_amount": {
+          "name": "Left amount",
+          "description": "How much came from the left side."
+        },
+        "right_amount": {
+          "name": "Right amount",
+          "description": "How much came from the right side."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "The unit of the amount: fl. oz. or mL. Defaults to what your Home Assistant unit system uses for bottles."
+        },
+        "left_minutes": {
+          "name": "Left side (minutes)",
+          "description": "Whole minutes on the left side."
+        },
+        "right_minutes": {
+          "name": "Right side (minutes)",
+          "description": "Whole minutes on the right side."
+        },
+        "finish_side": {
+          "name": "Finished on",
+          "description": "The side the session ended on. Defaults to the last side used, or right when both were."
+        },
+        "time": {
+          "name": "Start time",
+          "description": "When the session began. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the record."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new record each time."
+        }
+      }
     }
   },
   "selector": {
@@ -143,6 +292,24 @@
         "wet": "Wet",
         "dirty": "Dirty",
         "mixed": "Mixed"
+      }
+    },
+    "bottle_type": {
+      "options": {
+        "formula": "Formula",
+        "pumped": "Pumped milk"
+      }
+    },
+    "bottle_kind": {
+      "options": {
+        "formula": "Formula",
+        "pumped": "Pumped milk"
+      }
+    },
+    "finish_side": {
+      "options": {
+        "left": "Left",
+        "right": "Right"
       }
     }
   },
@@ -185,6 +352,27 @@
     },
     "record_not_for_baby": {
       "message": "That record belongs to a different baby."
+    },
+    "invalid_amount": {
+      "message": "The amount must be a number more than zero."
+    },
+    "invalid_unit": {
+      "message": "The unit must be fl. oz. or mL."
+    },
+    "invalid_bottle_kind": {
+      "message": "A bottle is either formula or pumped milk."
+    },
+    "invalid_finish_side": {
+      "message": "The side must be left or right."
+    },
+    "end_before_start": {
+      "message": "The end time must be after the start time."
+    },
+    "no_duration": {
+      "message": "Give at least one minute on the left or right side."
+    },
+    "no_amount": {
+      "message": "Give the amount for at least one side."
     }
   },
   "issues": {
