@@ -1,0 +1,124 @@
+blueprint:
+  name: Baby Tracker (Nighp) live activity
+  description: >
+    Shows a running sleep or nursing timer as an iOS Live Activity (a Live Update on Android)
+    through the Home Assistant Companion app. It starts when a timer starts, updates the side when
+    nursing switches sides, and ends when the timer stops. Create one automation per baby.
+    Needs Home Assistant 2026.7.0 or later and a Companion app with Live Activity support.
+  domain: automation
+  source_url: https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/nighp_baby_tracker/live_activity.yaml
+  input:
+    sleep_timer:
+      name: Sleep timer
+      description: The baby's "Sleep timer" sensor.
+      selector:
+        entity:
+          domain: sensor
+          integration: nighp_baby_tracker
+          device_class: timestamp
+    nursing_timer:
+      name: Nursing timer
+      description: The same baby's "Nursing timer" sensor.
+      selector:
+        entity:
+          domain: sensor
+          integration: nighp_baby_tracker
+          device_class: timestamp
+    notify_service:
+      name: Notify service
+      description: >
+        The Companion app's notify action for the phone, such as notify.mobile_app_your_phone.
+        Find it in the app under Settings, Companion app, Server & devices.
+      selector:
+        text:
+    sleep_title:
+      name: Sleep title
+      description: The static header of the sleep activity. It can't change once started.
+      default: Sleeping
+      selector:
+        text:
+    nursing_title:
+      name: Nursing title
+      description: The static header of the nursing activity. It can't change once started.
+      default: Nursing
+      selector:
+        text:
+
+# Queued, not parallel or single: the start, the side switches, and the end of one timer must
+# reach the notify service in the order they happened (a parallel stop could overtake its own
+# start and leave an activity running), and none may be dropped (single would drop a stop that
+# arrives while the start is still being sent). A queue of 10 is far more than the few events a
+# timer produces.
+mode: queued
+max: 10
+
+variables:
+  sleep_timer: !input sleep_timer
+  nursing_timer: !input nursing_timer
+  sleep_title: !input sleep_title
+  nursing_title: !input nursing_title
+  # One tag per baby and timer, from the entity id (letters, numbers, and underscores only).
+  sleep_tag: "{{ ('sleep_' ~ sleep_timer.split('.')[1])[:64] }}"
+  nursing_tag: "{{ ('nursing_' ~ nursing_timer.split('.')[1])[:64] }}"
+
+trigger:
+  - trigger: state
+    entity_id: !input sleep_timer
+    id: sleep
+  - trigger: state
+    entity_id: !input nursing_timer
+    id: nursing
+
+action:
+  - variables:
+      not_running: ["unknown", "unavailable", "none", ""]
+      was_running: >-
+        {{ trigger.from_state is not none and trigger.from_state.state not in not_running }}
+      is_running: >-
+        {{ trigger.to_state is not none and trigger.to_state.state not in not_running }}
+      is_nursing: "{{ trigger.id == 'nursing' }}"
+      tag: "{{ nursing_tag if is_nursing else sleep_tag }}"
+      title: "{{ nursing_title if is_nursing else sleep_title }}"
+      side: >-
+        {{ (trigger.to_state.attributes.get('side') or '') if is_running else '' }}
+      message: >-
+        {{ 'Nursing · ' ~ side | capitalize ~ ' side' if is_nursing and side else
+           ('Nursing' if is_nursing else 'Asleep') }}
+  - choose:
+      # Started: from no timer to a start time.
+      - conditions: "{{ is_running and not was_running }}"
+        sequence:
+          - action: !input notify_service
+            data:
+              title: "{{ title }}"
+              message: "{{ message }}"
+              data:
+                tag: "{{ tag }}"
+                live_update: true
+                chronometer: true
+                when: "{{ as_timestamp(trigger.to_state.state) }}"
+      # Stopped: the timer went to unknown, from a running timer or from unavailable (a failed sync
+      # mid-timer goes running, unavailable, unknown). A clear for a tag with no activity is harmless.
+      - conditions: >-
+          {{ trigger.to_state is not none and trigger.to_state.state == 'unknown'
+             and trigger.from_state is not none and trigger.from_state.state != 'unknown' }}
+        sequence:
+          - action: !input notify_service
+            data:
+              message: clear_notification
+              data:
+                tag: "{{ tag }}"
+      # Switched sides: still running, and the side changed.
+      - conditions: >-
+          {{ is_running and was_running and is_nursing
+             and trigger.from_state.attributes.get('side') != trigger.to_state.attributes.get('side') }}
+        sequence:
+          - action: !input notify_service
+            data:
+              title: "{{ title }}"
+              message: "{{ message }}"
+              data:
+                tag: "{{ tag }}"
+                live_update: true
+                chronometer: true
+                when: "{{ as_timestamp(trigger.to_state.state) }}"

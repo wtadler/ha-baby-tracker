@@ -135,6 +135,54 @@ the service, the next one says "the last entry is still being confirmed"; try ag
 Home Assistant's own log in your account can't be read back, writing pauses and a repair appears in
 **Settings > System > Repairs**. A rejected login starts the sign-in flow again.
 
+## Live activity on your iPhone
+
+The blueprint `blueprints/automation/nighp_baby_tracker/live_activity.yaml` turns a baby's running
+timers into iOS Live Activities through the Home Assistant Companion app. The integration itself
+sends no notifications; the blueprint does, from the timer sensors.
+
+**Import it**
+
+1. Copy the file to `<config>/blueprints/automation/nighp_baby_tracker/live_activity.yaml`, or
+   open **Settings > Automations & scenes > Blueprints > Import blueprint** and paste its GitHub
+   URL: `https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/nighp_baby_tracker/live_activity.yaml`
+2. Create an automation from it, one per baby, and fill in:
+   - **Sleep timer** and **Nursing timer**: that baby's two timer sensors (the pickers list only
+     this integration's timestamp sensors).
+   - **Notify service**: the Companion app's action for the phone you want the activity on, such as
+     `notify.mobile_app_your_phone`. Find the name in the app under **Settings > Companion app >
+     Server & devices**, or try it in **Developer tools > Actions** first. For several phones,
+     create one automation per phone.
+   - **Sleep title** and **Nursing title** (optional): the activity's header.
+
+**What shows on the lock screen**
+
+- A sleep timer starting shows "Asleep" under the title, with a running count-up from the time the
+  sleep began (a sleep a phone started shows its real start time). The timer stopping ends the
+  activity.
+- A nursing timer starting shows "Nursing · Left side" (or right) with a count-up from the start of
+  the session. Switching sides updates the same activity to the new side. Stopping ends it.
+- Sleep and nursing are separate activities with their own tags (`sleep_<sensor name>` and
+  `nursing_<sensor name>`), so a baby can show both, and each baby has their own.
+
+**Limits**
+
+- It needs the Home Assistant iOS Companion app with Live Activity support (iOS 17.2 or later)
+  and Home Assistant 2026.7.0 or later, as the
+  [Companion app docs](https://companion.home-assistant.io/docs/notifications/live-activities)
+  require. The app and Home Assistant must be able to reach each other to sync a token, so it
+  may not update while the phone has no connection to Home Assistant.
+- The count-up runs from the session's start, so it keeps counting through a nursing side switch
+  instead of restarting. The notification's title can't change once the activity starts, so the
+  side is in the message, not the title.
+- A nursing timer started in the phone app can't show: the app doesn't sync a running nursing
+  timer, so Home Assistant never sees it. Only timers started from Home Assistant (the **Nurse
+  left** and **Nurse right** buttons or actions) do. Sleep timers show from any device.
+- If Home Assistant restarts mid-session, a running timer's activity stays as it was and the
+  blueprint sends nothing new until the timer changes; ending it still ends the activity.
+- A sync failure mid-timer (running, then unavailable, then unknown) still ends the activity; going unavailable and back to the same running timer leaves it alone.
+- The blueprint runs queued, so a start, a switch, and an end are sent in order.
+
 ## Removal
 
 1. Go to **Settings > Devices & services**, open **Baby Tracker (Nighp)**, and choose **Delete**.
