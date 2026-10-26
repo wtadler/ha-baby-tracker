@@ -59,7 +59,7 @@ Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `tim
 |---|---|
 | `Formula` | `amount` |
 | `Pumped` (a bottle of pumped milk) | `amount` |
-| `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` |
+| `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` (no `baby`: a pump belongs to the account, and `leftAmount` and `rightAmount` appear only when per-side amounts were entered) |
 | `Nursing` | `leftDuration`, `rightDuration`, `bothDuration`, `finishSide`, `isDetailed`, `pairSessionState`, `state` |
 | `Sleep` | `duration` (minutes; 0 while running) |
 | `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |

@@ -158,8 +158,13 @@ log_sleep:
 
 log_pump:
   fields:
-    baby:
-      required: true
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: nighp_baby_tracker
+    device:
+      required: false
       selector:
         device:
           filter:

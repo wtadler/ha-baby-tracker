@@ -69,7 +69,7 @@ class FakeServer:
         object_id: str,
         *,
         when: datetime,
-        baby: dict[str, Any] = BABY_ONE,
+        baby: dict[str, Any] | None = BABY_ONE,
         op: int = OP_ADD,
         changed: datetime | None = None,
         note: str = "",
@@ -79,6 +79,10 @@ class FakeServer:
             type_name, object_id, when=when, baby=baby, changed=changed, note=note, **fields
         )
         return self.add_payload(device, payload, op=op)
+
+    def add_pump(self, device: str, object_id: str, *, when: datetime, **fields: Any) -> int:
+        """A pump as the live service shapes it: no ``baby`` key."""
+        return self.add_record(device, "Pump", object_id, when=when, baby=None, **fields)
 
     def add_payload(self, device: str, payload: Any, *, op: int = OP_ADD) -> int:
         log = self.logs.setdefault(device, [])

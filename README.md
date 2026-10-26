@@ -9,16 +9,20 @@ timers. See
 
 ## What you get
 
-- One Home Assistant device per baby.
-- Four timestamp sensors on each baby: **Last diaper**, **Last feed**, **Last pump**, and
-  **Last sleep**. The state is when it happened. The details are attributes:
+- One Home Assistant device per baby, and one account device per config entry (named for the
+  entry's title, model "Account").
+- Three timestamp sensors on each baby: **Last diaper**, **Last feed**, and **Last sleep**. The
+  state is when it happened. The details are attributes:
   - Diaper: `type` (`wet`, `dirty`, or `mixed`) and `note`.
   - Feed: `kind` (`nursing`, `formula`, or `pumped`), `amount` and `unit` (`fl. oz.` or `mL`) for
     bottles, nursing durations in minutes, `finish_side`, and `note`. The newest of nursing,
     formula, and pumped milk counts as the last feed.
-  - Pump: `amount`, `unit`, `left_amount`, `right_amount`, durations in minutes, `sides`, and
-    `note`.
   - Sleep: `duration_minutes` (0 while a sleep is in progress) and `note`.
+- **Last pump**, on the account device: the newest pump on the account, whoever logged it. Pumps
+  belong to the account, not a baby (the app stores no baby with them), so this isn't on a baby's
+  device. Attributes: `amount`, `unit`, `left_amount` and `right_amount` (only when the sides were
+  entered), durations in minutes, `sides`, and `note`. Upgrading removes the old per-baby last-pump
+  sensors from the entity registry; update any dashboard or automation that used one.
 - An **Asleep** sensor, on while the baby's newest sleep is running, from any device.
 - Two timer sensors on each baby, built for a live activity:
   - **Sleep timer**: when the running sleep started (from any device), or unknown. Attribute
@@ -107,9 +111,11 @@ The actions do the same and more:
 - `nighp_baby_tracker.log_sleep` takes `baby`, `start` and `end` (the end must be after the start),
   and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
   than 1.
-- `nighp_baby_tracker.log_pump` takes `baby`, `left_amount` and/or `right_amount`, an optional
-  `unit`, `left_minutes` and `right_minutes`, an optional `finish_side`, an optional `time` (the
-  start; default now), and an optional `note`. The total is the sum of the two sides.
+- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account) or `device` (the account's
+  device, or a baby's, which resolves to its account; give one, not both), `left_amount` and/or
+  `right_amount`, an optional `unit`, `left_minutes` and `right_minutes`, an optional
+  `finish_side`, an optional `time` (the start; default now), and an optional `note`. The total is
+  the sum of the two sides. A pump belongs to the account, so no baby is saved with it.
 - `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `baby` or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
   recent record Home Assistant created (for that baby, if you gave `baby`). Run it again and it

@@ -360,7 +360,6 @@ async def async_log_sleep(
 
 async def async_log_pump(
     coordinator: BabyTrackerCoordinator,
-    baby_id: str,
     *,
     left_amount: float | None = None,
     right_amount: float | None = None,
@@ -372,7 +371,10 @@ async def async_log_pump(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a pumping session of one or both sides, starting at ``time`` (default now)."""
+    """Add a pumping session of one or both sides, starting at ``time`` (default now).
+
+    A pump belongs to the account, not a baby, so it takes no baby and is written with none.
+    """
     if left_amount is None and right_amount is None:
         raise validation_error("no_amount")
     for amount in (left_amount, right_amount):
@@ -391,7 +393,6 @@ async def async_log_pump(
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
         return await engine.add_pump(
             client,
-            baby_id,
             left_volume=left,
             right_volume=right,
             left_minutes=left_minutes,

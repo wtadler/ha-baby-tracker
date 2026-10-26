@@ -57,12 +57,14 @@ def record_payload(
     object_id: str,
     *,
     when: datetime,
-    baby: dict[str, Any],
+    baby: dict[str, Any] | None,
     changed: datetime | None = None,
     note: str = "",
     **fields: Any,
 ) -> dict[str, Any]:
-    return {
+    """A record payload. ``baby=None`` leaves the ``baby`` key out, as the live service does for a
+    pump."""
+    payload = {
         "BCObjectType": type_name,
         "objectID": object_id,
         "time": fmt(when),
@@ -73,8 +75,10 @@ def record_payload(
         "newFlage": "true",
         "pictureLoaded": "true",
         **fields,
-        "baby": baby,
     }
+    if baby is not None:
+        payload["baby"] = baby
+    return payload
 
 
 def wire(sync_id: int, op_code: int, payload: Any) -> dict[str, Any]:

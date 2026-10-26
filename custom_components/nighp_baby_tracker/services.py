@@ -23,6 +23,7 @@ from .const import (
     SERVICE_STOP_SLEEP,
     SERVICE_SWITCH_NURSING_SIDE,
     SERVICE_UNDO,
+    is_account_identifier,
 )
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .writes import (
@@ -50,6 +51,7 @@ ATTR_TYPE = "type"
 ATTR_TIME = "time"
 ATTR_NOTE = "note"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+ATTR_DEVICE = "device"
 ATTR_OBJECT_ID = "object_id"
 ATTR_KIND = "kind"
 ATTR_AMOUNT = "amount"
@@ -130,17 +132,29 @@ LOG_SLEEP_SCHEMA = vol.Schema(
     }
 )
 
-LOG_PUMP_SCHEMA = vol.Schema(
-    {
-        **_COMMON,
-        vol.Optional(ATTR_LEFT_AMOUNT): vol.Coerce(float),
-        vol.Optional(ATTR_RIGHT_AMOUNT): vol.Coerce(float),
-        vol.Optional(ATTR_UNIT): _UNIT,
-        vol.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
-        vol.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
-        vol.Optional(ATTR_FINISH_SIDE): vol.In(list(FINISH_SIDES)),
-        vol.Optional(ATTR_TIME): cv.datetime,
-    }
+# A pump belongs to the account, not a baby, so it names an account or a device in one.
+_PUMP_COMMON = {
+    vol.Optional(ATTR_NOTE, default=""): cv.string,
+    vol.Optional(ATTR_OBJECT_ID): _uuid_upper,
+}
+
+LOG_PUMP_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            **_PUMP_COMMON,
+            vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
+            vol.Optional(ATTR_DEVICE): cv.string,
+            vol.Optional(ATTR_LEFT_AMOUNT): vol.Coerce(float),
+            vol.Optional(ATTR_RIGHT_AMOUNT): vol.Coerce(float),
+            vol.Optional(ATTR_UNIT): _UNIT,
+            vol.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
+            vol.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
+            vol.Optional(ATTR_FINISH_SIDE): vol.In(list(FINISH_SIDES)),
+            vol.Optional(ATTR_TIME): cv.datetime,
+        }
+    ),
+    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE),
+    cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE),
 )
 
 START_SLEEP_SCHEMA = vol.Schema(
@@ -193,13 +207,14 @@ def _loaded(entry: BabyTrackerConfigEntry | None) -> BabyTrackerCoordinator:
     return entry.runtime_data
 
 
-def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:
-    """The coordinator that owns a baby's device, and the baby's ID."""
+def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str, bool]:
+    """The coordinator that owns one of the integration's devices, the device's identifier, and
+    whether it is an account's device (rather than a baby's)."""
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
         raise validation_error("baby_not_found")
-    baby_id = next((ident for domain, ident in device.identifiers if domain == DOMAIN), None)
-    if baby_id is None:
+    identifier = next((ident for domain, ident in device.identifiers if domain == DOMAIN), None)
+    if identifier is None:
         raise validation_error("baby_not_found")
     loaded: list[BabyTrackerConfigEntry] = []
     found_any = False
@@ -211,8 +226,25 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
         if entry.state is ConfigEntryState.LOADED:
             loaded.append(entry)
     if loaded:
-        return loaded[0].runtime_data, baby_id
+        return loaded[0].runtime_data, identifier, is_account_identifier(identifier)
     raise validation_error("entry_not_loaded" if found_any else "baby_not_found")
+
+
+def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:
+    """The coordinator that owns a baby's device, and the baby's ID. An account's device isn't a
+    baby."""
+    coordinator, baby_id, is_account = _from_device(hass, device_id)
+    if is_account:
+        raise validation_error("baby_not_found")
+    return coordinator, baby_id
+
+
+def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
+    """The account a pump goes to: the named config entry, or the entry that owns the named
+    device (a baby's or the account's)."""
+    if ATTR_CONFIG_ENTRY_ID in call.data:
+        return _loaded(call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID]))
+    return _from_device(call.hass, call.data[ATTR_DEVICE])[0]
 
 
 async def _log_diaper(call: ServiceCall) -> None:
@@ -268,10 +300,8 @@ async def _log_sleep(call: ServiceCall) -> None:
 
 
 async def _log_pump(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
     await async_log_pump(
-        coordinator,
-        baby_id,
+        _account_coordinator(call),
         left_amount=call.data.get(ATTR_LEFT_AMOUNT),
         right_amount=call.data.get(ATTR_RIGHT_AMOUNT),
         unit=call.data.get(ATTR_UNIT),
