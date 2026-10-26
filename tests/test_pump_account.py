@@ -6,8 +6,6 @@ device per config entry, ``log_pump`` names an account (not a baby), and the old
 last-pump entities are removed from the entity registry on setup.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

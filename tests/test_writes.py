@@ -1,7 +1,5 @@
 """Diaper buttons, the log_diaper action, and undo."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 from collections.abc import Iterator
@@ -10,8 +8,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import probatio
 import pytest
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -304,7 +302,7 @@ async def test_a_log_diaper_retry_with_the_same_object_id_does_not_post_twice(
 async def test_log_diaper_rejects_an_object_id_that_is_not_a_uuid(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, bad: str
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await log_diaper(hass, BABY_ONE_ID, "wet", object_id=bad)
     assert server.posted == []
 
@@ -351,7 +349,7 @@ async def test_a_log_diaper_object_id_belonging_to_another_record_is_an_error(
 async def test_log_diaper_rejects_an_unknown_type(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await log_diaper(hass, BABY_ONE_ID, "purple")
     assert server.posted == []
 
@@ -935,7 +933,7 @@ async def test_undo_twice_deletes_once_and_then_refuses(
 async def test_undo_needs_a_baby_or_a_config_entry(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await undo(hass)
 
 

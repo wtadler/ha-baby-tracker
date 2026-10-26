@@ -6,8 +6,6 @@ Assistant reads and ends sleeps from any device. A nursing timer doesn't sync un
 Home Assistant keeps its own and writes one finished record at the stop.
 """
 
-from __future__ import annotations
-
 import asyncio
 from datetime import datetime, timedelta
 from typing import Any

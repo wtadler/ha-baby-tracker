@@ -1,14 +1,13 @@
 """Small helpers shared by the test modules."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 
-from custom_components.nighp_baby_tracker.const import DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+from custom_components.nighp_baby_tracker.const import DOMAIN
 
 
 async def tick(hass: HomeAssistant, minutes: float = 5) -> None:

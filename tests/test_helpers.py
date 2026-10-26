@@ -1,7 +1,5 @@
 """Turning the library's volumes into attribute values."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from homeassistant.const import UnitOfVolume

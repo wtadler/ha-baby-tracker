@@ -1,7 +1,5 @@
 """Last-activity, today, and timer sensors, one set per baby, and the account's last pump."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime

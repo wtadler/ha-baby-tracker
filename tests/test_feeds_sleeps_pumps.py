@@ -1,16 +1,14 @@
 # ruff: noqa: F811
 """Bottle, nursing, sleep, and pump actions, plus the Bottle button and its options."""
 
-from __future__ import annotations
-
 import json
 import math
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import probatio
 import pytest
-import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -436,7 +434,7 @@ async def test_log_bottle_with_a_negative_amount_gives_the_translated_amount_err
 async def test_log_bottle_with_an_unknown_kind_is_rejected(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, kind: str
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", kind=kind, amount=4, unit="fl. oz.")
     assert server.posted == []  # type: ignore[attr-defined]
 
@@ -445,7 +443,7 @@ async def test_log_bottle_with_an_unknown_kind_is_rejected(
 async def test_log_bottle_with_an_unknown_unit_is_rejected(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, unit: str
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", kind="formula", amount=4, unit=unit)
     assert server.posted == []  # type: ignore[attr-defined]
 
@@ -453,9 +451,9 @@ async def test_log_bottle_with_an_unknown_unit_is_rejected(
 async def test_log_bottle_needs_a_kind_and_an_amount(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", amount=4)
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", kind="formula")
 
 
@@ -495,7 +493,7 @@ async def test_log_sleep_needs_both_times(
 ) -> None:
     data = {"start": "2026-10-26T01:00:00+00:00", "end": "2026-10-26T02:00:00+00:00"}
     del data[missing]
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_sleep", **data)
 
 
@@ -629,7 +627,7 @@ async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
 async def test_log_nursing_rejects_negative_or_fractional_minutes(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, minutes: Any
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_nursing", left_minutes=minutes)
     assert server.posted == []  # type: ignore[attr-defined]
 
@@ -637,7 +635,7 @@ async def test_log_nursing_rejects_negative_or_fractional_minutes(
 async def test_log_nursing_rejects_an_unknown_finish_side(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await call(hass, "log_nursing", left_minutes=5, finish_side="both")
 
 
@@ -693,7 +691,7 @@ async def test_a_retry_with_the_same_object_id_does_not_post_twice(
 async def test_each_action_rejects_an_object_id_that_is_not_a_uuid(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await run_valid(hass, name, object_id="retry-1")
     assert server.posted == []  # type: ignore[attr-defined]
 

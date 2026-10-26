@@ -1,7 +1,5 @@
 """Today's counts, today's bottle volume, and the asleep sensor."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo

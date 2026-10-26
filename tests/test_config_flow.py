@@ -1,7 +1,5 @@
 """The setup screen, re-sign-in, and the options screen."""
 
-from __future__ import annotations
-
 import uuid
 
 import pytest

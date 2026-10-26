@@ -5,8 +5,6 @@ the posting device's log the way the service does, and switches to make a post f
 interleaving test, let another device write just before it, or report a log shorter than it is.
 """
 
-from __future__ import annotations
-
 import asyncio
 from dataclasses import replace
 from typing import Any

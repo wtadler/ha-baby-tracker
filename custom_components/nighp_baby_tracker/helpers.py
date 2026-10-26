@@ -1,7 +1,5 @@
 """Turn the library's volumes into attribute values."""
 
-from __future__ import annotations
-
 from homeassistant.const import UnitOfVolume
 
 from .pybabytracker import Volume

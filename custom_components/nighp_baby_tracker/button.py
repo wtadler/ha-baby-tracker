@@ -1,7 +1,5 @@
 """Diaper, Bottle, Sleep, and Nurse buttons, one set per baby."""
 
-from __future__ import annotations
-
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 

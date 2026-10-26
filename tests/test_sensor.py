@@ -1,15 +1,11 @@
 """The per-baby devices and their last-activity sensors."""
 
-from __future__ import annotations
-
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.nighp_baby_tracker.const import DOMAIN
 
 from .conftest import BABY_ONE, FakeServer
 from .factories import (

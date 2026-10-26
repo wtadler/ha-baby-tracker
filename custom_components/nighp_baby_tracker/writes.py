@@ -6,8 +6,6 @@ failed, and publishes the new state. This module adds the Home Assistant error t
 the checks that refuse bad input before anything is sent.
 """
 
-from __future__ import annotations
-
 import logging
 import math
 import uuid

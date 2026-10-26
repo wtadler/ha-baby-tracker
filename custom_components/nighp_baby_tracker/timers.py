@@ -10,8 +10,6 @@ refused: the press was deliberate, and a refusal would leave the timer running. 
 than 240 minutes (a forgotten timer) is written as 240, the most the library accepts.
 """
 
-from __future__ import annotations
-
 import logging
 import math
 from collections.abc import Mapping

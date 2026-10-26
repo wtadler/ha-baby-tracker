@@ -5,8 +5,6 @@ The library's client is faked at its public interface (``sign_in``, ``get_device
 exercise the real merging of logs.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any

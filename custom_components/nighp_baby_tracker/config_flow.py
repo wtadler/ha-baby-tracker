@@ -1,13 +1,11 @@
 """Config flow for Baby Tracker (Nighp)."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -53,12 +51,12 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_BOTTLE_SIZE = 32  # fluid ounces: more than any bottle
 
-CREDENTIALS_SCHEMA = vol.Schema(
+CREDENTIALS_SCHEMA = probatio.Schema(
     {
-        vol.Required(CONF_EMAIL): TextSelector(
+        probatio.Required(CONF_EMAIL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="username")
         ),
-        vol.Required(CONF_PASSWORD): TextSelector(
+        probatio.Required(CONF_PASSWORD): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
         ),
     }
@@ -172,9 +170,9 @@ class BabyTrackerOptionsFlow(OptionsFlow):
             )
         current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES)
         size, unit, kind = configured_bottle(self.config_entry.options)
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
+                probatio.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
                     NumberSelectorConfig(
                         min=MIN_SCAN_INTERVAL_MINUTES,
                         max=MAX_SCAN_INTERVAL_MINUTES,
@@ -183,17 +181,17 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                         unit_of_measurement="min",
                     )
                 ),
-                vol.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
+                probatio.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
                     NumberSelectorConfig(
                         min=0.1, max=MAX_BOTTLE_SIZE, step="any", mode=NumberSelectorMode.BOX
                     )
                 ),
-                vol.Required(CONF_BOTTLE_UNIT, default=unit): SelectSelector(
+                probatio.Required(CONF_BOTTLE_UNIT, default=unit): SelectSelector(
                     SelectSelectorConfig(
                         options=[OUNCES, MILLILITERS], mode=SelectSelectorMode.DROPDOWN
                     )
                 ),
-                vol.Required(CONF_BOTTLE_TYPE, default=kind): SelectSelector(
+                probatio.Required(CONF_BOTTLE_TYPE, default=kind): SelectSelector(
                     SelectSelectorConfig(
                         options=list(BOTTLE_KINDS),
                         mode=SelectSelectorMode.DROPDOWN,

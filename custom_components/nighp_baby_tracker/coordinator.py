@@ -1,7 +1,5 @@
 """Sync coordinator: keeps the sync engine current and exposes each baby's latest records."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable

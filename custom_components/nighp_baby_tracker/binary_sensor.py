@@ -1,7 +1,5 @@
 """The asleep sensor, one per baby."""
 
-from __future__ import annotations
-
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
