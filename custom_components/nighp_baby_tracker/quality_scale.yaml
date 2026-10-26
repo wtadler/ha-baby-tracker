@@ -1,8 +1,6 @@
 rules:
   # Bronze
-  action-setup:
-    status: exempt
-    comment: This version registers no actions. Writing and actions come in a later ticket.
+  action-setup: done
   appropriate-polling: done
   brands:
     status: exempt
@@ -13,9 +11,7 @@ rules:
   dependency-transparency:
     status: todo
     comment: library bundled while private; PyPI at go-public (#12)
-  docs-actions:
-    status: exempt
-    comment: This version registers no actions.
+  docs-actions: done
   docs-conditions:
     status: exempt
     comment: The integration registers no device conditions.
