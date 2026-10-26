@@ -74,6 +74,15 @@
       },
       "bottle": {
         "name": "Bottle"
+      },
+      "sleep": {
+        "name": "Sleep"
+      },
+      "nurse_left": {
+        "name": "Nurse left"
+      },
+      "nurse_right": {
+        "name": "Nurse right"
       }
     },
     "sensor": {
@@ -97,6 +106,35 @@
       },
       "last_sleep": {
         "name": "Last sleep"
+      },
+      "sleep_timer": {
+        "name": "Sleep timer",
+        "state_attributes": {
+          "object_id": {
+            "name": "Record ID"
+          }
+        }
+      },
+      "nursing_timer": {
+        "name": "Nursing timer",
+        "state_attributes": {
+          "side": {
+            "name": "Side",
+            "state": {
+              "left": "Left",
+              "right": "Right"
+            }
+          },
+          "side_started": {
+            "name": "Side started"
+          },
+          "left_seconds": {
+            "name": "Left seconds"
+          },
+          "right_seconds": {
+            "name": "Right seconds"
+          }
+        }
       }
     }
   },
@@ -284,6 +322,80 @@
           "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new record each time."
         }
       }
+    },
+    "start_sleep": {
+      "name": "Start sleep",
+      "description": "Starts a sleep timer for a baby. It syncs at once, so the phones show the sleep running.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "start": {
+          "name": "Start",
+          "description": "When the sleep began. Defaults to now. It can't be in the future or more than 24 hours ago. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the sleep."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a sleep with this ID already started, nothing is added again."
+        }
+      }
+    },
+    "stop_sleep": {
+      "name": "Stop sleep",
+      "description": "Ends the baby's running sleep, whether it started in Home Assistant or on a phone.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "end": {
+          "name": "End",
+          "description": "When the sleep ended. Defaults to now. A sleep longer than 24 hours is saved as 24 hours."
+        }
+      }
+    },
+    "start_nursing": {
+      "name": "Start nursing",
+      "description": "Starts Home Assistant's nursing timer on a side, or switches to that side if the timer is on the other one. Nothing is saved until the timer stops.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "side": {
+          "name": "Side",
+          "description": "The side to nurse on."
+        }
+      }
+    },
+    "switch_nursing_side": {
+      "name": "Switch nursing side",
+      "description": "Moves the running nursing timer to the other side, keeping the time on the first.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        }
+      }
+    },
+    "stop_nursing": {
+      "name": "Stop nursing",
+      "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it ended on, and the start time.",
+      "fields": {
+        "baby": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the nursing record."
+        }
+      }
     }
   },
   "selector": {
@@ -385,6 +497,30 @@
     },
     "amount_too_small": {
       "message": "That amount rounds to zero. Amounts are saved to two decimals."
+    },
+    "no_running_sleep": {
+      "message": "No sleep is running for that baby."
+    },
+    "sleep_already_running": {
+      "message": "A sleep is already running for that baby. Stop it first."
+    },
+    "sleep_start_out_of_range": {
+      "message": "A sleep can't start in the future or more than 24 hours ago."
+    },
+    "not_a_sleep": {
+      "message": "That record isn't a sleep, so it has no timer to stop."
+    },
+    "no_nursing_timer": {
+      "message": "No nursing timer is running for that baby."
+    },
+    "sleep_already_ended": {
+      "message": "That sleep was already ended on another device, so nothing was changed."
+    },
+    "sleep_already_started": {
+      "message": "A sleep was already started on another device, so no second one was started."
+    },
+    "nursing_not_saved": {
+      "message": "The nursing timer changed, but it couldn't be saved, so it won't survive a restart. Check the logs."
     }
   },
   "issues": {

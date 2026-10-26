@@ -1,4 +1,4 @@
-"""Diaper buttons and the Bottle button, one set per baby."""
+"""Diaper, Bottle, Sleep, and Nurse buttons, one set per baby."""
 
 from __future__ import annotations
 
@@ -13,7 +13,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
-from .writes import async_log_configured_bottle, async_log_diaper
+from .writes import (
+    async_log_configured_bottle,
+    async_log_diaper,
+    async_press_nurse,
+    async_press_sleep,
+)
 
 # The coordinator's lock serializes writes, so Home Assistant needn't.
 PARALLEL_UPDATES = 0
@@ -33,6 +38,13 @@ def _diaper(kind: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None
     return press
 
 
+def _nurse(side: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None]]:
+    async def press(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
+        await async_press_nurse(coordinator, baby_id, side)
+
+    return press
+
+
 BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     BabyTrackerButtonDescription(
         key="wet_diaper", translation_key="wet_diaper", press_fn=_diaper("wet")
@@ -46,6 +58,15 @@ BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     # Logs the bottle the options describe, read when the button is pressed.
     BabyTrackerButtonDescription(
         key="bottle", translation_key="bottle", press_fn=async_log_configured_bottle
+    ),
+    # Starts a sleep, or ends the running one (from any device).
+    BabyTrackerButtonDescription(key="sleep", translation_key="sleep", press_fn=async_press_sleep),
+    # Start a side, switch to it, or stop when it's the side already running.
+    BabyTrackerButtonDescription(
+        key="nurse_left", translation_key="nurse_left", press_fn=_nurse("left")
+    ),
+    BabyTrackerButtonDescription(
+        key="nurse_right", translation_key="nurse_right", press_fn=_nurse("right")
     ),
 )
 
@@ -74,7 +95,7 @@ async def async_setup_entry(
 
 
 class BabyTrackerButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity):
-    """Logs one thing, right now, for one baby."""
+    """Logs one thing, or moves a timer along, right now, for one baby."""
 
     _attr_has_entity_name = True
     entity_description: BabyTrackerButtonDescription

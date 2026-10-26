@@ -29,8 +29,10 @@ from .pybabytracker import (
     BabyTrackerClient,
     BabyTrackerError,
     Record,
+    Sleep,
     SyncEngine,
 )
+from .timers import NursingTimer, load_timers
 from .totals import DayTotals, day_totals
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,9 @@ _LOGGER = logging.getLogger(__name__)
 type BabyTrackerConfigEntry = ConfigEntry[BabyTrackerCoordinator]
 
 FEED_TYPES = ("Nursing", "Formula", "Pumped")
+
+# How often to sync while a sleep or nursing timer runs, so a phone's stop shows up quickly.
+TIMER_INTERVAL = timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,10 +56,20 @@ class BabyData:
     pump: Record | None = None
     sleep: Record | None = None
     today: DayTotals = DayTotals()
+    nursing: NursingTimer | None = None
+
+    @property
+    def running_sleep(self) -> Sleep | None:
+        """The newest sleep, if it's still running. The asleep sensor follows the same rule."""
+        return self.sleep if isinstance(self.sleep, Sleep) and self.sleep.is_running else None
 
 
 def storage_key(entry_id: str) -> str:
     return f"{DOMAIN}.{entry_id}"
+
+
+def nursing_storage_key(entry_id: str) -> str:
+    return f"{DOMAIN}.{entry_id}.nursing"
 
 
 def scan_interval(entry: ConfigEntry) -> timedelta:
@@ -101,13 +116,25 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self.lock = asyncio.Lock()
         self._store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
         self._baby_names: dict[str, str | None] = {}
+        # Home Assistant's own nursing timers, by baby ID (see timers.py).
+        self.nursing: dict[str, NursingTimer] = {}
+        self._nursing_store: Store = Store(
+            hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)
+        )
 
     async def _async_setup(self) -> None:
-        """Load the saved sync state, so a restart fetches only what's newer."""
+        """Load the saved sync state, so a restart fetches only what's newer, and any running
+        nursing timers."""
         # Today's counts change at local midnight even when nothing syncs.
         self.config_entry.async_on_unload(
             async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
         )
+        try:
+            self.nursing = load_timers(await self._nursing_store.async_load())
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "The saved nursing timers couldn't be read (%s); starting with none", err
+            )
         try:
             saved = await self._store.async_load()
         except HomeAssistantError as err:
@@ -145,7 +172,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             _LOGGER.exception("Couldn't save the sync state; it will be saved after the next sync")
 
     async def async_write[T](
-        self, operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]]
+        self,
+        operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]],
+        *,
+        locked: bool = False,
     ) -> T:
         """Run a write under the lock: sync first, call ``operation``, save, then publish.
 
@@ -153,21 +183,70 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         pending post and its grace window live only in that state. The new data reaches the
         entities at once, without waiting for the next poll, but only after a success. Library
         errors propagate as they are; a failed sync before the write is wrapped in
-        ``SyncBeforeWriteError`` (an authentication error passes through as itself).
+        ``SyncBeforeWriteError`` (an authentication error passes through as itself). Pass
+        ``locked=True`` when the caller already holds ``exclusive()`` (a nursing stop).
         """
+        if locked:
+            return await self._async_write_locked(operation)
         async with self.lock:
+            return await self._async_write_locked(operation)
+
+    async def _async_write_locked[T](
+        self, operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]]
+    ) -> T:
+        try:
             try:
-                try:
-                    await self.engine.sync(self.client)
-                except AuthenticationError:
-                    raise
-                except BabyTrackerError as err:
-                    raise SyncBeforeWriteError(str(err)) from err
-                result = await operation(self.engine, self.client)
-            finally:
-                await self._async_save()
-            self.async_set_updated_data(self._snapshot())
-            return result
+                await self.engine.sync(self.client)
+            except AuthenticationError:
+                raise
+            except BabyTrackerError as err:
+                raise SyncBeforeWriteError(str(err)) from err
+            result = await operation(self.engine, self.client)
+        finally:
+            await self._async_save()
+        self.async_set_updated_data(self._snapshot())
+        return result
+
+    def wanted_interval(self, data: dict[str, BabyData] | None = None) -> timedelta:
+        """One minute while any sleep (synced) or nursing timer (Home Assistant's) runs, and the
+        configured interval otherwise."""
+        babies = data if data is not None else self.data or {}
+        if any(baby_id in babies for baby_id in self.nursing) or any(
+            baby.running_sleep is not None for baby in babies.values()
+        ):
+            return TIMER_INTERVAL
+        return scan_interval(self.config_entry)
+
+    def exclusive(self) -> asyncio.Lock:
+        """The lock syncs and writes take, for a caller that needs several steps with neither
+        running in between (a nursing timer change). Pass ``locked=True`` to ``async_write``
+        while holding it."""
+        return self.lock
+
+    async def async_set_nursing(self, baby_id: str, timer: NursingTimer | None) -> None:
+        """Start, change, or (with ``None``) clear a baby's nursing timer, publish it, and save it.
+
+        Hold ``exclusive()``. The change applies in memory and on the entities even if the save
+        fails; the failure then raises ``HomeAssistantError`` (``nursing_not_saved``), because
+        the timer won't survive a restart.
+        """
+        if timer is None:
+            self.nursing.pop(baby_id, None)
+        else:
+            self.nursing[baby_id] = timer
+        self.async_set_updated_data(self._snapshot())
+        if not await self._async_save_nursing():
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="nursing_not_saved")
+
+    async def _async_save_nursing(self) -> bool:
+        try:
+            await self._nursing_store.async_save(
+                {baby: saved.to_dict() for baby, saved in self.nursing.items()}
+            )
+        except Exception:
+            _LOGGER.exception("Couldn't save the nursing timers")
+            return False
+        return True
 
     @callback
     def _async_midnight(self, _now: datetime) -> None:
@@ -194,7 +273,16 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 pump=latest.get("Pump"),
                 sleep=latest.get("Sleep"),
                 today=day_totals(self.engine.records.values(), baby_id, start, end),
+                nursing=self.nursing.get(baby_id),
             )
+        # A saved timer for a baby no longer in the account can't be stopped: drop it.
+        if orphaned := [baby_id for baby_id in self.nursing if baby_id not in data]:
+            for baby_id in orphaned:
+                _LOGGER.warning("Dropping the nursing timer of baby %s, no longer known", baby_id)
+                del self.nursing[baby_id]
+            self.hass.async_create_task(self._async_save_nursing())
+        # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
+        self.update_interval = self.wanted_interval(data)
         return data
 
     async def async_close(self) -> None:

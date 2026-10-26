@@ -3,7 +3,8 @@
 A custom integration for the Nighp "Baby Tracker" app. Home Assistant signs in to your account's
 sync service and shows each baby's last diaper, feed, pump, and sleep.
 
-This version reads, and logs diapers. Timers and today's counts come in later versions. See
+This version reads, logs diapers, bottles, nursing, sleep, and pumps, and runs sleep and nursing
+timers. See
 `PROTOCOL.md` for how the sync service works and `GLOSSARY.md` for the terms used here.
 
 ## What you get
@@ -18,6 +19,14 @@ This version reads, and logs diapers. Timers and today's counts come in later ve
   - Pump: `amount`, `unit`, `left_amount`, `right_amount`, durations in minutes, `sides`, and
     `note`.
   - Sleep: `duration_minutes` (0 while a sleep is in progress) and `note`.
+- An **Asleep** sensor, on while the baby's newest sleep is running, from any device.
+- Two timer sensors on each baby, built for a live activity:
+  - **Sleep timer**: when the running sleep started (from any device), or unknown. Attribute
+    `object_id`.
+  - **Nursing timer**: when Home Assistant's nursing timer started, or unknown. Attributes
+    `side` (`left` or `right`), `side_started` (when the current side began), and
+    `left_seconds` and `right_seconds` (time on each side before the current one). The current
+    side's time is now minus `side_started`.
 - Babies that appear later in your account are added without a restart.
 
 ## Installation
@@ -65,6 +74,25 @@ Each baby has **Wet diaper**, **Dirty diaper**, **Mixed diaper**, and **Bottle**
 Pressing one logs that diaper, or the bottle your options describe, for that baby, right now, as
 Home Assistant's own device in your account.
 
+### Timers
+
+- **Sleep** starts a sleep, or ends the one running, wherever it started. The app syncs a running
+  sleep, so the phones show it at once and Home Assistant sees theirs. A press does what Home
+  Assistant showed when you pressed it: if a phone already ended that sleep, or already started
+  one, the press writes nothing rather than starting a second sleep, and shows an error saying so.
+- **Nurse left** and **Nurse right** run Home Assistant's own nursing timer. Press a side to start
+  it, the other side to switch (the first side's time is kept), and the running side again to stop.
+  The app doesn't sync a running nursing timer, so Home Assistant can't see one running on a phone,
+  and the phones see Home Assistant's only when it stops: one nursing record with each side's whole
+  minutes (rounded half up), the side it ended on, and the start time. A stop within 30 seconds is
+  saved as 1 minute on that side, and more than 240 minutes on a side is saved as 240. The timer
+  survives a restart (if it can't be saved, the press still works and shows an error), and nursing
+  while the baby is asleep is fine. A timer for a baby no longer in the account is dropped.
+- While any sleep or nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
+  up quickly. It returns to your sync interval when none is running.
+- A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a
+  forgotten timer can always be stopped; fix the length in the app.
+
 The actions do the same and more:
 
 - `nighp_baby_tracker.log_diaper` takes `baby` (the baby's device), `type` (`wet`, `dirty`, or
@@ -88,7 +116,18 @@ The actions do the same and more:
   deletes the next older Home Assistant entry, and so on, until none are left. If you give both
   `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
   made.
-- Every `log_*` action also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
+- `nighp_baby_tracker.start_sleep` takes `baby`, an optional `start` (default now; not in the
+  future or more than 24 hours ago), an optional `note`, and an optional `object_id`. It's refused
+  while the baby's newest sleep is running.
+- `nighp_baby_tracker.stop_sleep` takes `baby` and an optional `end` (default now). It ends the
+  baby's running sleep, whether Home Assistant or a phone started it, and is refused when none is
+  running.
+- `nighp_baby_tracker.start_nursing` takes `baby` and `side` (`left` or `right`). With the timer on
+  the other side, it switches; on the same side, nothing changes.
+- `nighp_baby_tracker.switch_nursing_side` takes `baby` and moves the timer to the other side.
+- `nighp_baby_tracker.stop_nursing` takes `baby` and an optional `note`, and saves the nursing
+  record. Switching or stopping with no timer running is refused.
+- Every `log_*` action, and `start_sleep`, also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
   Send the same one to retry a write that may have landed: it's added once, never twice.
 
 Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from

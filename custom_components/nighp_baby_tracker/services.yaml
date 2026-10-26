@@ -248,3 +248,80 @@ undo:
       example: 6F1C2A3E-0000-4000-8000-000000000001
       selector:
         text:
+
+start_sleep:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    start:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Nap in the crib
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000005
+      selector:
+        text:
+
+stop_sleep:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    end:
+      required: false
+      selector:
+        datetime:
+
+start_nursing:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    side:
+      required: true
+      example: left
+      selector:
+        select:
+          translation_key: finish_side
+          options:
+            - left
+            - right
+
+switch_nursing_side:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+
+stop_nursing:
+  fields:
+    baby:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker
+    note:
+      required: false
+      example: Fell asleep at the end
+      selector:
+        text:

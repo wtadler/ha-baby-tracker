@@ -28,7 +28,8 @@ from .helpers import tick
 KEYS = ("last_diaper", "last_feed", "last_pump", "last_sleep")
 # The counts and the asleep sensor are covered in test_today.py; each baby also has these four.
 TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
-PER_BABY = len(KEYS) + len(TODAY_KEYS)
+TIMER_KEYS = ("sleep_timer", "nursing_timer")
+PER_BABY = len(KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
 # The buttons share each baby's device, so entity counts here look at readings only.
 READINGS = ("sensor", "binary_sensor")
 BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
@@ -64,7 +65,7 @@ async def test_two_babies_make_two_devices_each_with_four_sensors(
             e for e in er.async_entries_for_device(entities, device.id) if e.domain in READINGS
         ]
         assert len(sensors) == PER_BABY
-        assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS)
+        assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS + TIMER_KEYS)
     assert len(dr.async_entries_for_config_entry(devices, setup_entry.entry_id)) == 2
 
 
@@ -93,7 +94,9 @@ async def test_unique_ids_are_built_from_the_baby_id(
     entries = [e for e in entries if e.domain in READINGS]
     assert len(entries) == 2 * PER_BABY
     assert {e.unique_id for e in entries} == {
-        f"{baby}_{key}" for baby in (BABY_ONE_ID, BABY_TWO_ID) for key in KEYS + TODAY_KEYS
+        f"{baby}_{key}"
+        for baby in (BABY_ONE_ID, BABY_TWO_ID)
+        for key in KEYS + TODAY_KEYS + TIMER_KEYS
     }
 
 

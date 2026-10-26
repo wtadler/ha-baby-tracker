@@ -166,8 +166,11 @@ async def test_each_baby_gets_wet_dirty_mixed_and_bottle_buttons(
             "dirty_diaper",
             "mixed_diaper",
             "bottle",
+            "sleep",
+            "nurse_left",
+            "nurse_right",
         }
-        assert len({b.unique_id for b in buttons}) == 4
+        assert len({b.unique_id for b in buttons}) == 7
     assert hass.states.get(button("baby_one", "wet")) is not None
     assert hass.states.get(button("baby_two", "mixed")) is not None
 
@@ -1042,6 +1045,11 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "log_nursing",
         "log_sleep",
         "log_pump",
+        "start_sleep",
+        "stop_sleep",
+        "start_nursing",
+        "switch_nursing_side",
+        "stop_nursing",
     }
     assert set(services["log_diaper"]["fields"]) == {"baby", "type", "time", "note", "object_id"}
     assert set(services["undo"]["fields"]) == {"config_entry_id", "baby", "object_id"}
