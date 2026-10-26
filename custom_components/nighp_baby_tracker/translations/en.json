@@ -51,7 +51,21 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "asleep": {
+        "name": "Asleep"
+      }
+    },
     "sensor": {
+      "diapers_today": {
+        "name": "Diapers today"
+      },
+      "feeds_today": {
+        "name": "Feeds today"
+      },
+      "bottle_volume_today": {
+        "name": "Bottle volume today"
+      },
       "last_diaper": {
         "name": "Last diaper"
       },

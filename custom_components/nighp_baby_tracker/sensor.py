@@ -12,15 +12,19 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
+from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import DOMAIN
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .helpers import volume_parts
 from .pybabytracker import Record
+from .today_entity import BabyTrackerBabyEntity
+from .totals import DayTotals
 
 PARALLEL_UPDATES = 0
 
@@ -136,6 +140,11 @@ async def async_setup_entry(
             for baby_id in new
             for description in SENSORS
         )
+        async_add_entities(
+            BabyTrackerTodaySensor(coordinator, description, baby_id)
+            for baby_id in new
+            for description in TODAY_SENSORS
+        )
 
     _add_new_babies()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))
@@ -184,3 +193,69 @@ class BabyTrackerSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity)
     def extra_state_attributes(self) -> dict[str, Any] | None:
         record = self._record
         return self.entity_description.attributes_fn(record) if record is not None else None
+
+
+@dataclass(frozen=True, kw_only=True)
+class BabyTrackerTodaySensorDescription(SensorEntityDescription):
+    """A sensor that totals a baby's local calendar day."""
+
+    value_fn: Callable[[DayTotals], float | int]
+    attributes_fn: Callable[[DayTotals], dict[str, Any]] | None = None
+
+
+TODAY_SENSORS: tuple[BabyTrackerTodaySensorDescription, ...] = (
+    BabyTrackerTodaySensorDescription(
+        key="diapers_today",
+        translation_key="diapers_today",
+        value_fn=lambda totals: totals.diapers,
+        attributes_fn=lambda totals: {
+            "wet": totals.wet,
+            "dirty": totals.dirty,
+            "mixed": totals.mixed,
+        },
+    ),
+    BabyTrackerTodaySensorDescription(
+        key="feeds_today",
+        translation_key="feeds_today",
+        value_fn=lambda totals: totals.feeds,
+    ),
+    BabyTrackerTodaySensorDescription(
+        key="bottle_volume_today",
+        translation_key="bottle_volume_today",
+        device_class=SensorDeviceClass.VOLUME,
+        # The value is in milliliters; the entity converts it to the unit system's unit.
+        value_fn=lambda totals: totals.bottle_milliliters,
+    ),
+)
+
+
+class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
+    """Diapers, feeds, or bottle volume since local midnight."""
+
+    entity_description: BabyTrackerTodaySensorDescription
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        if self.entity_description.device_class is not SensorDeviceClass.VOLUME:
+            return None
+        # Home Assistant's US customary system measures volume in gallons: too big for a bottle.
+        if self.hass.config.units.volume_unit == UnitOfVolume.GALLONS:
+            return UnitOfVolume.FLUID_OUNCES
+        return UnitOfVolume.MILLILITERS
+
+    @property
+    def native_value(self) -> float | int | None:
+        baby = self._baby
+        if baby is None:
+            return None
+        value = self.entity_description.value_fn(baby.today)
+        unit = self.native_unit_of_measurement
+        if unit is None:
+            return value
+        return round(VolumeConverter.convert(value, UnitOfVolume.MILLILITERS, unit), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        baby = self._baby
+        attributes_fn = self.entity_description.attributes_fn
+        return attributes_fn(baby.today) if baby is not None and attributes_fn else None

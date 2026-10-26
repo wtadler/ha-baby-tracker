@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_DEVICE_UUID,
@@ -28,6 +30,7 @@ from .pybabytracker import (
     Record,
     SyncEngine,
 )
+from .totals import DayTotals, day_totals
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +49,7 @@ class BabyData:
     feed: Record | None = None
     pump: Record | None = None
     sleep: Record | None = None
+    today: DayTotals = DayTotals()
 
 
 def storage_key(entry_id: str) -> str:
@@ -95,6 +99,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
 
     async def _async_setup(self) -> None:
         """Load the saved sync state, so a restart fetches only what's newer."""
+        # Today's counts change at local midnight even when nothing syncs.
+        self.config_entry.async_on_unload(
+            async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
+        )
         try:
             saved = await self._store.async_load()
         except HomeAssistantError as err:
@@ -131,7 +139,18 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         except Exception:
             _LOGGER.exception("Couldn't save the sync state; it will be saved after the next sync")
 
+    @callback
+    def _async_midnight(self, _now: datetime) -> None:
+        """Start a new day of counts without syncing."""
+        if self.data is not None:
+            self.data = self._snapshot()
+            self.async_update_listeners()
+
     def _snapshot(self) -> dict[str, BabyData]:
+        # The local calendar day, so a day with a clock change is 23 or 25 hours long.
+        today = dt_util.now().date()
+        start = dt_util.start_of_local_day(today)
+        end = dt_util.start_of_local_day(today + timedelta(days=1))
         for baby_id, baby in self.engine.babies().items():
             self._baby_names[baby_id] = baby.name
         data: dict[str, BabyData] = {}
@@ -144,6 +163,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 feed=_newest([latest[kind] for kind in FEED_TYPES if kind in latest]),
                 pump=latest.get("Pump"),
                 sleep=latest.get("Sleep"),
+                today=day_totals(self.engine.records.values(), baby_id, start, end),
             )
         return data
 
