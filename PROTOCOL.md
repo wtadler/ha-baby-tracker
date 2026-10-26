@@ -27,6 +27,13 @@ Without a session, `GET /account/device` returns `401 Unauthorized`.
 - A device sends its changes with `POST /account/transaction`. To pull, it reads `/account/device` for every device's `LastSyncID` and fetches from each one that's ahead of what it has seen. The app stores what it has seen in the local `MergedTransaction(DeviceID, SyncID)` table.
 - Changes not yet sent wait in the local `TransactionLog(ID, OpCode, Log)` table, where `Log` holds the same base64 string.
 
+### Probe findings (2026-10-26, read-only, with `python -m pybabytracker --probe-history`)
+
+- **The server keeps full history.** Every device's log on a real account came back starting from `SyncID` 1, including logs going back about two years. A new device can backfill by replaying every log from 0. No snapshot import is needed.
+- **Logs come in pages of 500.** `GET /account/transaction/{DeviceUUID}/{SinceSyncID}` returns at most 500 transactions. Logs longer than that need repeated reads from the highest number returned, until a read comes back short or reaches `LastSyncID`.
+- **Signing in doesn't join the sync group.** A `POST /session` with a new `DeviceUUID` succeeds, but that device doesn't appear in `/account/device`. On a fresh test account, the iPad appeared (with `LastSyncID` 1) only after it posted its first transaction. A device seems to join the group by posting, which suggests a read-only client stays invisible in the device list.
+- A full probe of 5 devices (about 4,300 transactions) took about 4 seconds.
+
 ## OPCodes
 
 - `0`: add (observed)
@@ -71,7 +78,6 @@ Without a session, `GET /account/device` returns `401 Unauthorized`.
 
 ## Open questions
 
-- How long does the server keep transaction history? Can a new device pull every log from SyncID 0, or does it need a snapshot to start from?
-- Does logging in with a new `DeviceUUID` add a device to the sync group with no confirmation step? Is there a device limit?
+- When Home Assistant's first post makes it appear in the device list, is there a confirmation step or a device limit? Confirm on the test account in the first write ticket.
 - In the capture, the pull from another device returned a delete matching ours (SyncID 1602). Does the server echo deletes, or did that device send its own copy?
 - Payloads for `Nursing`, `Formula`, `Sleep` (start, stop, in-progress), and `Pump` still need to be captured. Their tables suggest the fields.
