@@ -59,7 +59,7 @@ RETRY_ID = "7E57ED00-0000-4000-8000-000000000001"
 
 BOTTLE_BUTTON = "button.baby_one_bottle"
 LAST_FEED = "sensor.baby_one_last_feed"
-LAST_PUMP = "sensor.baby_one_last_pump"
+LAST_PUMP = "sensor.baby_tracker_account_last_pump"  # the account's
 LAST_SLEEP = "sensor.baby_one_last_sleep"
 FEEDS_TODAY = "sensor.baby_one_feeds_today"
 BOTTLE_TODAY = "sensor.baby_one_bottle_volume_today"
@@ -73,6 +73,12 @@ def captured(prefix: str) -> dict[str, Any]:
 
 
 async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
+    if action == "log_pump":
+        # A pump belongs to the account: it names the account, not a baby.
+        [entry, *_] = hass.config_entries.async_entries(DOMAIN)
+        data = {"config_entry_id": entry.entry_id, **data}
+        await hass.services.async_call(DOMAIN, action, data, blocking=True)
+        return
     await hass.services.async_call(
         DOMAIN, action, {"baby": device_id(hass, baby_id), **data}, blocking=True
     )
@@ -159,7 +165,10 @@ async def test_each_action_posts_a_record_matching_the_captured_format(
     payload = record.to_payload()
     assert {k: v for k, v in payload.items() if k not in IGNORED} == expected
     assert payload["note"] == "a note"
-    assert payload["baby"]["objectID"] == BABY_ONE_ID
+    if name == "log_pump":
+        assert "baby" not in payload  # a pump belongs to the account, not a baby
+    else:
+        assert payload["baby"]["objectID"] == BABY_ONE_ID
     assert payload["newFlage"] == "true"
 
 
@@ -177,7 +186,7 @@ async def test_each_action_posts_an_add_under_the_next_number_with_a_new_upperca
     assert len(first.object_id) == 36
 
 
-@pytest.mark.parametrize("name", ACTIONS)
+@pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_goes_to_the_baby_named(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
@@ -652,7 +661,7 @@ async def test_log_pump_with_a_negative_side_is_a_validation_error(
     assert server.posted == []  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize("name", ACTIONS)
+@pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
@@ -1245,7 +1254,8 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
     }
     assert fields["log_sleep"] == {"baby", "start", "end", "note", "object_id"}
     assert fields["log_pump"] == {
-        "baby",
+        "config_entry_id",
+        "device",
         "left_amount",
         "right_amount",
         "unit",
@@ -1260,7 +1270,7 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
     assert bottle["kind"]["required"] is True
     assert bottle["amount"]["required"] is True
     assert bottle["unit"]["selector"]["select"]["options"] == ["fl. oz.", "mL"]
-    for action in ("log_bottle", "log_nursing", "log_sleep", "log_pump"):
+    for action in ("log_bottle", "log_nursing", "log_sleep"):
         assert services[action]["fields"]["baby"]["selector"]["device"]["filter"] == [
             {"integration": DOMAIN}
         ]

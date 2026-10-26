@@ -279,11 +279,15 @@
     },
     "log_pump": {
       "name": "Log pump",
-      "description": "Adds a pumping session for a baby. Give the amount for one side or both; the total is their sum.",
+      "description": "Adds a pumping session to a Baby Tracker account. A pump belongs to the account, not a baby. Name the account with its entry or with one of its devices. Give the amount for one side or both; the total is their sum.",
       "fields": {
-        "baby": {
-          "name": "Baby",
-          "description": "The baby's device."
+        "config_entry_id": {
+          "name": "Account",
+          "description": "The Baby Tracker account to log the pump to. Give this or a device, not both."
+        },
+        "device": {
+          "name": "Device",
+          "description": "The account's device, or one of its babies' devices (the pump still goes to the account, not that baby). Give this or an account, not both."
         },
         "left_amount": {
           "name": "Left amount",

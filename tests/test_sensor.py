@@ -25,7 +25,7 @@ from .factories import (
 )
 from .helpers import tick
 
-KEYS = ("last_diaper", "last_feed", "last_pump", "last_sleep")
+KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
 # The counts and the asleep sensor are covered in test_today.py; each baby also has these four.
 TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
 TIMER_KEYS = ("sleep_timer", "nursing_timer")
@@ -52,7 +52,7 @@ def _object_id(number: int) -> str:
 # Devices and entities
 
 
-async def test_two_babies_make_two_devices_each_with_four_sensors(
+async def test_two_babies_make_two_devices_each_with_their_own_sensors(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     devices = dr.async_get(hass)
@@ -66,24 +66,23 @@ async def test_two_babies_make_two_devices_each_with_four_sensors(
         ]
         assert len(sensors) == PER_BABY
         assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS + TIMER_KEYS)
-    assert len(dr.async_entries_for_config_entry(devices, setup_entry.entry_id)) == 2
+    # The two babies' devices and the account's (which holds the last pump).
+    assert len(dr.async_entries_for_config_entry(devices, setup_entry.entry_id)) == 3
 
 
 async def test_entities_are_named_after_the_baby_and_the_activity(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     for baby, name in (("baby_one", "Baby One"), ("baby_two", "Baby Two")):
-        for key, label in zip(
-            KEYS, ("Last diaper", "Last feed", "Last pump", "Last sleep"), strict=True
-        ):
+        for key, label in zip(KEYS, ("Last diaper", "Last feed", "Last sleep"), strict=True):
             assert _state(hass, baby, key).attributes["friendly_name"] == f"{name} {label}"
 
 
 async def test_entities_have_unique_ids(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
     unique_ids = [entry.unique_id for entry in entries if entry.domain in READINGS]
-    assert len(unique_ids) == 2 * PER_BABY
-    assert len(set(unique_ids)) == 2 * PER_BABY
+    assert len(unique_ids) == 2 * PER_BABY + 1  # and the account's last pump
+    assert len(set(unique_ids)) == 2 * PER_BABY + 1
     assert all(unique_id for unique_id in unique_ids)
 
 
@@ -92,12 +91,12 @@ async def test_unique_ids_are_built_from_the_baby_id(
 ) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
     entries = [e for e in entries if e.domain in READINGS]
-    assert len(entries) == 2 * PER_BABY
+    assert len(entries) == 2 * PER_BABY + 1
     assert {e.unique_id for e in entries} == {
         f"{baby}_{key}"
         for baby in (BABY_ONE_ID, BABY_TWO_ID)
         for key in KEYS + TODAY_KEYS + TIMER_KEYS
-    }
+    } | {f"{setup_entry.entry_id}_last_pump"}
 
 
 async def test_the_sensors_are_timestamps(
@@ -310,47 +309,6 @@ async def test_a_feed_that_is_not_nursing_formula_or_pumped_is_ignored(
     assert _state(hass, "baby_one", "last_feed").state == at(10).isoformat()
 
 
-# Last pump
-
-
-async def test_the_last_pump_shows_amounts_and_durations(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    server.add_record(
-        DEVICE_A,
-        "Pump",
-        _object_id(40),
-        when=at(45),
-        amount=volume(5),
-        leftAmount=volume(2),
-        rightAmount=volume(3),
-        leftDuration=10,
-        rightDuration=12,
-        sides=3,
-        note="morning",
-    )
-    await tick(hass)
-
-    state = _state(hass, "baby_one", "last_pump")
-    assert state.state == at(45).isoformat()
-    assert state.attributes["amount"] == 5
-    assert state.attributes["unit"] == "fl. oz."
-    assert state.attributes["left_amount"] == 2
-    assert state.attributes["right_amount"] == 3
-    assert state.attributes["left_duration_minutes"] == 10
-    assert state.attributes["right_duration_minutes"] == 12
-    assert state.attributes["sides"] == 3
-    assert state.attributes["note"] == "morning"
-
-
-async def test_a_pumped_bottle_is_not_a_pump_session(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    server.add_record(DEVICE_A, "Pumped", _object_id(41), when=at(45), amount=volume(3))
-    await tick(hass)
-    assert _state(hass, "baby_one", "last_pump").state == "unknown"
-
-
 # Last sleep
 
 
@@ -410,7 +368,7 @@ async def test_a_baby_with_only_a_diaper_has_unknown_other_sensors(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     assert _state(hass, "baby_one", "last_diaper").state != "unknown"
-    for key in ("last_feed", "last_pump", "last_sleep"):
+    for key in ("last_feed", "last_sleep"):
         state = _state(hass, "baby_one", key)
         assert state.state == "unknown"
         assert "kind" not in state.attributes
@@ -426,7 +384,7 @@ async def test_a_record_type_the_integration_does_not_model_breaks_nothing(
 
     assert setup_entry.state is ConfigEntryState.LOADED
     assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
-    for key in ("last_feed", "last_pump", "last_sleep"):
+    for key in ("last_feed", "last_sleep"):
         assert _state(hass, "baby_one", key).state == "unknown"
 
 
@@ -495,7 +453,7 @@ async def test_syncing_again_does_not_duplicate_a_baby(
     await tick(hass)
     await tick(hass)
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
-    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY
+    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 1
 
 
 async def test_babies_are_restored_from_saved_state_after_a_restart(

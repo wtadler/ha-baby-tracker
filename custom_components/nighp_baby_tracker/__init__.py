@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
@@ -58,9 +59,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
         raise
 
     entry.runtime_data = coordinator
+    _remove_per_baby_last_pumps(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
+    """Drop the per-baby last-pump entities an earlier version registered (``<baby_id>_last_pump``).
+
+    A pump belongs to the account, so the sensor moved to the account's device
+    (``<entry_id>_last_pump``). Nothing else is touched, and it does nothing once they're gone.
+    """
+    registry = er.async_get(hass)
+    account_unique_id = f"{entry.entry_id}_last_pump"
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            entity.domain == Platform.SENSOR
+            and entity.platform == DOMAIN
+            and entity.unique_id.endswith("_last_pump")
+            and entity.unique_id != account_unique_id
+        ):
+            registry.async_remove(entity.entity_id)
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:

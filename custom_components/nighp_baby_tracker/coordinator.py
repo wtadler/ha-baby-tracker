@@ -47,13 +47,16 @@ TIMER_INTERVAL = timedelta(minutes=1)
 
 @dataclass(frozen=True, slots=True)
 class BabyData:
-    """One baby's newest record of each kind the sensors show."""
+    """One baby's newest record of each kind the sensors show.
+
+    A pump belongs to the account, not a baby, so it isn't here (see the
+    coordinator's ``last_pump``).
+    """
 
     baby_id: str
     name: str | None
     diaper: Record | None = None
     feed: Record | None = None
-    pump: Record | None = None
     sleep: Record | None = None
     today: DayTotals = DayTotals()
     nursing: NursingTimer | None = None
@@ -116,6 +119,9 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self.lock = asyncio.Lock()
         self._store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
         self._baby_names: dict[str, str | None] = {}
+        # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
+        # baby, so it isn't part of any BabyData.
+        self.last_pump: Record | None = None
         # Home Assistant's own nursing timers, by baby ID (see timers.py).
         self.nursing: dict[str, NursingTimer] = {}
         self._nursing_store: Store = Store(
@@ -262,6 +268,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         end = dt_util.start_of_local_day(today + timedelta(days=1))
         for baby_id, baby in self.engine.babies().items():
             self._baby_names[baby_id] = baby.name
+        self.last_pump = self.engine.latest_pump()
         data: dict[str, BabyData] = {}
         for baby_id, name in self._baby_names.items():
             latest = self.engine.latest_records(baby_id)
@@ -270,7 +277,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 name=name,
                 diaper=latest.get("Diaper"),
                 feed=_newest([latest[kind] for kind in FEED_TYPES if kind in latest]),
-                pump=latest.get("Pump"),
                 sleep=latest.get("Sleep"),
                 today=day_totals(self.engine.records.values(), baby_id, start, end),
                 nursing=self.nursing.get(baby_id),

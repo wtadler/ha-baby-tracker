@@ -1,4 +1,4 @@
-"""Last-activity, today, and timer sensors, one set per baby."""
+"""Last-activity, today, and timer sensors, one set per baby, and the account's last pump."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.unit_conversion import VolumeConverter
 
-from .const import DOMAIN
+from .const import ACCOUNT_DEVICE_MODEL, ACCOUNT_DEVICE_NAME, DOMAIN, account_identifier
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .helpers import volume_parts
 from .pybabytracker import Record
@@ -106,13 +106,6 @@ SENSORS: tuple[BabyTrackerSensorDescription, ...] = (
         attributes_fn=_feed_attributes,
     ),
     BabyTrackerSensorDescription(
-        key="last_pump",
-        translation_key="last_pump",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        record_fn=lambda baby: baby.pump,
-        attributes_fn=_pump_attributes,
-    ),
-    BabyTrackerSensorDescription(
         key="last_sleep",
         translation_key="last_sleep",
         device_class=SensorDeviceClass.TIMESTAMP,
@@ -122,13 +115,22 @@ SENSORS: tuple[BabyTrackerSensorDescription, ...] = (
 )
 
 
+LAST_PUMP = SensorEntityDescription(
+    key="last_pump",
+    translation_key="last_pump",
+    device_class=SensorDeviceClass.TIMESTAMP,
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: BabyTrackerConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the sensors for every baby, and for babies that appear in later syncs."""
+    """Add the account's last-pump sensor, the sensors for every baby, and those for babies that
+    appear in later syncs."""
     coordinator = entry.runtime_data
+    async_add_entities([BabyTrackerLastPumpSensor(coordinator, entry)])
     known: set[str] = set()
 
     @callback
@@ -198,6 +200,39 @@ class BabyTrackerSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity)
     def extra_state_attributes(self) -> dict[str, Any] | None:
         record = self._record
         return self.entity_description.attributes_fn(record) if record is not None else None
+
+
+class BabyTrackerLastPumpSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity):
+    """When the account's last pump happened, with its details.
+
+    A pump belongs to the account, not a baby, so this sits on an account-level device (one per
+    config entry) and shows the newest pump whoever logged it.
+    """
+
+    _attr_has_entity_name = True
+    entity_description = LAST_PUMP
+
+    def __init__(self, coordinator: BabyTrackerCoordinator, entry: BabyTrackerConfigEntry) -> None:
+        super().__init__(coordinator)
+        # The entry's ID scopes it, as a baby's ID scopes a baby's sensors.
+        self._attr_unique_id = f"{entry.entry_id}_{LAST_PUMP.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, account_identifier(entry.entry_id))},
+            name=ACCOUNT_DEVICE_NAME,
+            manufacturer="Nighp",
+            model=ACCOUNT_DEVICE_MODEL,
+            entry_type=DeviceEntryType.SERVICE,
+        )
+
+    @property
+    def native_value(self) -> datetime | None:
+        pump = self.coordinator.last_pump
+        return pump.time if pump is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        pump = self.coordinator.last_pump
+        return _pump_attributes(pump) if pump is not None else None
 
 
 @dataclass(frozen=True, kw_only=True)
