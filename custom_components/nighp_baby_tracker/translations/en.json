@@ -111,12 +111,16 @@
         "note": {
           "name": "Note",
           "description": "An optional note to save with the diaper."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "An ID you make up, to retry safely. If a write with this ID already landed, nothing is added again. Leave it empty for a new diaper each time."
         }
       }
     },
     "undo": {
       "name": "Undo",
-      "description": "Deletes a record Home Assistant created. Without an object ID, it deletes the most recent one. Records made by the phones can't be deleted here.",
+      "description": "Deletes a record Home Assistant created. Without a record ID, it deletes the most recent one, and running it again deletes the next older one. Records made by the phones can't be deleted here.",
       "fields": {
         "config_entry_id": {
           "name": "Account",
@@ -175,12 +179,18 @@
     },
     "write_failed": {
       "message": "Couldn't save to Baby Tracker: {error}"
+    },
+    "object_id_in_use": {
+      "message": "That record ID already belongs to a different record. Use a new ID."
+    },
+    "record_not_for_baby": {
+      "message": "That record belongs to a different baby."
     }
   },
   "issues": {
     "own_log_gap": {
       "title": "Baby Tracker can't write for {account}",
-      "description": "The service says Home Assistant's own log for {account} is longer than what Home Assistant can read back. Writing is paused so no entries are skipped or overwritten. Remove the integration's entry for this account and add it again, then press a button to test."
+      "description": "The service says Home Assistant's own log for {account} is longer than what Home Assistant can read back, so writing is paused to avoid skipping or overwriting entries. This may be a short delay on the service's side that clears after the next successful write. If it persists for more than an hour, remove this integration entry and add it again. That reloads the account's history, and Home Assistant appears as a new device in the Baby Tracker app, while the old Home Assistant device stays in its list."
     }
   }
 }

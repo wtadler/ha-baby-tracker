@@ -281,6 +281,28 @@ async def test_log_diaper_for_another_integrations_device_is_a_validation_error(
     assert server.posted == []
 
 
+async def test_a_log_diaper_retry_with_the_same_object_id_does_not_post_twice(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    retry_id = "7E57ED00-0000-4000-8000-000000000001"
+    await log_diaper(hass, BABY_ONE_ID, "wet", object_id=retry_id)
+    # The caller never saw the answer, so it sends the same logical write again (any case).
+    await log_diaper(hass, BABY_ONE_ID, "wet", object_id=retry_id.lower())
+
+    [(_, _, record)] = posted(server)
+    assert record.object_id == retry_id
+    assert [n for n, _, _ in posted(server)] == [1]
+
+
+async def test_a_log_diaper_object_id_belonging_to_another_record_is_an_error(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    with pytest.raises(ServiceValidationError) as raised:
+        await log_diaper(hass, BABY_ONE_ID, "wet", object_id=OTHER_DEVICES_RECORD)
+    assert raised.value.translation_key == "object_id_in_use"
+    assert server.posted == []
+
+
 async def test_log_diaper_rejects_an_unknown_type(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -526,6 +548,60 @@ async def test_the_repair_issue_goes_away_after_a_write_succeeds(
     assert ir.async_get(hass).async_get_issue(DOMAIN, f"own_log_gap_{setup_entry.entry_id}") is None
 
 
+async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    with pytest.raises(HomeAssistantError):
+        await press(hass, button("baby_one", "wet"))
+    issue_id = f"own_log_gap_{setup_entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+
+    await hass.config_entries.async_remove(setup_entry.entry_id)
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+def test_the_repair_text_says_it_may_be_temporary_and_names_the_cost() -> None:
+    issue = json.loads((INTEGRATION / "strings.json").read_text())["issues"]["own_log_gap"]
+    text = issue["description"]
+    assert "more than an hour" in text
+    assert "history" in text
+    assert "new device" in text
+
+
+def test_writes_use_the_coordinators_public_write_method_not_its_private_members() -> None:
+    source = (INTEGRATION / "writes.py").read_text()
+    assert "SLF001" not in source
+    assert "_async_save" not in source
+    assert "_snapshot" not in source
+    assert "coordinator.lock" not in source
+
+
+async def test_the_coordinators_write_method_locks_syncs_saves_and_publishes(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    coordinator = setup_entry.runtime_data
+    seen: dict[str, Any] = {}
+
+    async def operation(engine: SyncEngine, client: Any) -> str:
+        seen["locked"] = coordinator.lock.locked()
+        seen["engine"] = engine is coordinator.engine
+        seen["client"] = client is coordinator.client
+        return "result"
+
+    updates: list[object] = []
+    coordinator.async_add_listener(lambda: updates.append(1))
+    with patch.object(Store, "async_save", autospec=True) as save:
+        result = await coordinator.async_write(operation)
+
+    assert result == "result"
+    assert seen == {"locked": True, "engine": True, "client": True}
+    assert server.calls[0] == "devices"  # type: ignore[attr-defined]  # it synced first
+    assert save.call_count == 1
+    assert updates
+
+
 async def test_a_gap_in_the_own_log_still_saves_state(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -665,6 +741,50 @@ async def test_a_wet_press_bumps_todays_count_with_no_poll(
 
     await undo(hass, baby=device_id(hass, BABY_ONE_ID))
     assert hass.states.get("sensor.baby_one_diapers_today").state == "1"
+
+
+async def test_undo_accepts_an_object_id_in_any_case(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    await press(hass, button("baby_one", "wet"))
+    created = posted(server)[0][2].object_id
+
+    await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=created.lower())
+
+    assert posted(server)[1][1] == OP_DELETE
+    assert posted(server)[1][2].object_id == created
+
+
+async def test_undo_with_a_baby_and_another_babys_record_id_is_a_validation_error(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    await press(hass, button("baby_two", "wet"))
+    babys_two = posted(server)[0][2].object_id
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=babys_two)
+
+    assert raised.value.translation_key == "record_not_for_baby"
+    assert len(posted(server)) == 1  # nothing deleted
+
+
+async def test_a_baby_device_with_an_unloaded_and_a_loaded_entry_uses_the_loaded_one(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    second_entry: MockConfigEntry,
+    server: FakeServer,
+    second_server: FakeServer,
+) -> None:
+    baby_device = device_id(hass, BABY_ONE_ID)
+    dr.async_get(hass).async_update_device(baby_device, add_config_entry_id=second_entry.entry_id)
+    await hass.config_entries.async_unload(setup_entry.entry_id)
+
+    # Routed to the loaded second entry, which doesn't know this baby: not "not loaded".
+    with pytest.raises(ServiceValidationError) as raised:
+        await hass.services.async_call(
+            DOMAIN, "log_diaper", {"baby": baby_device, "type": "wet"}, blocking=True
+        )
+    assert raised.value.translation_key == "baby_not_found"
 
 
 async def test_undo_with_an_object_id_removes_that_record(
@@ -839,7 +959,7 @@ def test_services_yaml_describes_both_actions_and_their_fields() -> None:
 
     services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
     assert set(services) == {"log_diaper", "undo"}
-    assert set(services["log_diaper"]["fields"]) == {"baby", "type", "time", "note"}
+    assert set(services["log_diaper"]["fields"]) == {"baby", "type", "time", "note", "object_id"}
     assert set(services["undo"]["fields"]) == {"config_entry_id", "baby", "object_id"}
     baby = services["log_diaper"]["fields"]["baby"]
     assert baby["required"] is True
@@ -871,6 +991,7 @@ def test_every_error_and_issue_the_integration_raises_has_a_translation() -> Non
         "entry_not_found",
         "entry_not_loaded",
         "nothing_to_undo",
+        "record_not_for_baby",
         "not_own_record",
         "record_not_found",
         "write_outcome_unknown",

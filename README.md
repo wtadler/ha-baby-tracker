@@ -64,8 +64,12 @@ Two actions do the same and more:
   zone), and an optional `note`.
 - `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `baby` or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
-  recent record Home Assistant created (for that baby, if you gave `baby`). It can't delete records
-  the phones made.
+  recent record Home Assistant created (for that baby, if you gave `baby`). Run it again and it
+  deletes the next older Home Assistant entry, and so on, until none are left. If you give both
+  `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
+  made.
+- `log_diaper` also takes an optional `object_id` (an ID you make up). Send the same one to retry a
+  write that may have landed: it's added once, never twice.
 
 Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from
 the service, the next one says "the last entry is still being confirmed"; try again in a minute. If

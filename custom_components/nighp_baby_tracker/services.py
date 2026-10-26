@@ -5,13 +5,12 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN, SERVICE_LOG_DIAPER, SERVICE_UNDO
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
-from .writes import DIAPER_STATUS, async_log_diaper, async_undo
+from .writes import DIAPER_STATUS, async_log_diaper, async_undo, validation_error
 
 ATTR_BABY = "baby"
 ATTR_TYPE = "type"
@@ -26,6 +25,7 @@ LOG_DIAPER_SCHEMA = vol.Schema(
         vol.Required(ATTR_TYPE): vol.In(list(DIAPER_STATUS)),
         vol.Optional(ATTR_TIME): cv.datetime,
         vol.Optional(ATTR_NOTE, default=""): cv.string,
+        vol.Optional(ATTR_OBJECT_ID): cv.string,
     }
 )
 
@@ -41,15 +41,11 @@ UNDO_SCHEMA = vol.All(
 )
 
 
-def _validation_error(key: str) -> ServiceValidationError:
-    return ServiceValidationError(translation_domain=DOMAIN, translation_key=key)
-
-
 def _loaded(entry: BabyTrackerConfigEntry | None) -> BabyTrackerCoordinator:
     if entry is None or entry.domain != DOMAIN:
-        raise _validation_error("entry_not_found")
+        raise validation_error("entry_not_found")
     if entry.state is not ConfigEntryState.LOADED:
-        raise _validation_error("entry_not_loaded")
+        raise validation_error("entry_not_loaded")
     return entry.runtime_data
 
 
@@ -57,15 +53,22 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
     """The coordinator that owns a baby's device, and the baby's ID."""
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
-        raise _validation_error("baby_not_found")
+        raise validation_error("baby_not_found")
     baby_id = next((ident for domain, ident in device.identifiers if domain == DOMAIN), None)
     if baby_id is None:
-        raise _validation_error("baby_not_found")
+        raise validation_error("baby_not_found")
+    loaded: list[BabyTrackerConfigEntry] = []
+    found_any = False
     for entry_id in device.config_entries:
         entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is not None and entry.domain == DOMAIN:
-            return _loaded(entry), baby_id
-    raise _validation_error("baby_not_found")
+        if entry is None or entry.domain != DOMAIN:
+            continue
+        found_any = True
+        if entry.state is ConfigEntryState.LOADED:
+            loaded.append(entry)
+    if loaded:
+        return loaded[0].runtime_data, baby_id
+    raise validation_error("entry_not_loaded" if found_any else "baby_not_found")
 
 
 async def _log_diaper(call: ServiceCall) -> None:
@@ -76,6 +79,7 @@ async def _log_diaper(call: ServiceCall) -> None:
         call.data[ATTR_TYPE],
         time=call.data.get(ATTR_TIME),
         note=call.data[ATTR_NOTE],
+        object_id=call.data.get(ATTR_OBJECT_ID),
     )
 
 

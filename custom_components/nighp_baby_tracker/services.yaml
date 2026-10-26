@@ -25,6 +25,11 @@ log_diaper:
       example: Rash cream applied
       selector:
         text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000002
+      selector:
+        text:
 
 undo:
   fields:

@@ -1,8 +1,8 @@
 """Writing diapers and undoing them, one baby tracker entry at a time.
 
-Every write takes the coordinator's lock, syncs first (so the baby is known and the numbering
-is current), writes, pushes the new state to the entities, and saves the engine state, even when
-the write failed: the engine's pending post and its grace window live only in that saved state.
+Every write goes through the coordinator's ``async_write``, which holds the lock, syncs first (so
+the baby is known and the numbering is current), saves the engine state even when the write
+failed, and publishes the new state. This module adds the Home Assistant error translation.
 """
 
 from __future__ import annotations
@@ -16,12 +16,13 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_EMAIL, DOMAIN
-from .coordinator import BabyTrackerCoordinator
+from .coordinator import BabyTrackerCoordinator, SyncBeforeWriteError
 from .pybabytracker import (
     DIAPER_DIRTY,
     DIAPER_MIXED,
     DIAPER_WET,
     AuthenticationError,
+    BabyTrackerClient,
     BabyTrackerError,
     NotOwnRecordError,
     ProtocolError,
@@ -43,12 +44,12 @@ def _error(key: str, **placeholders: str) -> HomeAssistantError:
     )
 
 
-def _validation_error(key: str) -> ServiceValidationError:
+def validation_error(key: str) -> ServiceValidationError:
     return ServiceValidationError(translation_domain=DOMAIN, translation_key=key)
 
 
-def _issue_id(coordinator: BabyTrackerCoordinator) -> str:
-    return f"own_log_gap_{coordinator.config_entry.entry_id}"
+def issue_id(entry_id: str) -> str:
+    return f"own_log_gap_{entry_id}"
 
 
 def _reauth(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
@@ -61,7 +62,7 @@ def _own_log_gap(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
     ir.async_create_issue(
         coordinator.hass,
         DOMAIN,
-        _issue_id(coordinator),
+        issue_id(coordinator.config_entry.entry_id),
         is_fixable=False,
         severity=ir.IssueSeverity.ERROR,
         translation_key="own_log_gap",
@@ -72,40 +73,32 @@ def _own_log_gap(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
 
 async def _write[T](
     coordinator: BabyTrackerCoordinator,
-    operation: Callable[[SyncEngine], Awaitable[T]],
+    operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]],
 ) -> T:
-    """Sync, run ``operation`` on the engine, then publish and save the result."""
-    async with coordinator.lock:
-        try:
-            try:
-                await coordinator.engine.sync(coordinator.client)
-            except AuthenticationError as err:
-                raise _reauth(coordinator) from err
-            except BabyTrackerError as err:
-                raise _error("sync_failed", error=str(err)) from err
-            try:
-                result = await operation(coordinator.engine)
-            except AuthenticationError as err:
-                raise _reauth(coordinator) from err
-            except UnknownBabyError as err:
-                raise _validation_error("baby_not_found") from err
-            except WriteOutcomeUnknownError as err:
-                raise _error("write_outcome_unknown") from err
-            except NotOwnRecordError as err:
-                raise _validation_error("not_own_record") from err
-            except RecordNotFoundError as err:
-                raise _validation_error("record_not_found") from err
-            except ProtocolError as err:
-                _LOGGER.error("This device's own log can't be caught up: %s", err)
-                raise _own_log_gap(coordinator) from err
-            except BabyTrackerError as err:
-                raise _error("write_failed", error=str(err)) from err
-        finally:
-            # Save after every attempt, failed ones included: the pending post lives here.
-            await coordinator._async_save()  # noqa: SLF001
-        ir.async_delete_issue(coordinator.hass, DOMAIN, _issue_id(coordinator))
-        coordinator.async_set_updated_data(coordinator._snapshot())  # noqa: SLF001
-        return result
+    """Run a write through the coordinator and turn library errors into Home Assistant's."""
+    try:
+        result = await coordinator.async_write(operation)
+    except AuthenticationError as err:
+        raise _reauth(coordinator) from err
+    except SyncBeforeWriteError as err:
+        raise _error("sync_failed", error=str(err)) from err
+    except ValueError as err:  # the engine's refusal of an object_id another record holds
+        raise validation_error("object_id_in_use") from err
+    except UnknownBabyError as err:
+        raise validation_error("baby_not_found") from err
+    except WriteOutcomeUnknownError as err:
+        raise _error("write_outcome_unknown") from err
+    except NotOwnRecordError as err:
+        raise validation_error("not_own_record") from err
+    except RecordNotFoundError as err:
+        raise validation_error("record_not_found") from err
+    except ProtocolError as err:
+        _LOGGER.error("This device's own log can't be caught up: %s", err)
+        raise _own_log_gap(coordinator) from err
+    except BabyTrackerError as err:
+        raise _error("write_failed", error=str(err)) from err
+    ir.async_delete_issue(coordinator.hass, DOMAIN, issue_id(coordinator.config_entry.entry_id))
+    return result
 
 
 def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
@@ -127,19 +120,24 @@ async def async_log_diaper(
     *,
     time: datetime | None = None,
     note: str = "",
+    object_id: str | None = None,
 ) -> None:
-    """Add a diaper for a baby. ``kind`` is wet, dirty, or mixed; ``time`` defaults to now."""
+    """Add a diaper for a baby. ``kind`` is wet, dirty, or mixed; ``time`` defaults to now.
+
+    Pass the same ``object_id`` to retry a write safely: if the earlier attempt landed, nothing
+    is posted again. Without one, each call is a new logical write (a button press).
+    """
     moment, offset = _in_home_assistant_time(time)
 
-    async def add(engine: SyncEngine) -> object:
-        # No object_id: each call is a new logical write, even after a failed one.
+    async def add(engine: SyncEngine, client: BabyTrackerClient) -> object:
         return await engine.add_diaper(
-            coordinator.client,
+            client,
             baby_id,
             DIAPER_STATUS[kind],
             time=moment,
             timezone_offset=offset,
             note=note,
+            object_id=object_id,
         )
 
     await _write(coordinator, add)
@@ -179,13 +177,25 @@ async def async_undo(
 ) -> None:
     """Delete a record Home Assistant created: the given one, else the most recent.
 
-    With a ``baby_id`` and no ``object_id``, only that baby's records are considered.
+    With a ``baby_id`` and no ``object_id``, only that baby's records are considered. With both,
+    the record must belong to that baby.
     """
 
-    async def delete(engine: SyncEngine) -> None:
-        target = object_id if object_id is not None else _most_recent_own(engine, baby_id)
-        if target is None:
-            raise _validation_error("nothing_to_undo")
-        await engine.delete_record(coordinator.client, target)
+    async def delete(engine: SyncEngine, client: BabyTrackerClient) -> None:
+        if object_id is not None:
+            target = object_id.upper()
+            record = engine.records.get(target)
+            if (
+                baby_id is not None
+                and record is not None
+                and (record.baby is None or record.baby.object_id != baby_id)
+            ):
+                raise validation_error("record_not_for_baby")
+        else:
+            found = _most_recent_own(engine, baby_id)
+            if found is None:
+                raise validation_error("nothing_to_undo")
+            target = found
+        await engine.delete_record(client, target)
 
     await _write(coordinator, delete)
