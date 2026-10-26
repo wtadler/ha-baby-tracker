@@ -46,6 +46,7 @@ from .pybabytracker import (
     Volume,
     WriteOutcomeUnknownError,
 )
+from .pybabytracker.builders import MAX_MINUTES_PER_SIDE, MAX_SLEEP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -175,7 +176,19 @@ def _volume(amount: float, unit: str | None) -> Volume:
 def _checked_amount(amount: float) -> float:
     if not math.isfinite(amount) or amount <= 0:
         raise validation_error("invalid_amount")
+    if round(amount, 2) <= 0:  # the library writes two decimals
+        raise validation_error("amount_too_small")
     return amount
+
+
+def _checked_minutes(*minutes: int) -> None:
+    if any(m > MAX_MINUTES_PER_SIDE for m in minutes):
+        raise validation_error("minutes_too_long")
+
+
+def _is_id_clash(err: ValueError) -> bool:
+    message = str(err)
+    return message.startswith("object_id ") and " belongs to " in message
 
 
 async def _add(
@@ -189,9 +202,9 @@ async def _add(
         try:
             return await add(engine, client, object_id)
         except ValueError as err:
-            if object_id is None:
+            # Only the engine's ID-collision refusal means the ID is taken; anything else surfaces.
+            if object_id is None or not _is_id_clash(err):
                 raise
-            # The engine refuses an object_id that another record already holds.
             raise validation_error("object_id_in_use") from err
 
     await _write(coordinator, operation)
@@ -282,6 +295,7 @@ async def async_log_nursing(
     ``end_time`` (default now); ``finish_side`` (left or right) defaults to the last side used."""
     if left_minutes + right_minutes <= 0:
         raise validation_error("no_duration")
+    _checked_minutes(left_minutes, right_minutes)
     if finish_side is not None and finish_side not in FINISH_SIDES:
         raise validation_error("invalid_finish_side")
     moment, offset = _in_home_assistant_time(end_time)
@@ -317,6 +331,8 @@ async def async_log_sleep(
     finish, _ = _in_home_assistant_time(end)
     if finish <= begin:
         raise validation_error("end_before_start")
+    if finish - begin > MAX_SLEEP:
+        raise validation_error("sleep_too_long")
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
         return await engine.add_sleep(
@@ -353,6 +369,9 @@ async def async_log_pump(
         if amount is not None and (not math.isfinite(amount) or amount < 0):
             raise validation_error("invalid_amount")
     _checked_amount((left_amount or 0) + (right_amount or 0))
+    if round(left_amount or 0, 2) + round(right_amount or 0, 2) <= 0:
+        raise validation_error("amount_too_small")  # each side is saved to two decimals
+    _checked_minutes(left_minutes, right_minutes)
     if finish_side is not None and finish_side not in FINISH_SIDES:
         raise validation_error("invalid_finish_side")
     left = _volume(left_amount, unit) if left_amount is not None else None

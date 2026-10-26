@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
@@ -32,6 +33,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Pump,
     Pumped,
     Sleep,
+    SyncEngine,
     Volume,
 )
 
@@ -498,6 +500,121 @@ async def test_log_nursing_with_no_minutes_is_a_validation_error(
     assert server.posted == []  # type: ignore[attr-defined]
 
 
+# --- the library's limits, checked here first with translated errors ------------------------
+
+LIMITS = {
+    "nursing left over 240": ("log_nursing", {"left_minutes": 241}, "minutes_too_long"),
+    "nursing right over 240": (
+        "log_nursing",
+        {"left_minutes": 5, "right_minutes": 241},
+        "minutes_too_long",
+    ),
+    "pump left over 240": (
+        "log_pump",
+        {"left_amount": 2, "left_minutes": 241},
+        "minutes_too_long",
+    ),
+    "pump right over 240": (
+        "log_pump",
+        {"left_amount": 2, "right_minutes": 241},
+        "minutes_too_long",
+    ),
+    "sleep over 24 hours": (
+        "log_sleep",
+        {"start": "2026-10-25T01:00:00+00:00", "end": "2026-10-26T01:00:01+00:00"},
+        "sleep_too_long",
+    ),
+    "bottle rounds to zero": (
+        "log_bottle",
+        {"kind": "formula", "amount": 0.004, "unit": "fl. oz."},
+        "amount_too_small",
+    ),
+    "pump rounds to zero": (
+        "log_pump",
+        {"left_amount": 0.004, "right_amount": 0.004},
+        "amount_too_small",
+    ),
+}
+
+
+@pytest.mark.parametrize("with_id", [False, True], ids=["no-id", "with-id"])
+@pytest.mark.parametrize("case", list(LIMITS))
+async def test_a_value_past_a_limit_is_a_translated_validation_error_with_no_sync(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    server: FakeServer,
+    case: str,
+    with_id: bool,
+) -> None:
+    action, data, key = LIMITS[case]
+    extra = {"object_id": RETRY_ID} if with_id else {}
+    sent = len(server.calls)  # type: ignore[attr-defined]
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await call(hass, action, **data, **extra)
+
+    assert raised.value.translation_key == key
+    assert server.posted == []  # type: ignore[attr-defined]
+    assert len(server.calls) == sent  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ("action", "data"),
+    [
+        ("log_nursing", {"left_minutes": 240, "right_minutes": 240}),
+        ("log_pump", {"left_amount": 2, "left_minutes": 240}),
+        ("log_sleep", {"start": "2026-10-25T01:00:00+00:00", "end": "2026-10-26T01:00:00+00:00"}),
+        ("log_bottle", {"kind": "formula", "amount": 0.01, "unit": "fl. oz."}),
+    ],
+    ids=["nursing", "pump", "sleep", "bottle"],
+)
+async def test_the_values_at_the_limits_are_accepted(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    server: FakeServer,
+    action: str,
+    data: dict[str, Any],
+) -> None:
+    await call(hass, action, **data)
+
+    assert len(posted(server)) == 1
+
+
+@pytest.mark.parametrize("action", ["log_bottle", "log_nursing", "log_sleep", "log_pump"])
+async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, action: str
+) -> None:
+    engine_method = {
+        "log_bottle": "add_formula",
+        "log_nursing": "add_nursing",
+        "log_sleep": "add_sleep",
+        "log_pump": "add_pump",
+    }[action]
+    data, _, _ = VALID[{"log_bottle": "log_bottle"}.get(action, action)]
+    with (
+        patch.object(SyncEngine, engine_method, side_effect=ValueError("some other refusal")),
+        pytest.raises(ValueError, match="some other refusal"),
+    ):
+        await call(hass, action, object_id=RETRY_ID, **data)
+
+
+async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
+    hass: HomeAssistant, setup_entry: MockConfigEntry
+) -> None:
+    good = {
+        CONF_SCAN_INTERVAL: 5,
+        CONF_BOTTLE_SIZE: 32,
+        CONF_BOTTLE_UNIT: "fl. oz.",
+        CONF_BOTTLE_TYPE: "formula",
+    }
+    await set_options(hass, setup_entry, **good)
+    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {**good, CONF_BOTTLE_SIZE: 33}
+        )
+
+
 @pytest.mark.parametrize("minutes", [-1, 2.5, "ten"])
 async def test_log_nursing_rejects_negative_or_fractional_minutes(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, minutes: Any
@@ -926,7 +1043,7 @@ async def test_a_bottle_press_with_milliliter_options_is_refused_with_a_translat
     await set_options(
         hass,
         setup_entry,
-        **{CONF_BOTTLE_SIZE: 120, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
+        **{CONF_BOTTLE_SIZE: 4, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
     )
     sent = len(server.calls)  # type: ignore[attr-defined]
 
@@ -1147,6 +1264,9 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
 def test_the_new_actions_errors_options_and_button_are_translated() -> None:
     strings = json.loads((INTEGRATION / "strings.json").read_text())
     assert {
+        "minutes_too_long",
+        "sleep_too_long",
+        "amount_too_small",
         "invalid_amount",
         "end_before_start",
         "no_duration",

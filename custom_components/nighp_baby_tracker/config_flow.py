@@ -51,7 +51,7 @@ from .writes import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 
 _LOGGER = logging.getLogger(__name__)
 
-MAX_BOTTLE_SIZE = 2000
+MAX_BOTTLE_SIZE = 32  # fluid ounces: more than any bottle
 
 CREDENTIALS_SCHEMA = vol.Schema(
     {

@@ -376,6 +376,15 @@
     },
     "metric_not_supported": {
       "message": "Metric amounts aren't supported yet, because the app's metric format hasn't been confirmed. Use fl. oz."
+    },
+    "minutes_too_long": {
+      "message": "Nursing and pump minutes can be at most 240 per side."
+    },
+    "sleep_too_long": {
+      "message": "A sleep can be at most 24 hours long."
+    },
+    "amount_too_small": {
+      "message": "That amount rounds to zero. Amounts are saved to two decimals."
     }
   },
   "issues": {
