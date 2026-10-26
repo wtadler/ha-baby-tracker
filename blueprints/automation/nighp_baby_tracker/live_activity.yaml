@@ -97,8 +97,11 @@ action:
                 live_update: true
                 chronometer: true
                 when: "{{ as_timestamp(trigger.to_state.state) }}"
-      # Stopped: the timer went back to unknown.
-      - conditions: "{{ trigger.to_state is not none and trigger.to_state.state == 'unknown' and was_running }}"
+      # Stopped: the timer went to unknown, from a running timer or from unavailable (a failed sync
+      # mid-timer goes running, unavailable, unknown). A clear for a tag with no activity is harmless.
+      - conditions: >-
+          {{ trigger.to_state is not none and trigger.to_state.state == 'unknown'
+             and trigger.from_state is not none and trigger.from_state.state != 'unknown' }}
         sequence:
           - action: !input notify_service
             data:

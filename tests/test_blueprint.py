@@ -365,7 +365,49 @@ async def test_recovering_from_unavailable_to_a_running_timer_starts_the_activit
     assert payload(calls[0])["live_update"] is True
 
 
-async def test_unavailable_then_unknown_sends_nothing(
+async def test_a_timer_that_goes_unavailable_then_unknown_still_ends_the_activity(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, SLEEP, "unavailable")
+
+    await set_state(hass, SLEEP, "unknown")
+
+    assert len(calls) == 2
+    assert calls[1].data["message"] == "clear_notification"
+    assert payload(calls[1])["tag"] == payload(calls[0])["tag"]
+
+
+async def test_a_nursing_timer_that_goes_unavailable_then_unknown_still_ends_the_activity(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+    await set_state(hass, NURSING, "unavailable")
+
+    await set_state(hass, NURSING, "unknown")
+
+    assert calls[-1].data["message"] == "clear_notification"
+    assert payload(calls[-1])["tag"] == payload(calls[0])["tag"]
+
+
+async def test_unavailable_and_back_to_the_same_running_timer_neither_restarts_nor_clears(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    await set_state(hass, SLEEP, "unavailable")
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert not any(c.data["message"] == "clear_notification" for c in calls)
+    # Any re-send is an in-place update of the same activity: same tag, same start.
+    assert {payload(c)["tag"] for c in calls} == {payload(calls[0])["tag"]}
+    assert {payload(c)["when"] for c in calls} == {STARTED.timestamp()}
+
+
+async def test_a_timer_that_is_unavailable_then_unknown_with_nothing_running_sends_a_harmless_clear(
     hass: HomeAssistant, calls: list[ServiceCall]
 ) -> None:
     await install(hass, inputs())
@@ -373,7 +415,7 @@ async def test_unavailable_then_unknown_sends_nothing(
 
     await set_state(hass, SLEEP, "unknown")
 
-    assert calls == []
+    assert [c.data["message"] for c in calls] == ["clear_notification"]
 
 
 async def test_an_already_running_timer_at_setup_sends_nothing_until_it_changes(

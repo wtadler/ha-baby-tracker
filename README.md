@@ -180,6 +180,7 @@ sends no notifications; the blueprint does, from the timer sensors.
   left** and **Nurse right** buttons or actions) do. Sleep timers show from any device.
 - If Home Assistant restarts mid-session, a running timer's activity stays as it was and the
   blueprint sends nothing new until the timer changes; ending it still ends the activity.
+- A sync failure mid-timer (running, then unavailable, then unknown) still ends the activity; going unavailable and back to the same running timer leaves it alone.
 - The blueprint runs queued, so a start, a switch, and an end are sent in order.
 
 ## Removal
