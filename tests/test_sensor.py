@@ -61,9 +61,7 @@ async def test_two_babies_make_two_devices_each_with_four_sensors(
         assert device is not None
         assert device.name == name
         sensors = [
-            e
-            for e in er.async_entries_for_device(entities, device.id)
-            if e.domain in READINGS
+            e for e in er.async_entries_for_device(entities, device.id) if e.domain in READINGS
         ]
         assert len(sensors) == PER_BABY
         assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS)

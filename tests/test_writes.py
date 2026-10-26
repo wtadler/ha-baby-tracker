@@ -616,6 +616,57 @@ async def test_undo_with_a_baby_only_considers_that_babys_records(
     assert posted(server)[3][2].baby.object_id == BABY_TWO_ID
 
 
+async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)  # the clock never moves: every record has the same timestamp
+    for _ in range(6):
+        await press(hass, button("baby_one", "wet"))
+    ids = [record.object_id for _, _, record in posted(server)]
+
+    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, config_entry_id=setup_entry.entry_id)
+
+    deleted = [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
+    assert deleted == [ids[5], ids[4]]
+
+
+async def test_undo_follows_write_order_not_the_time_of_the_diaper(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    await press(hass, button("baby_one", "wet"))
+    # Written last, but its diaper happened days ago.
+    await log_diaper(hass, BABY_ONE_ID, "dirty", time="2026-10-22T08:00:00+00:00")
+    written_last = posted(server)[1][2].object_id
+
+    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+
+    assert posted(server)[2][2].object_id == written_last
+
+
+async def test_a_wet_press_bumps_todays_count_with_no_poll(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to(NOW)
+    assert hass.states.get("sensor.baby_one_diapers_today").state == "0"
+
+    await press(hass, button("baby_one", "wet"))
+    state = hass.states.get("sensor.baby_one_diapers_today")
+    assert state.state == "1"
+    assert (state.attributes["wet"], state.attributes["dirty"]) == (1, 0)
+
+    await press(hass, button("baby_one", "dirty"))
+    state = hass.states.get("sensor.baby_one_diapers_today")
+    assert state.state == "2"
+    assert (state.attributes["wet"], state.attributes["dirty"]) == (1, 1)
+    assert hass.states.get("sensor.baby_two_diapers_today").state == "0"
+
+    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    assert hass.states.get("sensor.baby_one_diapers_today").state == "1"
+
+
 async def test_undo_with_an_object_id_removes_that_record(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
