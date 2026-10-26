@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Home Assistant 2026.x requires Python 3.13 (see ruff target-version in pyproject.toml).
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - name: Install
+        run: pip install -r requirements_test.txt
+      - name: pytest
+        run: pytest
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format
+        run: ruff format --check .
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # home-assistant/actions publishes no release tags, so this is pinned to a commit on master.
+      - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, 2026-10-26
+
+  vendored-copy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read the commit the bundled library claims
+        id: commit
+        run: echo "sha=$(tr -d '[:space:]' < custom_components/nighp_baby_tracker/pybabytracker/VENDORED_FROM)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: wtadler/pybabytracker
+          ref: ${{ steps.commit.outputs.sha }}
+          path: library
+      - name: Compare the bundled copy with that commit
+        run: |
+          diff -r -x VENDORED_FROM -x __pycache__ \
+            library/src/pybabytracker custom_components/nighp_baby_tracker/pybabytracker
