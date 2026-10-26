@@ -512,6 +512,15 @@
     },
     "no_nursing_timer": {
       "message": "No nursing timer is running for that baby."
+    },
+    "sleep_already_ended": {
+      "message": "That sleep was already ended on another device, so nothing was changed."
+    },
+    "sleep_already_started": {
+      "message": "A sleep was already started on another device, so no second one was started."
+    },
+    "nursing_not_saved": {
+      "message": "The nursing timer changed, but it couldn't be saved, so it won't survive a restart. Check the logs."
     }
   },
   "issues": {

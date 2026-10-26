@@ -42,6 +42,8 @@ class WriteClient(FakeClient):
         server.max_active_posts = max(server.max_active_posts, server.active_posts)
         try:
             await asyncio.sleep(0)
+            if server.post_gate is not None:  # hold the post until the test opens the gate
+                await server.post_gate.wait()
             while server.before_post:  # another device writes between the sync and this post
                 server.before_post.pop(0)()
             if server.post_errors:
@@ -66,6 +68,7 @@ def add_write_state(server: FakeServer) -> FakeServer:
     server.posted = []  # type: ignore[attr-defined]
     server.post_errors = []  # type: ignore[attr-defined]  # (error, whether the post landed)
     server.last_sync_override = {}  # type: ignore[attr-defined]
+    server.post_gate = None  # type: ignore[attr-defined]  # an asyncio.Event, or None
     server.before_post = []  # type: ignore[attr-defined]  # callables run as the next post starts
     server.active_posts = 0  # type: ignore[attr-defined]
     server.max_active_posts = 0  # type: ignore[attr-defined]

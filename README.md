@@ -79,14 +79,15 @@ Home Assistant's own device in your account.
 - **Sleep** starts a sleep, or ends the one running, wherever it started. The app syncs a running
   sleep, so the phones show it at once and Home Assistant sees theirs. A press does what Home
   Assistant showed when you pressed it: if a phone already ended that sleep, or already started
-  one, the press writes nothing rather than starting a second sleep.
+  one, the press writes nothing rather than starting a second sleep, and shows an error saying so.
 - **Nurse left** and **Nurse right** run Home Assistant's own nursing timer. Press a side to start
   it, the other side to switch (the first side's time is kept), and the running side again to stop.
   The app doesn't sync a running nursing timer, so Home Assistant can't see one running on a phone,
   and the phones see Home Assistant's only when it stops: one nursing record with each side's whole
   minutes (rounded half up), the side it ended on, and the start time. A stop within 30 seconds is
   saved as 1 minute on that side, and more than 240 minutes on a side is saved as 240. The timer
-  survives a restart, and nursing while the baby is asleep is fine.
+  survives a restart (if it can't be saved, the press still works and shows an error), and nursing
+  while the baby is asleep is fine. A timer for a baby no longer in the account is dropped.
 - While any sleep or nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
   up quickly. It returns to your sync interval when none is running.
 - A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a

@@ -105,10 +105,13 @@ def _own_log_gap(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
 async def _write[T](
     coordinator: BabyTrackerCoordinator,
     operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]],
+    *,
+    locked: bool = False,
 ) -> T:
-    """Run a write through the coordinator and turn library errors into Home Assistant's."""
+    """Run a write through the coordinator and turn library errors into Home Assistant's.
+    ``locked`` says the caller already holds the coordinator's lock."""
     try:
-        result = await coordinator.async_write(operation)
+        result = await coordinator.async_write(operation, locked=locked)
     except AuthenticationError as err:
         raise _reauth(coordinator) from err
     except SyncBeforeWriteError as err:
@@ -200,6 +203,8 @@ async def _add(
     coordinator: BabyTrackerCoordinator,
     object_id: str | None,
     add: Callable[[SyncEngine, BabyTrackerClient, str | None], Awaitable[object]],
+    *,
+    locked: bool = False,
 ) -> None:
     """Run one add through ``_write``, naming a clash with another record's ID."""
 
@@ -212,7 +217,7 @@ async def _add(
                 raise
             raise validation_error("object_id_in_use") from err
 
-    await _write(coordinator, operation)
+    await _write(coordinator, operation, locked=locked)
 
 
 async def async_log_diaper(
@@ -416,29 +421,31 @@ async def async_press_sleep(coordinator: BabyTrackerCoordinator, baby_id: str) -
 
     What the press means is fixed by what Home Assistant showed when it was pressed. If a phone
     changed things since (the sync before the write finds that sleep already ended, or a sleep
-    already started), the press is done without writing, so it never starts a second sleep or a
-    new one the parent meant to stop.
+    already started), the press writes nothing, so it never starts a second sleep or a new one
+    the parent meant to stop, and raises a validation error saying so (after the new state is
+    shown).
     """
     shown = coordinator.data.get(baby_id) if coordinator.data else None
     seen = shown.running_sleep if shown is not None else None
     moment, offset = _in_home_assistant_time(None)
     new_id = _new_id()
 
-    async def operation(engine: SyncEngine, client: BabyTrackerClient) -> object:
+    async def operation(engine: SyncEngine, client: BabyTrackerClient) -> str | None:
         if seen is not None:
             record = engine.records.get(seen.object_id)
             if not (isinstance(record, Sleep) and record.is_running):
-                _LOGGER.info("Sleep %s already ended on another device", seen.object_id)
-                return None
-            return await engine.end_sleep(client, seen.object_id, end=moment)
-        if (running := running_sleep(engine, baby_id)) is not None:
-            _LOGGER.info("Sleep %s already started on another device", running.object_id)
+                return "sleep_already_ended"
+            await engine.end_sleep(client, seen.object_id, end=moment)
             return None
-        return await engine.start_sleep(
+        if running_sleep(engine, baby_id) is not None:
+            return "sleep_already_started"
+        await engine.start_sleep(
             client, baby_id, start=moment, timezone_offset=offset, object_id=new_id
         )
+        return None
 
-    await _write(coordinator, operation)
+    if (stale := await _write(coordinator, operation)) is not None:
+        raise validation_error(stale)
 
 
 async def async_start_sleep(
@@ -492,9 +499,19 @@ def _check_baby(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
 async def async_start_nursing(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
     """Start Home Assistant's nursing timer on ``side``. If it's running on the other side, switch
     to ``side``; if it's on ``side`` already, nothing changes. Nothing is written until the stop.
+
+    Every nursing timer change holds the coordinator's lock (``exclusive()``), so one can't land
+    in the middle of a stop's write and be erased when the stop clears the timer.
     """
     if side not in SIDES:
         raise validation_error("invalid_finish_side")
+    async with coordinator.exclusive():
+        await _start_nursing_locked(coordinator, baby_id, side)
+
+
+async def _start_nursing_locked(
+    coordinator: BabyTrackerCoordinator, baby_id: str, side: str
+) -> None:
     _check_baby(coordinator, baby_id)
     now = dt_util.utcnow()
     timer = coordinator.nursing.get(baby_id)
@@ -506,20 +523,29 @@ async def async_start_nursing(coordinator: BabyTrackerCoordinator, baby_id: str,
 
 async def async_switch_nursing_side(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
     """Move the running nursing timer to the other side, keeping the time on the first."""
-    timer = coordinator.nursing.get(baby_id)
-    if timer is None:
-        raise validation_error("no_nursing_timer")
-    await coordinator.async_set_nursing(
-        baby_id, timer.switched(other_side(timer.side), dt_util.utcnow())
-    )
+    async with coordinator.exclusive():
+        timer = coordinator.nursing.get(baby_id)
+        if timer is None:
+            raise validation_error("no_nursing_timer")
+        await coordinator.async_set_nursing(
+            baby_id, timer.switched(other_side(timer.side), dt_util.utcnow())
+        )
 
 
 async def async_stop_nursing(
     coordinator: BabyTrackerCoordinator, baby_id: str, *, note: str = ""
 ) -> None:
     """Stop the nursing timer and write one finished record: whole minutes per side, the side it
-    ended on, and the start time. The timer is cleared only once the write succeeds, and the
-    record's ID was fixed at the start, so stopping again after an error can't write twice."""
+    ended on, and the start time. The minutes count to when the lock is acquired. The timer is
+    cleared only once the write succeeds, and the record's ID was fixed at the start, so stopping
+    again after an error can't write twice."""
+    async with coordinator.exclusive():
+        await _stop_nursing_locked(coordinator, baby_id, note=note)
+
+
+async def _stop_nursing_locked(
+    coordinator: BabyTrackerCoordinator, baby_id: str, *, note: str = ""
+) -> None:
     timer = coordinator.nursing.get(baby_id)
     if timer is None:
         raise validation_error("no_nursing_timer")
@@ -539,20 +565,19 @@ async def async_stop_nursing(
             object_id=object_id,
         )
 
-    await _add(coordinator, timer.object_id, add)
-    current = coordinator.nursing.get(baby_id)
-    if current is not None and current.object_id == timer.object_id:
-        await coordinator.async_set_nursing(baby_id, None)
+    await _add(coordinator, timer.object_id, add, locked=True)
+    await coordinator.async_set_nursing(baby_id, None)
 
 
 async def async_press_nurse(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
     """A Nurse button: start ``side``, switch to it from the other side, or stop if it's the side
-    already running."""
-    timer = coordinator.nursing.get(baby_id)
-    if timer is not None and timer.side == side:
-        await async_stop_nursing(coordinator, baby_id)
-    else:
-        await async_start_nursing(coordinator, baby_id, side)
+    already running. Decided under the lock, against the timer as it is then."""
+    async with coordinator.exclusive():
+        timer = coordinator.nursing.get(baby_id)
+        if timer is not None and timer.side == side:
+            await _stop_nursing_locked(coordinator, baby_id)
+        else:
+            await _start_nursing_locked(coordinator, baby_id, side)
 
 
 def _most_recent_own(engine: SyncEngine, baby_id: str | None) -> str | None:

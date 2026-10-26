@@ -8,8 +8,10 @@ Home Assistant keeps its own and writes one finished record at the stop.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
@@ -249,8 +251,10 @@ async def test_a_sleep_press_after_a_phone_already_ended_the_sleep_starts_nothin
     await sync(hass, setup_entry)
     phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=38, changed=minutes(-2))
 
-    await press(hass, SLEEP_BUTTON)
+    with pytest.raises(ServiceValidationError) as err:
+        await press(hass, SLEEP_BUTTON)
 
+    assert err.value.translation_key == "sleep_already_ended"
     assert posted(server) == []
     assert state(hass, ASLEEP).state == "off"
 
@@ -262,8 +266,10 @@ async def test_a_sleep_press_after_a_phone_already_started_a_sleep_starts_no_sec
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-1))  # not synced yet
 
-    await press(hass, SLEEP_BUTTON)
+    with pytest.raises(ServiceValidationError) as err:
+        await press(hass, SLEEP_BUTTON)
 
+    assert err.value.translation_key == "sleep_already_started"
     assert posted(server) == []
     assert state(hass, ASLEEP).state == "on"
     assert state(hass, SLEEP_TIMER).attributes["object_id"] == PHONE_SLEEP
@@ -876,3 +882,88 @@ async def test_a_running_sleep_for_one_baby_leaves_the_other_awake(
     assert state(hass, TWO_SLEEP_TIMER).state == minutes(-15).isoformat()
     assert state(hass, ASLEEP).state == "off"
     assert state(hass, SLEEP_TIMER).state == "unknown"
+
+
+# Round 1: nursing timers under the lock, orphaned timers, and a failed save
+
+
+async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets_it(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"))
+    coordinator = setup_entry.runtime_data
+    freezer.move_to(minutes(5))
+    async with coordinator.lock:  # a sync is running
+        stop = hass.async_create_task(press(hass, NURSE_LEFT))
+        for _ in range(5):
+            await asyncio.sleep(0)
+        freezer.move_to(minutes(8))
+    await stop
+
+    [record] = nursing_posts(server)
+    assert record.left_duration == 8
+
+
+async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"))
+    gate = asyncio.Event()
+    server.post_gate = gate
+    freezer.move_to(minutes(6))
+    stop = hass.async_create_task(press(hass, NURSE_LEFT))
+    for _ in range(20):
+        await asyncio.sleep(0)
+    assert "post" in server.calls  # the stop's post is waiting at the gate
+    switch = hass.async_create_task(call(hass, "switch_nursing_side"))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    gate.set()
+    await stop
+
+    with pytest.raises(ServiceValidationError) as err:
+        await switch
+
+    assert err.value.translation_key == "no_nursing_timer"
+    [record] = nursing_posts(server)
+    assert (record.left_duration, record.right_duration) == (6, 0)
+    assert state(hass, NURSING_TIMER).state == "unknown"
+
+
+async def test_a_saved_nursing_timer_for_a_baby_no_longer_in_the_account_is_dropped(
+    hass: HomeAssistant, config_entry: MockConfigEntry, hass_storage: dict[str, Any]
+) -> None:
+    key = f"{DOMAIN}.{config_entry.entry_id}.nursing"
+    gone = "99999999-0000-4000-8000-000000000099"
+    timer = {
+        "object_id": "AB000000-0000-4000-8000-000000000001",
+        "started": NOW.isoformat(),
+        "side": "left",
+        "side_started": NOW.isoformat(),
+        "left_seconds": 0,
+        "right_seconds": 0,
+    }
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {gone: timer}}
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data
+    assert coordinator.update_interval == timedelta(minutes=5)
+    assert gone not in coordinator.nursing
+    assert gone not in hass_storage[key]["data"]
+
+
+async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any
+) -> None:
+    coordinator = setup_entry.runtime_data
+    freezer.move_to(NOW)
+    with (
+        patch.object(coordinator._nursing_store, "async_save", side_effect=OSError("disk full")),
+        pytest.raises(HomeAssistantError) as err,
+    ):
+        await press(hass, NURSE_LEFT)
+
+    assert err.value.translation_key == "nursing_not_saved"
+    assert state(hass, NURSING_TIMER).state == NOW.isoformat()

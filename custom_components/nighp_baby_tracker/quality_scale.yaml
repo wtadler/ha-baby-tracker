@@ -1,7 +1,9 @@
 rules:
   # Bronze
   action-setup: done
-  appropriate-polling: done
+  appropriate-polling:
+    status: done
+    comment: Polls on the configured interval (5 minutes by default), and every minute only while a sleep or nursing timer runs.
   brands:
     status: exempt
     comment: This is a custom integration. Brand images go to the brands repository only when it moves to core.
