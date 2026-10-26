@@ -80,6 +80,9 @@ def test_config_flow_errors_and_aborts_have_messages() -> None:
 def test_every_sensor_has_a_translated_name() -> None:
     sensors = _load(INTEGRATION / "strings.json")["entity"]["sensor"]
     assert {key: value["name"] for key, value in sensors.items()} == {
+        "diapers_today": "Diapers today",
+        "feeds_today": "Feeds today",
+        "bottle_volume_today": "Bottle volume today",
         "last_diaper": "Last diaper",
         "last_feed": "Last feed",
         "last_pump": "Last pump",

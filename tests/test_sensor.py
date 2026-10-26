@@ -26,6 +26,9 @@ from .factories import (
 from .helpers import tick
 
 KEYS = ("last_diaper", "last_feed", "last_pump", "last_sleep")
+# The counts and the asleep sensor are covered in test_today.py; each baby also has these four.
+TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
+PER_BABY = len(KEYS) + len(TODAY_KEYS)
 BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
 
 
@@ -56,8 +59,8 @@ async def test_two_babies_make_two_devices_each_with_four_sensors(
         assert device is not None
         assert device.name == name
         sensors = er.async_entries_for_device(entities, device.id)
-        assert len(sensors) == 4
-        assert {sensor.translation_key for sensor in sensors} == set(KEYS)
+        assert len(sensors) == PER_BABY
+        assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS)
     assert len(dr.async_entries_for_config_entry(devices, setup_entry.entry_id)) == 2
 
 
@@ -74,8 +77,8 @@ async def test_entities_are_named_after_the_baby_and_the_activity(
 async def test_entities_have_unique_ids(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
     unique_ids = [entry.unique_id for entry in entries]
-    assert len(unique_ids) == 8
-    assert len(set(unique_ids)) == 8
+    assert len(unique_ids) == 2 * PER_BABY
+    assert len(set(unique_ids)) == 2 * PER_BABY
     assert all(unique_id for unique_id in unique_ids)
 
 
@@ -83,9 +86,9 @@ async def test_unique_ids_are_built_from_the_baby_id(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
-    assert len(entries) == 8
+    assert len(entries) == 2 * PER_BABY
     assert {e.unique_id for e in entries} == {
-        f"{baby}_{key}" for baby in (BABY_ONE_ID, BABY_TWO_ID) for key in KEYS
+        f"{baby}_{key}" for baby in (BABY_ONE_ID, BABY_TWO_ID) for key in KEYS + TODAY_KEYS
     }
 
 
@@ -473,7 +476,7 @@ async def test_a_baby_that_appears_later_is_added_without_a_reload(
     assert _state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
     device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, BABY_THREE_ID)})
     assert device is not None
-    assert len(er.async_entries_for_device(er.async_get(hass), device.id)) == 4
+    assert len(er.async_entries_for_device(er.async_get(hass), device.id)) == PER_BABY
 
 
 async def test_syncing_again_does_not_duplicate_a_baby(
@@ -483,7 +486,7 @@ async def test_syncing_again_does_not_duplicate_a_baby(
     await tick(hass)
     await tick(hass)
     entries = er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
-    assert len(entries) == 12
+    assert len(entries) == 3 * PER_BABY
 
 
 async def test_babies_are_restored_from_saved_state_after_a_restart(
