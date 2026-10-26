@@ -39,6 +39,7 @@ from .pybabytracker import (
     BabyTrackerClient,
     BabyTrackerError,
     NotOwnRecordError,
+    ObjectIdInUseError,
     ProtocolError,
     RecordNotFoundError,
     SyncEngine,
@@ -186,11 +187,6 @@ def _checked_minutes(*minutes: int) -> None:
         raise validation_error("minutes_too_long")
 
 
-def _is_id_clash(err: ValueError) -> bool:
-    message = str(err)
-    return message.startswith("object_id ") and " belongs to " in message
-
-
 async def _add(
     coordinator: BabyTrackerCoordinator,
     object_id: str | None,
@@ -201,9 +197,9 @@ async def _add(
     async def operation(engine: SyncEngine, client: BabyTrackerClient) -> object:
         try:
             return await add(engine, client, object_id)
-        except ValueError as err:
+        except ObjectIdInUseError as err:
             # Only the engine's ID-collision refusal means the ID is taken; anything else surfaces.
-            if object_id is None or not _is_id_clash(err):
+            if object_id is None:
                 raise
             raise validation_error("object_id_in_use") from err
 

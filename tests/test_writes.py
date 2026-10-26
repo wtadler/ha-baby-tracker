@@ -324,6 +324,17 @@ async def test_other_value_errors_are_not_reported_as_an_id_in_use(
         await log_diaper(hass, BABY_ONE_ID, "wet")
 
 
+async def test_a_plain_value_error_that_mentions_belongs_to_is_not_reported_as_an_id_in_use(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    lookalike = "object_id 7E57ED00-0000-4000-8000-00000000000A belongs to another record"
+    with (
+        patch.object(SyncEngine, "add_diaper", side_effect=ValueError(lookalike)),
+        pytest.raises(ValueError, match="belongs to another record"),
+    ):
+        await log_diaper(hass, BABY_ONE_ID, "wet", object_id="7e57ed00-0000-4000-8000-00000000000a")
+
+
 async def test_a_log_diaper_object_id_belonging_to_another_record_is_an_error(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
