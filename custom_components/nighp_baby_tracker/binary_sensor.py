@@ -1,5 +1,7 @@
 """The asleep sensor, one per baby."""
 
+from typing import override
+
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
@@ -45,6 +47,7 @@ class BabyTrackerAsleepSensor(BabyTrackerBabyEntity, BinarySensorEntity):
     """
 
     @property
+    @override
     def is_on(self) -> bool | None:
         """Return whether the baby's newest sleep is running."""
         baby = self._baby

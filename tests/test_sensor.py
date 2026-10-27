@@ -1,59 +1,22 @@
-"""Core PR 1: the sensor platform snapshot and entity naming. Later PRs add their entities to
-the snapshot."""
+"""Core PR 1: the sensor platform snapshot, and the sensors and device each baby has."""
 
 from unittest.mock import patch
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.const import (
-    Platform,
-)
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    snapshot_platform,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry, snapshot_platform
 from syrupy.assertion import SnapshotAssertion
 
-from . import setup_integration
-from .factories import (
-    BABY_ONE_ID,
-    BABY_TWO_ID,
-    at,
-)
+from . import NOW, get_baby_device, setup_integration
+from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, at, baby_payload
 from .fake_server import FakeServer
-from .helpers import (
-    NOW,
-    get_baby_device,
-)
 
-KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
-
-
-# The counts and the asleep sensor are in test_sensor_today.py; each baby also has these four.
-TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
-
-
-TIMER_KEYS = ("sleep_timer", "nursing_timer", "nursing_left_time", "nursing_right_time")
-
-
-PER_BABY = len(KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
-
-
-# The buttons share each baby's device, so entity counts here look at readings only.
-READINGS = ("sensor", "binary_sensor")
-
-
-def _entity_id(baby: str, key: str) -> str:
-    return f"sensor.{baby}_{key}"
-
-
-def _sensor_state(hass: HomeAssistant, baby: str, key: str):
-    state = hass.states.get(_entity_id(baby, key))
-    assert state is not None, f"{_entity_id(baby, key)} does not exist"
-    return state
+KEYS = ("last_diaper", "last_feed", "last_sleep")
+BABIES = ((BABY_ONE_ID, "baby_one", "Baby One"), (BABY_TWO_ID, "baby_two", "Baby Two"))
 
 
 @pytest.fixture(autouse=True)
@@ -74,6 +37,7 @@ async def test_sensors(
     mock_config_entry: MockConfigEntry,
     populated_server: FakeServer,
 ) -> None:
+    """Test the sensor entities and their states."""
     freezer.move_to(at(180))
     with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.SENSOR]):
         await setup_integration(hass, mock_config_entry)
@@ -81,60 +45,66 @@ async def test_sensors(
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)
 
 
-async def test_two_babies_make_two_devices_each_with_their_own_sensors(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+@pytest.mark.usefixtures("init_integration")
+async def test_each_baby_has_a_device_with_the_last_activity_sensors(
+    hass: HomeAssistant,
+    device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
 ) -> None:
-    devices = dr.async_get(hass)
-    entities = er.async_get(hass)
-    for baby_id, name in ((BABY_ONE_ID, "Baby One"), (BABY_TWO_ID, "Baby Two")):
-        device = get_baby_device(devices, baby_id)
+    """Test each baby gets a device named after them, holding the sensors."""
+    for baby_id, _, name in BABIES:
+        device = get_baby_device(device_registry, baby_id)
         assert device is not None
         assert device.name == name
-        sensors = [
-            e for e in er.async_entries_for_device(entities, device.id) if e.domain in READINGS
-        ]
-        assert len(sensors) == PER_BABY
-        assert {sensor.translation_key for sensor in sensors} == set(KEYS + TODAY_KEYS + TIMER_KEYS)
-    # The two babies' devices and the account's (which holds the last pump).
-    assert len(dr.async_entries_for_config_entry(devices, init_integration.entry_id)) == 3
+        sensors = er.async_entries_for_device(entity_registry, device.id)
+        assert set(KEYS) <= {sensor.translation_key for sensor in sensors}
 
 
-async def test_entities_are_named_after_the_baby_and_the_activity(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+async def test_a_baby_without_a_name_gets_a_translated_device_name(
+    hass: HomeAssistant,
+    device_registry: dr.DeviceRegistry,
+    mock_config_entry: MockConfigEntry,
+    server: FakeServer,
 ) -> None:
-    for baby, name in (("baby_one", "Baby One"), ("baby_two", "Baby Two")):
+    """Test a baby with no name gets the device's translated name."""
+    nameless_id = "44444444-DDDD-4DDD-8DDD-000000000004"
+    server.add_payload(DEVICE_A, baby_payload("", nameless_id))
+    await setup_integration(hass, mock_config_entry)
+
+    device = get_baby_device(device_registry, nameless_id)
+    assert device is not None
+    assert device.name == "Baby"
+    state = hass.states.get("sensor.baby_last_diaper")
+    assert state is not None
+    assert state.attributes["friendly_name"] == "Baby Last diaper"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_the_sensors_are_named_after_the_baby_and_the_activity(hass: HomeAssistant) -> None:
+    """Test the sensor names combine the baby's name and the activity."""
+    for _, baby, name in BABIES:
         for key, label in zip(KEYS, ("Last diaper", "Last feed", "Last sleep"), strict=True):
-            assert _sensor_state(hass, baby, key).attributes["friendly_name"] == f"{name} {label}"
-
-
-async def test_entities_have_unique_ids(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
-    unique_ids = [entry.unique_id for entry in entries if entry.domain in READINGS]
-    assert len(unique_ids) == 2 * PER_BABY + 2  # and the account's last pump and pump timer
-    assert len(set(unique_ids)) == 2 * PER_BABY + 2
-    assert all(unique_id for unique_id in unique_ids)
+            state = hass.states.get(f"sensor.{baby}_{key}")
+            assert state is not None
+            assert state.attributes["friendly_name"] == f"{name} {label}"
 
 
 async def test_unique_ids_are_built_from_the_baby_id(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+    init_integration: MockConfigEntry,
 ) -> None:
-    entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
-    entries = [e for e in entries if e.domain in READINGS]
-    assert len(entries) == 2 * PER_BABY + 2
-    assert {e.unique_id for e in entries} == {
-        f"{baby}_{key}"
-        for baby in (BABY_ONE_ID, BABY_TWO_ID)
-        for key in KEYS + TODAY_KEYS + TIMER_KEYS
-    } | {
-        f"{init_integration.entry_id}_last_pump",
-        f"{init_integration.entry_id}_pump_timer",
-    }
+    """Test the unique IDs are the baby's ID and the sensor's key."""
+    entries = er.async_entries_for_config_entry(entity_registry, init_integration.entry_id)
+    unique_ids = [entry.unique_id for entry in entries]
+    assert len(set(unique_ids)) == len(unique_ids)
+    assert {f"{baby_id}_{key}" for baby_id, _, _ in BABIES for key in KEYS} <= set(unique_ids)
 
 
-async def test_the_sensors_are_timestamps(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
+@pytest.mark.usefixtures("init_integration")
+async def test_the_sensors_are_timestamps(hass: HomeAssistant) -> None:
+    """Test the last-activity sensors are timestamps."""
     for key in KEYS:
-        assert _sensor_state(hass, "baby_one", key).attributes["device_class"] == "timestamp"
+        state = hass.states.get(f"sensor.baby_one_{key}")
+        assert state is not None
+        assert state.attributes["device_class"] == "timestamp"

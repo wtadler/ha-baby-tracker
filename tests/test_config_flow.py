@@ -36,6 +36,7 @@ async def _submit(hass: HomeAssistant, flow_id: str, email: str = EMAIL, passwor
 
 
 async def test_shows_the_email_and_password_form(hass: HomeAssistant) -> None:
+    """Test the user step asks for an email and a password."""
     result = await _start(hass)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -46,6 +47,7 @@ async def test_shows_the_email_and_password_form(hass: HomeAssistant) -> None:
 async def test_full_flow_creates_one_entry(
     hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
 ) -> None:
+    """Test a working login creates one entry for the account."""
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"])
 
@@ -61,6 +63,7 @@ async def test_full_flow_creates_one_entry(
 async def test_the_entry_has_a_generated_device_id_the_login_check_used(
     hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
 ) -> None:
+    """Test the entry keeps the device ID the login check signed in with."""
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"])
 
@@ -74,6 +77,7 @@ async def test_the_entry_has_a_generated_device_id_the_login_check_used(
 async def test_each_new_entry_gets_its_own_device_id(
     hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
 ) -> None:
+    """Test each new entry gets a device ID of its own."""
     first = await _submit(hass, (await _start(hass))["flow_id"], email="one@example.com")
     second = await _submit(hass, (await _start(hass))["flow_id"], email="two@example.com")
     assert first["data"][CONF_DEVICE_UUID] != second["data"][CONF_DEVICE_UUID]
@@ -83,6 +87,7 @@ async def test_each_new_entry_gets_its_own_device_id(
 async def test_the_login_check_client_is_closed(
     hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
 ) -> None:
+    """Test the client that checks the login is closed afterwards."""
     result = await _start(hass)
     await _submit(hass, result["flow_id"])
     assert server.clients[0].closed
@@ -112,6 +117,7 @@ async def test_form_errors_show_on_the_form_and_the_flow_recovers(
     break_login: Callable[[FakeServer], None],
     error: str,
 ) -> None:
+    """Test a failed login shows an error, and the same form then finishes."""
     break_login(server)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"])
@@ -139,6 +145,7 @@ async def test_form_errors_show_on_the_form_and_the_flow_recovers(
 async def test_the_form_keeps_what_was_typed_after_an_error(
     hass: HomeAssistant, server: FakeServer
 ) -> None:
+    """Test the form keeps the email after an error."""
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], password="test-wrong")
 
@@ -149,6 +156,7 @@ async def test_the_form_keeps_what_was_typed_after_an_error(
 async def test_an_account_already_set_up_aborts(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
+    """Test adding an account that is already set up aborts."""
     mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"])
@@ -160,6 +168,7 @@ async def test_an_account_already_set_up_aborts(
 async def test_the_same_account_in_a_different_case_aborts(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
+    """Test the email's case doesn't make a second entry for an account."""
     mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], email=EMAIL.upper())
@@ -171,6 +180,7 @@ async def test_the_same_account_in_a_different_case_aborts(
 async def test_the_unique_id_is_the_lowercased_email(
     hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
 ) -> None:
+    """Test the unique ID is the email in lowercase."""
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], email="Parent@Example.COM")
     entry = result["result"]
@@ -183,8 +193,10 @@ async def test_a_second_account_can_be_added(
     server: FakeServer,
     mock_setup_entry: AsyncMock,
 ) -> None:
+    """Test a second account gets its own entry."""
     mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], email="other@example.com")
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == "other@example.com"
     assert len(hass.config_entries.async_entries(DOMAIN)) == 2

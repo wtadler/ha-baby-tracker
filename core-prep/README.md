@@ -1,0 +1,36 @@
+# Core prep
+
+This folder holds what `scripts/core_cut.py` needs to write a planned Home Assistant core pull request out of this repository. This repository stays the source of truth: a fix that core's checks ask for lands here, and the cut is run again.
+
+- `plan.yaml`: the PR each file, key, and quality-scale status belongs to.
+- `quality_scale/prNN.yaml`: the core `quality_scale.yaml` for each planned PR. They're generated: run `scripts/core_cut.py --quality-scales` after changing `plan.yaml`.
+- `overlay/prNN/`: core-only files that replace the cut's own, from that PR on. `integration/` is the integration's folder and `tests/` its tests. A snapshot is the usual case: generate it in core with `pytest --snapshot-update`, then copy it here.
+
+## Cutting a PR
+
+```sh
+scripts/core_cut.py 1 ~/path/to/core
+```
+
+The checkout needs core's development environment (its `.venv` and ruff) and the library installed. The script replaces `homeassistant/components/nighp_baby_tracker/` and `tests/components/nighp_baby_tracker/`, adds the integration to `.strict-typing` when the PR marks `strict-typing` done, and formats the result with the checkout's ruff. It never touches the checkout's git state or remotes.
+
+Then run core's checks in the checkout:
+
+```sh
+python -m script.hassfest --integration-path homeassistant/components/nighp_baby_tracker
+python -m script.translations develop --integration nighp_baby_tracker
+ruff check homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
+ruff format --check homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
+mypy homeassistant/components/nighp_baby_tracker
+pylint homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
+pytest tests/components/nighp_baby_tracker --cov=homeassistant.components.nighp_baby_tracker --cov-report=term-missing
+```
+
+## Markers
+
+Python files are cut by comments, described at the top of `scripts/core_cut.py`:
+
+- `# Core PR N` on its own line marks the statement under it, and as a trailing comment marks its line (or the whole statement that starts there).
+- `# HACS-only` (or `# HACS only`) works the same way for code that never goes to core. So does a docstring line starting `HACS-only:`, and a test marked `@pytest.mark.engine`.
+- `# Core: <code>` is a line core needs instead: on its own line it becomes `<code>`, and as a trailing comment it replaces its line. It's for core APIs newer than the oldest Home Assistant this repository supports.
+- A test module's docstring starts with `Core PR N` or `HACS only`, which places the whole file.

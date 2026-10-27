@@ -23,7 +23,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     SyncEngine,
 )
 
-from . import OWN_DEVICE, OWN_DEVICE_TWO
+from . import NOW, OWN_DEVICE, OWN_DEVICE_TWO
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -35,7 +35,6 @@ from .fake_server import FakeServer
 from .helpers import (
     ALL_ACTIONS,
     LAST_DIAPER,
-    NOW,
     OTHER_DEVICES_RECORD,
     account_device,
     call,
@@ -56,7 +55,7 @@ def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
-CAPTURE = load_json_array_fixture("captured_payloads.json")
+CAPTURE = load_json_array_fixture("captured_payloads.json", DOMAIN)
 
 
 IGNORED = ("objectID", "timestamp", "note", "baby")

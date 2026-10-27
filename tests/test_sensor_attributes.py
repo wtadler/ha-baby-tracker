@@ -8,9 +8,10 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from . import tick
 from .factories import BABY_THREE_ID, DEVICE_A, OP_DELETE, at, baby_payload, volume
 from .fake_server import FakeServer
-from .helpers import state, state_of, tick
+from .helpers import state, state_of
 
 DIAPER_KEYS = {"type", "note"}
 FEED_KEYS = {

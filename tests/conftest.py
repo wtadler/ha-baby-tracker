@@ -5,13 +5,13 @@ The real sync engine runs on top of the fake, so the tests exercise the real mer
 """
 
 from collections.abc import Generator, Iterator
-from datetime import timedelta
+from datetime import timedelta  # Core PR 2
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from freezegun.api import FrozenDateTimeFactory
-from homeassistant.config_entries import ConfigEntryState
+from freezegun.api import FrozenDateTimeFactory  # Core PR 2
+from homeassistant.config_entries import ConfigEntryState  # Core PR 5
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import (
@@ -21,14 +21,14 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import (
-    BABY_ONE,
+    BABY_ONE,  # Core PR 7
     BABY_THREE,
     BABY_TWO,
     EMAIL,
     EMAIL_TWO,
     ENTRY_ID,
     OWN_DEVICE,
-    OWN_DEVICE_TWO,
+    OWN_DEVICE_TWO,  # Core PR 5
     PASSWORD,
     setup_integration,
 )
@@ -39,9 +39,10 @@ from .factories import (
     volume,
 )
 from .fake_server import FakeClient, FakeServer
-from .helpers import LOCAL_NOW
+from .helpers import LOCAL_NOW  # Core PR 2
 
 
+# HACS-only: core's tests load core's integrations
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterator[None]:
     """Load custom_components/ in every test."""
@@ -52,7 +53,8 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterato
 def mock_setup_entry() -> Generator[AsyncMock]:
     """Override async_setup_entry, so a config flow test doesn't set the integration up."""
     with patch(
-        "custom_components.nighp_baby_tracker.async_setup_entry", return_value=True
+        "custom_components.nighp_baby_tracker.async_setup_entry",
+        return_value=True,  # Core: return_value=None,
     ) as mock_setup_entry:
         yield mock_setup_entry
 
@@ -139,6 +141,7 @@ async def init_integration(
     return mock_config_entry
 
 
+# Core PR 5
 @pytest.fixture
 async def second_entry(hass: HomeAssistant, init_integration: MockConfigEntry) -> MockConfigEntry:
     """A second account, set up next to the default one."""
@@ -203,6 +206,7 @@ def populated_server(server: FakeServer) -> FakeServer:
     return server
 
 
+# Core PR 2
 @pytest.fixture
 async def clock(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
     """Eastern time, frozen at the default "now"."""
@@ -211,6 +215,7 @@ async def clock(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> FrozenDa
     return freezer
 
 
+# Core PR 7
 @pytest.fixture
 def empty(server: FakeServer) -> FakeServer:
     """The fake service with no records: each test adds exactly what it needs."""
@@ -222,6 +227,7 @@ def empty(server: FakeServer) -> FakeServer:
     return server
 
 
+# Core PR 2
 @pytest.fixture
 def entry(
     hass: HomeAssistant, clock: FrozenDateTimeFactory, monkeypatch: pytest.MonkeyPatch

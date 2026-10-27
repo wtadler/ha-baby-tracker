@@ -23,7 +23,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     NoResponseError,
 )
 
-from . import OWN_DEVICE
+from . import NOW, OWN_DEVICE
 from .factories import (
     BABY_TWO_ID,
     DEVICE_B,
@@ -32,7 +32,6 @@ from .factories import (
 from .fake_server import FakeServer
 from .helpers import (
     LAST_DIAPER,
-    NOW,
     button,
     fail_to_write,
     gap_issue,

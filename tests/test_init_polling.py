@@ -9,11 +9,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from . import NOW, sync_interval, tick
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
     LEGACY_INTERVAL,
-    NOW,
     NURSE_LEFT,
     PHONE_SLEEP,
     SLEEP_SWITCH,
@@ -23,8 +23,6 @@ from .helpers import (
     phone_ends_sleep,
     phone_sleep,
     state,
-    sync_interval,
-    tick,
     toggle,
 )
 

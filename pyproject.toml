@@ -36,6 +36,8 @@ ignore = ["D202", "D203", "D213", "D406", "D407", "D417"]
 [tool.mypy]
 python_version = "3.14"
 strict = true
+# Core requires @override on every overriding method.
+enable_error_code = ["explicit-override"]
 files = ["custom_components/nighp_baby_tracker"]
 # The vendored library is checked in its own repo.
 exclude = ["custom_components/nighp_baby_tracker/pybabytracker/"]
@@ -44,3 +46,9 @@ exclude = ["custom_components/nighp_baby_tracker/pybabytracker/"]
 module = "custom_components.nighp_baby_tracker.pybabytracker.*"
 follow_imports = "skip"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# Run on the folder, mypy names the vendored library without custom_components. The library is
+# checked in its own repo, which has no @override rule yet.
+module = "nighp_baby_tracker.pybabytracker.*"
+disable_error_code = ["explicit-override"]

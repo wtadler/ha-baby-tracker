@@ -1,23 +1,22 @@
 """Baby Tracker (Nighp)."""
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState  # Core PR 6
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import config_validation as cv  # Core PR 9
+from homeassistant.helpers import device_registry as dr  # Core PR 6
+from homeassistant.helpers import entity_registry as er  # HACS-only: the registry cleanups
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.typing import ConfigType  # Core PR 9
 
 from .const import (
     CONF_DEVICE_UUID,
-    CONFIG_ENTRY_MINOR_VERSION,
-    CONFIG_ENTRY_VERSION,
+    CONFIG_ENTRY_MINOR_VERSION,  # HACS-only: the config entry migration
     DEVICE_NAME,
-    DOMAIN,
+    DOMAIN,  # Core PR 6
     STORAGE_VERSION,
-    is_account_identifier,
+    is_account_identifier,  # Core PR 6
 )
 from .coordinator import (
     BabyTrackerConfigEntry,
@@ -25,15 +24,18 @@ from .coordinator import (
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
-from .services import async_setup_services
-from .timer_state import nursing_storage_key, pump_storage_key
-from .writes import forget_gap
+from .services import async_setup_services  # Core PR 9
+from .timer_state import (  # Core PR 18
+    nursing_storage_key,
+    pump_storage_key,  # Core PR 21
+)
+from .writes import forget_gap  # Core PR 11
 
 PLATFORMS: list[Platform] = [
-    Platform.BINARY_SENSOR,
-    Platform.BUTTON,
+    Platform.BINARY_SENSOR,  # Core PR 8
+    Platform.BUTTON,  # Core PR 14
     Platform.SENSOR,
-    Platform.SWITCH,
+    Platform.SWITCH,  # Core PR 17
 ]
 
 # HACS-only: the legacy button cleanup. These are the ends of the unique IDs (``<baby_id>_<key>``)
@@ -42,16 +44,21 @@ PLATFORMS: list[Platform] = [
 # on setup).
 REMOVED_BUTTONS = ("_sleep", "_nurse_left", "_nurse_right")
 
+# Core PR 9
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
+# Core PR 9
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the actions, which belong to the integration rather than to one entry."""
     async_setup_services(hass)
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: BabyTrackerConfigEntry,
+) -> bool:  # Core: ) -> None:
     """Sign in, load or backfill the records, and set up the sensors."""
     # The service authenticates by cookie, so this client gets a session of its own.
     session = async_create_clientsession(hass)
@@ -70,7 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
     entry.runtime_data = coordinator
     _remove_old_timer_buttons(hass, entry)  # HACS-only: the legacy button cleanup
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
+    return True  # HACS-only: core's entry methods return None (2026.11 and later)
 
 
 def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
@@ -96,13 +103,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry
     HACS-only: the config entry migration. Minor version 2 drops the per-baby last-pump
     entities. Doing it twice is harmless.
     """
-    if entry.version > CONFIG_ENTRY_VERSION:
+    if entry.version > 1:
         # The entry's layout comes from a newer release than this one: don't guess at it.
         return False
     if entry.minor_version < 2:
         _remove_per_baby_last_pumps(hass, entry)
         hass.config_entries.async_update_entry(
-            entry, version=CONFIG_ENTRY_VERSION, minor_version=CONFIG_ENTRY_MINOR_VERSION
+            entry, version=1, minor_version=CONFIG_ENTRY_MINOR_VERSION
         )
     return True
 
@@ -126,19 +133,26 @@ def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEnt
             registry.async_remove(entity.entity_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant,
+    entry: BabyTrackerConfigEntry,
+) -> bool:  # Core: ) -> None:
     """Unload the platforms. The coordinator stops and the client closes through the entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)  # HACS-only
+    # Core: await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Delete the saved sync state, the saved timers, and any repair about this entry."""
-    forget_gap(hass, entry.entry_id)
+    """Delete what the entry saved."""
+    forget_gap(hass, entry.entry_id)  # Core PR 11
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
+    # Core PR 18
     await Store(hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)).async_remove()
+    # Core PR 21
     await Store(hass, STORAGE_VERSION, pump_storage_key(entry.entry_id)).async_remove()
 
 
+# Core PR 6
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: BabyTrackerConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:

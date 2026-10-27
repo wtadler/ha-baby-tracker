@@ -8,9 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from . import NOW
 from .fake_server import FakeServer
 from .helpers import (
-    NOW,
     NURSE_LEFT,
     NURSING_TIMER,
     call,

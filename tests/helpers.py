@@ -1,7 +1,7 @@
 """Small helpers shared by the test modules."""
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -16,7 +16,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -29,7 +28,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     decode_transaction,
 )
 
-from . import BABY_ONE, EMAIL, PASSWORD
+from . import BABY_ONE, EMAIL, NOW, PASSWORD, get_baby_device, tick
 from .factories import (
     BABY_ONE_ID,
     DEVICE_A,
@@ -42,36 +41,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
 VENDORED = INTEGRATION / "pybabytracker"
 
-NOW = datetime(2026, 10, 26, 15, 0, 0, tzinfo=UTC)
 OTHER_DEVICES_RECORD = "D0000000-0000-4000-8000-000000000001"  # baby one's diaper from device A
-
-
-async def tick(hass: HomeAssistant, minutes: float = 5) -> None:
-    """Let the clock reach the next scheduled sync (and a second past it), then settle."""
-    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=minutes, seconds=1))
-    await hass.async_block_till_done()
-
-
-async def sync_interval(hass: HomeAssistant, server: FakeServer) -> timedelta:
-    """How often the integration syncs, found by moving the clock and counting the reads.
-
-    A sync already scheduled at the old interval runs first, so the first minute is let go by.
-    """
-    await tick(hass, minutes=1)
-    calls = server.device_list_calls
-    await tick(hass, minutes=1)
-    if server.device_list_calls > calls:
-        return timedelta(minutes=1)
-    await tick(hass, minutes=5)
-    if server.device_list_calls > calls:
-        return timedelta(minutes=5)
-    raise AssertionError("no sync within five minutes")
-
-
-def get_baby_device(registry: dr.DeviceRegistry, baby_id: str) -> dr.DeviceEntry | None:
-    """Return the device registered for a baby, or None."""
-    devices = registry.async_get_devices(identifiers={(DOMAIN, baby_id)})
-    return devices[0] if devices else None
 
 
 def button(baby: str, kind: str) -> str:
@@ -338,7 +308,6 @@ ACTION_IDS = list(BABY_ACTIONS)
 
 ALL_ACTIONS = [*BABY_ACTIONS, "log_pump", "start_pump", "stop_pump", "undo"]
 
-DIAPER = "sensor.baby_one_last_diaper"
 
 # A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.
 LEGACY_INTERVAL = "scan_interval"

@@ -8,8 +8,10 @@ device write just before a post, or report a log shorter than it is.
 """
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any
 
 from custom_components.nighp_baby_tracker.pybabytracker import (
@@ -28,6 +30,7 @@ class FakeServer:
     """The state behind every fake client: devices, their logs, and failure switches."""
 
     def __init__(self) -> None:
+        """Set up an empty service."""
         self.password = PASSWORD
         self.logs: dict[str, list[dict[str, Any]]] = {}
         self.names: dict[str, str] = {}
@@ -55,12 +58,13 @@ class FakeServer:
         object_id: str,
         *,
         when: datetime,
-        baby: dict[str, Any] | None = BABY_ONE,
+        baby: Mapping[str, Any] | None = MappingProxyType(BABY_ONE),
         op: int = OP_ADD,
         changed: datetime | None = None,
         note: str = "",
         **fields: Any,
     ) -> int:
+        """Add a record to a device's log, and return its sync ID."""
         payload = record_payload(
             type_name, object_id, when=when, baby=baby, changed=changed, note=note, **fields
         )
@@ -71,6 +75,7 @@ class FakeServer:
         return self.add_record(device, "Pump", object_id, when=when, baby=None, **fields)
 
     def add_payload(self, device: str, payload: dict[str, Any], *, op: int = OP_ADD) -> int:
+        """Add a payload to a device's log, and return its sync ID."""
         log = self.logs.setdefault(device, [])
         sync_id = len(log) + 1
         log.append(wire(sync_id, op, payload))
@@ -78,14 +83,17 @@ class FakeServer:
         return sync_id
 
     def add_raw(self, device: str, entry: dict[str, Any]) -> None:
+        """Add an entry to a device's log exactly as given."""
         self.logs.setdefault(device, []).append(entry)
         self.names.setdefault(device, f"Device {device[:1]}")
 
     @property
     def open_clients(self) -> list[FakeClient]:
+        """The clients not yet closed."""
         return [client for client in self.clients if not client.closed]
 
     def reads_from_start(self) -> list[tuple[str, int]]:
+        """The log reads that started from the beginning."""
         return [read for read in self.transaction_reads if read[1] == 0]
 
 
@@ -101,6 +109,7 @@ class FakeClient:
         device_name: str,
         **kwargs: Any,
     ) -> None:
+        """Set up a client on the fake service."""
         self.server = server
         self.email = email
         self.password = password
@@ -112,6 +121,7 @@ class FakeClient:
         server.clients.append(self)
 
     async def sign_in(self) -> int:
+        """Sign in, as the real client does."""
         self.server.sign_ins.append(
             {
                 "email": self.email,
@@ -134,6 +144,7 @@ class FakeClient:
             await self.sign_in()
 
     async def get_devices(self) -> list[Device]:
+        """List the devices in the sync group."""
         self.server.calls.append("devices")
         await asyncio.sleep(0)  # a real await point, so concurrent callers can interleave
         await self._ensure_session()
@@ -163,6 +174,7 @@ class FakeClient:
     async def get_transactions(
         self, device_uuid: str, since_sync_id: int = 0
     ) -> list[RawTransaction]:
+        """Read a page of a device's log after a sync ID."""
         await self._ensure_session()
         if device_uuid in self.server.read_errors:
             raise self.server.read_errors[device_uuid]
@@ -173,6 +185,7 @@ class FakeClient:
         ]
 
     async def post_transaction(self, op_code: int, sync_id: int, transaction: str) -> None:
+        """Append a transaction to this device's log."""
         server = self.server
         server.calls.append("post")
         server.active_posts += 1
@@ -199,4 +212,5 @@ class FakeClient:
         self.server.posted.append((sync_id, op_code, transaction))
 
     async def close(self) -> None:
+        """Close the client."""
         self.closed = True

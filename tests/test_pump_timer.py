@@ -36,11 +36,11 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
+from . import NOW, sync_interval
 from .factories import volume
 from .fake_server import FakeServer
 from .helpers import (
     LAST_PUMP,
-    NOW,
     PUMP_SWITCH,
     PUMP_TIMER,
     account_device,
@@ -48,7 +48,6 @@ from .helpers import (
     minutes,
     posted,
     state,
-    sync_interval,
     toggle,
     turn_off,
     turn_on,

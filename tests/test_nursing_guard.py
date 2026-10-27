@@ -26,12 +26,11 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.nighp_baby_tracker.const import DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
 
-from . import BABY_TWO
+from . import BABY_TWO, NOW, sync_interval, tick
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_B, OP_DELETE
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
-    NOW,
     NURSE_LEFT,
     NURSING_TIMER,
     account_device,
@@ -42,8 +41,6 @@ from .helpers import (
     phone_sleep,
     posted,
     state,
-    sync_interval,
-    tick,
     toggle,
 )
 

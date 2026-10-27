@@ -19,11 +19,11 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     BabyTrackerConnectionError,
 )
 
+from . import NOW
 from .factories import BABY_ONE_ID, BABY_TWO_ID
 from .fake_server import FakeServer
 from .helpers import (
     DISCARD_NURSING,
-    NOW,
     NURSE_LEFT,
     NURSE_RIGHT,
     NURSING_TIMER,
