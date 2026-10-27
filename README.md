@@ -23,6 +23,9 @@ timers. See
   device. Attributes: `amount`, `unit`, `left_amount` and `right_amount` (only when the sides were
   entered), durations in minutes, `sides`, and `note`. Upgrading removes the old per-baby last-pump
   sensors from the entity registry; update any dashboard or automation that used one.
+- **Pump timer**, also on the account device: a switch that is on while Home Assistant's pump timer
+  runs, and a timestamp sensor with the same name (`sensor.baby_tracker_account_pump_timer`) that
+  shows when it started, or is unknown. See [Timers](#timers).
 - An **Asleep** sensor, on while the baby's newest sleep is running, from any device.
 - Two timer sensors on each baby, built for a live activity:
   - **Sleep timer**: when the running sleep started (from any device), or unknown. Attribute
@@ -122,16 +125,30 @@ any dashboard or automation that used one.
   session runs.
 - **Discard nursing** drops the running nursing timer without writing anything (the
   `discard_nursing` action). With no timer running it shows an error.
-- While a sleep or a nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
-  up quickly. It returns to every 5 minutes when none is running. A nursing timer that has run for
-  an hour or more no longer counts: it's probably forgotten, and a [repair](#troubleshooting) asks
-  you to stop or discard it. A running sleep always counts, however long, because the app syncs it
+- **Pump timer**, on the account device, runs Home Assistant's own pump timer. A pump belongs to
+  the account, not a baby. Turn it on to start, and off to stop and log the session: one pump
+  record starting when the timer did, with the same whole minutes (rounded half up, at least 1, at
+  most 240) on both sides, as the app writes a timed pump with both sides together, and an
+  **amount of 0**, as the app does for a timed pump with no volume. In the app, the timer and the amount are one step; here, use `stop_pump` with an
+  `amount` (a dashboard card or script can offer both) to save the total with the minutes. There is
+  deliberately no separate amount entity.
+  - Turning it on while it runs, or off when it doesn't, shows an error and writes nothing.
+  - Like the nursing timer, it lives only in Home Assistant until it stops: nothing posts at the
+    start, the phones don't see it running, and it survives a restart (if it can't be saved, the
+    change still happens and an error says so).
+  - It does what the `start_pump` and `stop_pump` actions do. The **Pump timer** sensor shows its
+    start time.
+- While a sleep, a nursing timer, or the pump timer runs, Home Assistant syncs every minute, so a phone's stop shows
+  up quickly. It returns to every 5 minutes when none is running. A nursing or pump timer that has
+  run for an hour or more no longer counts: it's probably forgotten, and a
+  [repair](#troubleshooting) asks you to stop (or discard, for nursing) it. A running sleep always counts, however long, because the app syncs it
   and every phone shows it.
 - A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a
   forgotten timer can always be stopped; fix the length in the app.
 
 The actions do the same and more. A baby action takes the baby's device as `device_id`. The
-account actions (`log_pump`, and `undo` for a whole account) take `config_entry_id`.
+account actions (`log_pump`, `start_pump`, `stop_pump`, and `undo` for a whole account) take
+`config_entry_id`.
 
 **Upgrading automations:** the old `baby` field (and `device` on `log_pump`) still works for one
 more release. Using it raises a repair in **Settings > System > Repairs** that names the action
@@ -150,10 +167,25 @@ and the field to switch to: `device_id` for a baby, and `config_entry_id` for an
 - `nighp_baby_tracker.log_sleep` takes `device_id`, `start` and `end` (the end must be after the start),
   and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
   than 1.
-- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account), `left_amount` and/or
-  `right_amount`, an optional `unit`, `left_minutes` and `right_minutes`, an optional
-  `finish_side`, an optional `time` (the start; default now), and an optional `note`. The total is
-  the sum of the two sides. A pump belongs to the account, so no baby is saved with it.
+- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account), an optional `unit` (`fl. oz.`
+  or `mL`), an optional `finish_side`, an optional `time` (the start; default now), an optional
+  `note`, and the volume and length, either as a total or by side:
+  - **A total**, which is how most pumps are logged in the app: `amount` (the total volume) and,
+    if you like, `minutes` (the session's length with both sides together, written as the same
+    minutes on each side). The record has the total and no per-side amounts. `minutes` of 0 is
+    allowed.
+  - **By side**: `left_amount` and/or `right_amount`, and `left_minutes` and `right_minutes`. The
+    total is the sum of the sides.
+
+  Passing `amount` with `left_amount` or `right_amount`, or `minutes` with `left_minutes` or
+  `right_minutes` (even 0), is an error and posts nothing. A pump belongs to the account, so no baby
+  is saved with it.
+- `nighp_baby_tracker.start_pump` takes `config_entry_id` and starts Home Assistant's pump timer.
+  It's refused while the timer runs.
+- `nighp_baby_tracker.stop_pump` takes `config_entry_id`, an optional `amount` (the total, more
+  than zero), an optional `unit`, and an optional `note`. It saves one pump with the elapsed
+  whole minutes on both sides, and the amount if you gave one. It's refused when no timer runs, and
+  a bad amount is refused with the timer still running.
 - `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `device_id` (a baby) or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
   recent record Home Assistant created (for that baby, if you gave `device_id`). Run it again and it
@@ -248,6 +280,27 @@ night wake-up needs one tap. For feeds, put **Nursing left**, **Nursing right**,
 sensors on the card: tap a side to start, tap the other to switch, and tap the lit side to stop and
 log the session. The time sensors show how long each side has gone.
 
+**A pumping card.** On the account device, put the **Pump timer** switch next to **Last pump**. Tap
+the switch to start a session and again to stop it. To save the volume with the minutes, add a
+button (or a script) that calls `stop_pump` with an amount, for example by asking for it with an
+`input_number` helper:
+
+```yaml
+script:
+  stop_pump_with_amount:
+    alias: Stop pump and save the amount
+    sequence:
+      - action: nighp_baby_tracker.stop_pump
+        data:
+          config_entry_id: YOUR_CONFIG_ENTRY_ID
+          amount: "{{ states('input_number.pumped_amount') | float }}"
+          unit: fl. oz.
+```
+
+Pick the account from the action's form in **Developer tools > Actions** to get the right
+`config_entry_id`. A pump logged afterwards with only a total, with no timer, uses `log_pump` with
+`amount` and `minutes`.
+
 **Quiet notifications while the baby sleeps.** Mute announcements, or dim a hallway light, while
 `binary_sensor.baby_asleep` is on. It turns on for a sleep started from any phone as well as from
 Home Assistant, after the next sync.
@@ -308,12 +361,16 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
 - **A running nursing timer on a phone isn't visible.** The app doesn't sync one until it stops.
   Home Assistant shows only its own nursing timer (the **Nursing left** and **Nursing right**
   switches). A sleep timer is synced, so it shows from any device.
-- **A forgotten nursing timer is only caught after an hour.** Because only Home Assistant can see
-  its nursing timer, one left running keeps going until you stop or discard it. After an hour a
-  repair appears and Home Assistant goes back to checking every 5 minutes. A running sleep has no
-  such limit.
+- **A forgotten nursing or pump timer is only caught after an hour.** Because only Home Assistant
+  can see these timers, one left running keeps going until you stop it (or discard a nursing one).
+  After an hour a repair appears and Home Assistant goes back to checking every 5 minutes. A running
+  sleep has no such limit. A forgotten pump timer is stopped with the **Pump timer** switch or
+  `stop_pump`, which saves up to 240 minutes; `undo` then deletes that record if it wasn't real.
+- **A pump timer's stop has no amount by default.** The switch can't ask for one, so use
+  `stop_pump` with an `amount` when you want it saved with the minutes. Without one the record's
+  amount is 0, as the app writes it, and **Last pump** shows no amount for it.
 - **Records arrive on a schedule, not instantly.** Home Assistant checks for new records every 5
-  minutes, and every minute while a sleep timer or a nursing timer under an hour old runs. No option
+  minutes, and every minute while a sleep timer, or a nursing or pump timer under an hour old, runs. No option
   changes this. Records
   Home Assistant writes show at once. Call `homeassistant.update_entity` to check sooner.
 - **A sleep is at most 24 hours.** Stopping a sleep later than that saves 24 hours. Fix the length
@@ -348,6 +405,11 @@ paused so nothing is skipped or overwritten. To fix it:
 Adding it again reloads the account's history, and Home Assistant appears as a new device in the
 app. The old "Home Assistant" device stays in the app's device list. A shorter gap shows only an
 error on the write.
+
+**A repair says the pump timer has run for over an hour.** Home Assistant's pump timer is probably
+forgotten. Turn off the **Pump timer** switch, or call `stop_pump`, to save the session (at most
+240 minutes), then use `nighp_baby_tracker.undo` for the account if the record wasn't real. The
+repair goes away when the timer stops.
 
 **A repair says an automation uses an old field.** The `baby` field (and `device` on `log_pump`)
 still works for one more release. The repair names the action and the field to switch to:

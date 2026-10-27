@@ -19,6 +19,8 @@ SCAN_INTERVAL = timedelta(minutes=5)
 # can't be seen or ended anywhere else. Once it has run this long it raises a repair and stops
 # counting toward the one-minute polling. Sleeps are synced, so they have no such limit.
 NURSING_TIMER_GUARD_AFTER = timedelta(minutes=60)
+# The pump timer is Home Assistant's alone in the same way, so it has the same hour.
+PUMP_TIMER_GUARD_AFTER = timedelta(minutes=60)
 
 # How Home Assistant names itself in the account's device list.
 DEVICE_NAME = "Home Assistant"
@@ -38,6 +40,11 @@ def nursing_guard_issue_id(entry_id: str, baby_id: str) -> str:
     return f"nursing_timer_long_{entry_id}_{baby_id}"
 
 
+def pump_guard_issue_id(entry_id: str) -> str:
+    """Return the repair issue ID for an account's overlong pump timer."""
+    return f"pump_timer_long_{entry_id}"
+
+
 def account_identifier(entry_id: str) -> str:
     """Return the identifier of an account's device."""
     return f"{entry_id}{ACCOUNT_SUFFIX}"
@@ -53,6 +60,8 @@ SERVICE_LOG_BOTTLE = "log_bottle"
 SERVICE_LOG_NURSING = "log_nursing"
 SERVICE_LOG_SLEEP = "log_sleep"
 SERVICE_LOG_PUMP = "log_pump"
+SERVICE_START_PUMP = "start_pump"
+SERVICE_STOP_PUMP = "stop_pump"
 SERVICE_UNDO = "undo"
 SERVICE_START_SLEEP = "start_sleep"
 SERVICE_STOP_SLEEP = "stop_sleep"

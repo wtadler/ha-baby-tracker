@@ -254,6 +254,17 @@
       'translation_key': 'last_pump',
       'unique_id': '<entry>_last_pump',
     }),
+    'sensor.baby_tracker_account_pump_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '<entry>_account',
+        ),
+      ]),
+      'device_name': 'Baby Tracker account',
+      'translation_key': 'pump_timer',
+      'unique_id': '<entry>_pump_timer',
+    }),
     'sensor.baby_two_bottle_volume_today': dict({
       'device_identifiers': list([
         tuple(
@@ -396,6 +407,17 @@
       'device_name': 'Baby One',
       'translation_key': 'sleep',
       'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_sleep',
+    }),
+    'switch.baby_tracker_account_pump_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '<entry>_account',
+        ),
+      ]),
+      'device_name': 'Baby Tracker account',
+      'translation_key': 'pump',
+      'unique_id': '<entry>_pump',
     }),
     'switch.baby_two_nursing_left': dict({
       'device_identifiers': list([

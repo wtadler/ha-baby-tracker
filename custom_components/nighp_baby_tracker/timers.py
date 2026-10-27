@@ -1,4 +1,4 @@
-"""Home Assistant's own nursing timer.
+"""Home Assistant's own nursing and pump timers.
 
 The app doesn't sync a nursing timer while it runs: one finished record arrives when it stops
 (PROTOCOL.md, "Timers"). So a nursing timer started in Home Assistant lives here, is saved with
@@ -8,6 +8,10 @@ Each side's time is rounded to whole minutes, half up. A session stopped so soon
 round to 0 (under 30 seconds) is written as 1 minute on the side it ended on, rather than
 refused: the press was deliberate, and a refusal would leave the timer running. A side longer
 than 240 minutes (a forgotten timer) is written as 240, the most the library accepts.
+
+The pump timer works the same way for the account: nothing syncs while it runs, it is saved with
+``Store``, and the stop writes one finished pump with equal minutes on both sides (a pump with
+both sides together, as the app writes a timed one), rounded and capped like a nursing side.
 """
 
 import logging
@@ -140,3 +144,76 @@ def load_timers(saved: Any) -> dict[str, NursingTimer]:
         except (KeyError, TypeError, ValueError, AttributeError) as err:
             _LOGGER.warning("Dropping a saved nursing timer that can't be read (%r)", err)
     return timers
+
+
+@dataclass(frozen=True, slots=True)
+class PumpTimer:
+    """A running pump session on the account: when it began, and the record its stop writes.
+
+    ``object_id`` is chosen at the start so a retried stop can't write twice.
+    """
+
+    object_id: str
+    started: datetime
+
+    @classmethod
+    def start(cls, object_id: str, now: datetime) -> PumpTimer:
+        """Start a timer at ``now``."""
+        return cls(object_id, now)
+
+    def is_overdue(self, now: datetime, after: timedelta) -> bool:
+        """Whether the timer has run for ``after`` or longer since it started."""
+        return now - self.started >= after
+
+    def minutes(self, now: datetime) -> int:
+        """Whole minutes to write at ``now``, on both sides alike.
+
+        Rounded half up, at least 1 (a deliberate press is never refused for being short), and at
+        most 240, the most the library accepts (a forgotten timer).
+        """
+        minutes = max(1, _whole_minutes(max(0.0, (now - self.started).total_seconds())))
+        if minutes > MAX_MINUTES_PER_SIDE:
+            _LOGGER.warning(
+                "Pump timer %s ran past %s minutes; writing %s",
+                self.object_id,
+                MAX_MINUTES_PER_SIDE,
+                MAX_MINUTES_PER_SIDE,
+            )
+        return min(minutes, MAX_MINUTES_PER_SIDE)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the timer as saveable data."""
+        return {"object_id": self.object_id, "started": self.started.isoformat()}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> PumpTimer:
+        """Rebuild a saved timer.
+
+        Raises ``ValueError`` (or ``KeyError``/``TypeError``) on bad data.
+        """
+        object_id = str(data["object_id"])
+        if not object_id:
+            raise ValueError("no record ID")
+        started = dt_util.parse_datetime(str(data["started"]))
+        if started is None:
+            raise ValueError("bad time")
+        if started.tzinfo is None:
+            raise ValueError("naive time")
+        return cls(object_id, started)
+
+
+def load_pump_timer(saved: Any) -> PumpTimer | None:
+    """Return the saved pump timer, or None when there is none.
+
+    Nothing saved, or an empty save (the timer was stopped), is no timer and says nothing. One
+    that can't be read is dropped with a warning.
+    """
+    if saved is None or (isinstance(saved, Mapping) and not saved):
+        return None
+    try:
+        if not isinstance(saved, Mapping):
+            raise TypeError("not a mapping")
+        return PumpTimer.from_dict(saved)
+    except (KeyError, TypeError, ValueError, AttributeError) as err:
+        _LOGGER.warning("Dropping a saved pump timer that can't be read (%r)", err)
+        return None

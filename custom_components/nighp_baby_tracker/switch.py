@@ -1,4 +1,4 @@
-"""Timer switches: Sleep, Nursing left, and Nursing right, one set per baby.
+"""Timer switches: a baby's Sleep, Nursing left, and Nursing right, and the account's Pump timer.
 
 A switch reads on while its timer runs, so a dashboard shows the timer without a separate
 sensor. Every control calls the same function in ``writes.py`` as the matching action, so it
@@ -8,9 +8,12 @@ The Sleep switch follows the baby's newest sleep, from any device. The two nursi
 follow Home Assistant's own nursing timer only: the app doesn't sync a running nursing timer
 (PROTOCOL.md, "Timers"), so one started on a phone shows when it stops.
 
-To add a switch for the account (a pump timer), give it a description like
-``BabyTrackerSwitchDescription`` whose functions take the coordinator alone, and build it on
-``BabyTrackerAccountEntity``, as the last-pump sensor is.
+The Pump timer belongs to the account, not a baby, so it sits on the account's device. It follows
+Home Assistant's own pump timer only (the app doesn't sync a running pump). Its description,
+``BabyTrackerAccountSwitchDescription``, is the baby one's counterpart: its functions take the
+coordinator alone, and the entity is built on ``BabyTrackerAccountEntity``, as the last-pump sensor
+is. Turning it on or off is one call to the same function as ``start_pump`` and ``stop_pump``;
+the stop has no amount (the ``stop_pump`` action takes one).
 """
 
 from collections.abc import Awaitable, Callable
@@ -21,12 +24,19 @@ from homeassistant.components.switch import SwitchEntity, SwitchEntityDescriptio
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
-from .entity import BabyTrackerBabyEntity
+from .coordinator import (
+    BabyData,
+    BabyTrackerConfigEntry,
+    BabyTrackerCoordinator,
+    BabyTrackerData,
+)
+from .entity import BabyTrackerAccountEntity, BabyTrackerBabyEntity
 from .timers import LEFT, RIGHT
 from .writes import (
     async_start_nursing,
+    async_start_pump,
     async_start_sleep,
+    async_stop_pump,
     async_stop_sleep,
     async_turn_off_nursing_side,
 )
@@ -44,6 +54,18 @@ class BabyTrackerSwitchDescription(SwitchEntityDescription):
     is_on_fn: Callable[[BabyData], bool]
     turn_on_fn: BabyAction
     turn_off_fn: BabyAction
+
+
+type AccountAction = Callable[[BabyTrackerCoordinator], Awaitable[None]]
+
+
+@dataclass(frozen=True, kw_only=True)
+class BabyTrackerAccountSwitchDescription(SwitchEntityDescription):
+    """A switch for a timer that belongs to the account."""
+
+    is_on_fn: Callable[[BabyTrackerData], bool]
+    turn_on_fn: AccountAction
+    turn_off_fn: AccountAction
 
 
 def _nursing_side(side: str) -> tuple[Callable[[BabyData], bool], BabyAction, BabyAction]:
@@ -95,13 +117,32 @@ SWITCHES: tuple[BabyTrackerSwitchDescription, ...] = (
 )
 
 
+async def _stop_pump(coordinator: BabyTrackerCoordinator) -> None:
+    await async_stop_pump(coordinator)
+
+
+ACCOUNT_SWITCHES: tuple[BabyTrackerAccountSwitchDescription, ...] = (
+    # On while Home Assistant's pump timer runs. Turning it off logs the minutes with no amount.
+    BabyTrackerAccountSwitchDescription(
+        key="pump",
+        translation_key="pump",
+        is_on_fn=lambda data: data.pump is not None,
+        turn_on_fn=async_start_pump,
+        turn_off_fn=_stop_pump,
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: BabyTrackerConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the switches for every baby, and for babies that appear in later syncs."""
+    """Add the account's switch and every baby's, and the babies' that appear in later syncs."""
     coordinator = entry.runtime_data
+    async_add_entities(
+        BabyTrackerAccountSwitch(coordinator, description) for description in ACCOUNT_SWITCHES
+    )
     known: set[str] = set()
 
     @callback
@@ -138,3 +179,22 @@ class BabyTrackerSwitch(BabyTrackerBabyEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop the timer: a sleep ends, a nursing session is logged."""
         await self.entity_description.turn_off_fn(self.coordinator, self._baby_id)
+
+
+class BabyTrackerAccountSwitch(BabyTrackerAccountEntity, SwitchEntity):
+    """The account's pump timer, on while it runs."""
+
+    entity_description: BabyTrackerAccountSwitchDescription
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the timer runs."""
+        return self.entity_description.is_on_fn(self.coordinator.data)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Start the timer."""
+        await self.entity_description.turn_on_fn(self.coordinator)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Stop the timer and log the session, with no amount."""
+        await self.entity_description.turn_off_fn(self.coordinator)

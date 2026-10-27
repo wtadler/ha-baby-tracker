@@ -40,6 +40,7 @@ async def async_get_config_entry_diagnostics(
             ),
             "babies": len(data.babies),
             "has_last_pump": data.last_pump is not None,
+            "pump_timer_running": data.pump is not None,
         },
         "engine": {
             "devices_seen": len(engine.last_seen),

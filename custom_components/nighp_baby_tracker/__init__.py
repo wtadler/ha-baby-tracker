@@ -23,6 +23,7 @@ from .coordinator import (
     BabyTrackerConfigEntry,
     BabyTrackerCoordinator,
     nursing_storage_key,
+    pump_storage_key,
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
@@ -130,10 +131,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Delete the saved sync state, the saved nursing timers, and any repair about this entry."""
+    """Delete the saved sync state, the saved timers, and any repair about this entry."""
     forget_gap(hass, entry.entry_id)
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
     await Store(hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)).async_remove()
+    await Store(hass, STORAGE_VERSION, pump_storage_key(entry.entry_id)).async_remove()
 
 
 async def async_remove_config_entry_device(

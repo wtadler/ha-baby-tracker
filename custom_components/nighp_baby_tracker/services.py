@@ -19,8 +19,10 @@ from .const import (
     SERVICE_LOG_PUMP,
     SERVICE_LOG_SLEEP,
     SERVICE_START_NURSING,
+    SERVICE_START_PUMP,
     SERVICE_START_SLEEP,
     SERVICE_STOP_NURSING,
+    SERVICE_STOP_PUMP,
     SERVICE_STOP_SLEEP,
     SERVICE_SWITCH_NURSING_SIDE,
     SERVICE_UNDO,
@@ -40,8 +42,10 @@ from .writes import (
     async_log_pump,
     async_log_sleep,
     async_start_nursing,
+    async_start_pump,
     async_start_sleep,
     async_stop_nursing,
+    async_stop_pump,
     async_stop_sleep,
     async_switch_nursing_side,
     async_undo,
@@ -60,6 +64,7 @@ ATTR_OBJECT_ID = "object_id"
 ATTR_KIND = "kind"
 ATTR_AMOUNT = "amount"
 ATTR_UNIT = "unit"
+ATTR_MINUTES = "minutes"
 ATTR_LEFT_AMOUNT = "left_amount"
 ATTR_RIGHT_AMOUNT = "right_amount"
 ATTR_LEFT_MINUTES = "left_minutes"
@@ -164,17 +169,33 @@ LOG_PUMP_SCHEMA = probatio.All(
             probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
             probatio.Optional(ATTR_DEVICE): cv.string,
             probatio.Optional(ATTR_BABY): cv.string,
+            # The total, or the sides (checked in writes.py): so none has a default, and an
+            # explicit 0 minutes alongside ``minutes`` is a conflict.
+            probatio.Optional(ATTR_AMOUNT): probatio.Coerce(float),
+            probatio.Optional(ATTR_MINUTES): _whole_minutes,
             probatio.Optional(ATTR_LEFT_AMOUNT): probatio.Coerce(float),
             probatio.Optional(ATTR_RIGHT_AMOUNT): probatio.Coerce(float),
             probatio.Optional(ATTR_UNIT): _UNIT,
-            probatio.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
-            probatio.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
+            probatio.Optional(ATTR_LEFT_MINUTES): _whole_minutes,
+            probatio.Optional(ATTR_RIGHT_MINUTES): _whole_minutes,
             probatio.Optional(ATTR_FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
             probatio.Optional(ATTR_TIME): cv.datetime,
         }
     ),
     cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
     cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
+)
+
+# The pump timer belongs to the account, so these name it by config entry.
+START_PUMP_SCHEMA = probatio.Schema({probatio.Required(ATTR_CONFIG_ENTRY_ID): cv.string})
+
+STOP_PUMP_SCHEMA = probatio.Schema(
+    {
+        probatio.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        probatio.Optional(ATTR_AMOUNT): probatio.Coerce(float),
+        probatio.Optional(ATTR_UNIT): _UNIT,
+        probatio.Optional(ATTR_NOTE, default=""): cv.string,
+    }
 )
 
 START_SLEEP_SCHEMA = _baby_schema(
@@ -336,15 +357,30 @@ async def _log_sleep(call: ServiceCall) -> None:
 async def _log_pump(call: ServiceCall) -> None:
     await async_log_pump(
         _account_coordinator(call),
+        amount=call.data.get(ATTR_AMOUNT),
+        minutes=call.data.get(ATTR_MINUTES),
         left_amount=call.data.get(ATTR_LEFT_AMOUNT),
         right_amount=call.data.get(ATTR_RIGHT_AMOUNT),
         unit=call.data.get(ATTR_UNIT),
-        left_minutes=call.data[ATTR_LEFT_MINUTES],
-        right_minutes=call.data[ATTR_RIGHT_MINUTES],
+        left_minutes=call.data.get(ATTR_LEFT_MINUTES),
+        right_minutes=call.data.get(ATTR_RIGHT_MINUTES),
         finish_side=call.data.get(ATTR_FINISH_SIDE),
         time=call.data.get(ATTR_TIME),
         note=call.data[ATTR_NOTE],
         object_id=call.data.get(ATTR_OBJECT_ID),
+    )
+
+
+async def _start_pump(call: ServiceCall) -> None:
+    await async_start_pump(_entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID]))
+
+
+async def _stop_pump(call: ServiceCall) -> None:
+    await async_stop_pump(
+        _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID]),
+        amount=call.data.get(ATTR_AMOUNT),
+        unit=call.data.get(ATTR_UNIT),
+        note=call.data[ATTR_NOTE],
     )
 
 
@@ -403,6 +439,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(DOMAIN, SERVICE_LOG_SLEEP, _log_sleep, schema=LOG_SLEEP_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_LOG_PUMP, _log_pump, schema=LOG_PUMP_SCHEMA)
+    hass.services.async_register(DOMAIN, SERVICE_START_PUMP, _start_pump, schema=START_PUMP_SCHEMA)
+    hass.services.async_register(DOMAIN, SERVICE_STOP_PUMP, _stop_pump, schema=STOP_PUMP_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_UNDO, _undo, schema=UNDO_SCHEMA)
     hass.services.async_register(
         DOMAIN, SERVICE_START_SLEEP, _start_sleep, schema=START_SLEEP_SCHEMA

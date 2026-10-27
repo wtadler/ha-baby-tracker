@@ -52,7 +52,7 @@ from .pybabytracker import (
 )
 from .pybabytracker.builders import MAX_MINUTES_PER_SIDE, MAX_SLEEP, START_SKEW
 from .pybabytracker.times import standard_offset_seconds
-from .timers import SIDES, NursingTimer, other_side
+from .timers import SIDES, NursingTimer, PumpTimer, other_side
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -393,42 +393,61 @@ async def async_log_sleep(
 async def async_log_pump(
     coordinator: BabyTrackerCoordinator,
     *,
+    amount: float | None = None,
+    minutes: int | None = None,
     left_amount: float | None = None,
     right_amount: float | None = None,
     unit: str | None = None,
-    left_minutes: int = 0,
-    right_minutes: int = 0,
+    left_minutes: int | None = None,
+    right_minutes: int | None = None,
     finish_side: str | None = None,
     time: datetime | None = None,
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a pumping session of one or both sides, starting at ``time`` (default now).
+    """Add a pumping session, starting at ``time`` (default now).
+
+    Give the total as ``amount``, or the volume of one or both sides (not both: the total is then
+    their sum). ``minutes`` is the length with both sides together, written as equal minutes on
+    each side; ``left_minutes`` and ``right_minutes`` give each side its own (not both, even at 0).
+    A total-only pump carries no per-side amounts, as the app writes it.
 
     A pump belongs to the account, not a baby, so it takes no baby and is written with none.
     """
-    if left_amount is None and right_amount is None:
+    if amount is not None and (left_amount is not None or right_amount is not None):
+        raise validation_error("amount_with_sides")
+    if minutes is not None and (left_minutes is not None or right_minutes is not None):
+        raise validation_error("minutes_with_sides")
+    if amount is None and left_amount is None and right_amount is None:
         raise validation_error("no_amount")
-    for amount in (left_amount, right_amount):
-        if amount is not None and (not math.isfinite(amount) or amount < 0):
-            raise validation_error("invalid_amount")
-    _checked_amount((left_amount or 0) + (right_amount or 0))
-    if round(left_amount or 0, 2) + round(right_amount or 0, 2) <= 0:
-        raise validation_error("amount_too_small")  # each side is saved to two decimals
-    _checked_minutes(left_minutes, right_minutes)
+    if amount is not None:
+        total: Volume | None = _volume(_checked_amount(amount), unit)
+        left = right = None
+    else:
+        total = None
+        for side_amount in (left_amount, right_amount):
+            if side_amount is not None and (not math.isfinite(side_amount) or side_amount < 0):
+                raise validation_error("invalid_amount")
+        _checked_amount((left_amount or 0) + (right_amount or 0))
+        if round(left_amount or 0, 2) + round(right_amount or 0, 2) <= 0:
+            raise validation_error("amount_too_small")  # each side is saved to two decimals
+        left = _volume(left_amount, unit) if left_amount is not None else None
+        right = _volume(right_amount, unit) if right_amount is not None else None
+    left_length = minutes if minutes is not None else (left_minutes or 0)
+    right_length = minutes if minutes is not None else (right_minutes or 0)
+    _checked_minutes(left_length, right_length)
     if finish_side is not None and finish_side not in FINISH_SIDES:
         raise validation_error("invalid_finish_side")
-    left = _volume(left_amount, unit) if left_amount is not None else None
-    right = _volume(right_amount, unit) if right_amount is not None else None
     moment, offset = _in_home_assistant_time(time)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
         return await engine.add_pump(
             client,
+            amount=total,
             left_volume=left,
             right_volume=right,
-            left_minutes=left_minutes,
-            right_minutes=right_minutes,
+            left_minutes=left_length,
+            right_minutes=right_length,
             finish_side=FINISH_SIDES[finish_side] if finish_side is not None else None,
             time=moment,
             timezone_offset=offset,
@@ -601,6 +620,65 @@ async def async_turn_off_nursing_side(
         timer = coordinator.nursing.get(baby_id)
         if timer is not None and timer.side == side:
             await _stop_nursing_locked(coordinator, baby_id)
+
+
+async def async_start_pump(coordinator: BabyTrackerCoordinator) -> None:
+    """Start Home Assistant's pump timer. Nothing is written until the stop.
+
+    Refused while it's running. Like every timer change, it holds the coordinator's lock.
+    """
+    async with coordinator.exclusive():
+        if coordinator.pump is not None:
+            raise validation_error("pump_already_running")
+        await coordinator.async_set_pump(PumpTimer.start(_new_id(), dt_util.utcnow()))
+
+
+async def async_stop_pump(
+    coordinator: BabyTrackerCoordinator,
+    *,
+    amount: float | None = None,
+    unit: str | None = None,
+    note: str = "",
+) -> None:
+    """Stop the pump timer and write one finished pump.
+
+    The record starts when the timer did and has equal whole minutes on both sides. ``amount``
+    (fl. oz. unless ``unit`` says mL) is the total; without it the record's amount is 0 (as the
+    app writes a timed pump with no volume), in ``unit`` or else the Bottle button's unit. A bad
+    amount is refused and the timer keeps running. The timer is cleared only once the write
+    succeeds, and the record's ID was fixed at the start, so stopping again after an error can't
+    write twice.
+    """
+    volume = _volume(_checked_amount(amount), unit) if amount is not None else None
+    # The unit of the zero written when there's no amount: the one given, else the unit the
+    # Bottle button uses (the options, or fl. oz. / mL by the unit system).
+    if unit is None:
+        unit = configured_bottle(coordinator.hass, coordinator.config_entry.options)[1]
+    zero_unit = _volume(0, unit).unit
+    async with coordinator.exclusive():
+        timer = coordinator.pump
+        if timer is None:
+            raise validation_error("no_pump_timer")
+        length = timer.minutes(dt_util.utcnow())
+        start, offset = _in_home_assistant_time(timer.started)
+
+        async def add(
+            engine: SyncEngine, client: BabyTrackerClient, object_id: str | None
+        ) -> object:
+            return await engine.add_pump(
+                client,
+                amount=volume,
+                default_unit=zero_unit,
+                left_minutes=length,
+                right_minutes=length,
+                time=start,
+                timezone_offset=offset,
+                note=note,
+                object_id=object_id,
+            )
+
+        await _add(coordinator, timer.object_id, add, locked=True)
+        await coordinator.async_set_pump(None)
 
 
 def _most_recent_own(engine: SyncEngine, baby_id: str | None) -> str | None:

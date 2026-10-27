@@ -163,6 +163,23 @@ log_pump:
       selector:
         config_entry:
           integration: nighp_baby_tracker
+    amount:
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: any
+    minutes:
+      required: false
+      example: 15
+      selector:
+        number:
+          min: 0
+          max: 240
+          step: 1
+          unit_of_measurement: min
     left_amount:
       required: false
       example: 2
@@ -226,6 +243,43 @@ log_pump:
     object_id:
       required: false
       example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:
+
+start_pump:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: nighp_baby_tracker
+
+stop_pump:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: nighp_baby_tracker
+    amount:
+      required: false
+      example: 4.5
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: any
+    unit:
+      required: false
+      example: fl. oz.
+      selector:
+        select:
+          options:
+            - fl. oz.
+            - mL
+    note:
+      required: false
+      example: Pumped at the office
       selector:
         text:
 

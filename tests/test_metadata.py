@@ -103,6 +103,8 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "log_nursing",
         "log_sleep",
         "log_pump",
+        "start_pump",
+        "stop_pump",
         "start_sleep",
         "stop_sleep",
         "start_nursing",
@@ -188,6 +190,8 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "log_nursing",
         "log_sleep",
         "log_pump",
+        "start_pump",
+        "stop_pump",
         "start_sleep",
         "stop_sleep",
         "start_nursing",
@@ -217,6 +221,8 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
     assert fields["log_sleep"] == {"device_id", "start", "end", "note", "object_id"}
     assert fields["log_pump"] == {
         "config_entry_id",
+        "amount",
+        "minutes",
         "left_amount",
         "right_amount",
         "unit",
@@ -367,6 +373,7 @@ def test_the_timer_switches_and_discard_button_are_translated_and_the_old_button
         "sleep": "Sleep",
         "nursing_left": "Nursing left",
         "nursing_right": "Nursing right",
+        "pump": "Pump timer",
     }
     assert entity["button"]["discard_nursing"]["name"] == "Discard nursing"
     for key in ("sleep", "nurse_left", "nurse_right"):
@@ -448,6 +455,7 @@ def test_every_sensor_has_a_translated_name() -> None:
         "nursing_timer": "Nursing timer",
         "nursing_left_time": "Nursing left time",
         "nursing_right_time": "Nursing right time",
+        "pump_timer": "Pump timer",
     }
 
 
@@ -504,3 +512,45 @@ def test_trigger_and_condition_docs_are_exempt_with_a_reason(rule: str) -> None:
 
 def test_claude_worktrees_are_gitignored() -> None:
     assert ".claude/" in (ROOT / ".gitignore").read_text().splitlines()
+
+
+# --- the pump timer ------------------------------------------------------------------------------
+
+
+def test_the_pump_actions_take_the_account_and_stop_pump_takes_an_amount_unit_and_note() -> None:
+    services = _yaml()
+
+    assert set(services["start_pump"]["fields"]) == {"config_entry_id"}
+    assert set(services["stop_pump"]["fields"]) == {"config_entry_id", "amount", "unit", "note"}
+    for action in ("start_pump", "stop_pump"):
+        field = services[action]["fields"]["config_entry_id"]
+        assert field["required"] is True
+        assert field["selector"] == {"config_entry": {"integration": DOMAIN}}
+    assert services["stop_pump"]["fields"]["amount"]["required"] is False
+    assert services["stop_pump"]["fields"]["unit"]["selector"]["select"]["options"] == [
+        "fl. oz.",
+        "mL",
+    ]
+    assert services["log_pump"]["fields"]["amount"]["required"] is False
+    assert services["log_pump"]["fields"]["minutes"]["required"] is False
+
+
+def test_the_pump_timer_errors_repair_entities_and_icons_are_translated() -> None:
+    strings = _strings()
+    assert {
+        "pump_already_running",
+        "no_pump_timer",
+        "pump_not_saved",
+        "amount_with_sides",
+        "minutes_with_sides",
+    } <= set(strings["exceptions"])
+    repair = strings["issues"]["pump_timer_long"]
+    assert repair["title"]
+    assert "Pump timer switch" in repair["description"]
+    assert "Stop pump" in repair["description"]
+    assert "Undo" in repair["description"]  # a forgotten timer's record can be deleted again
+    assert strings["entity"]["switch"]["pump"]["name"] == "Pump timer"
+    assert strings["entity"]["sensor"]["pump_timer"]["name"] == "Pump timer"
+    icons = _icons()["entity"]
+    assert icons["switch"]["pump"]["state"]["on"] != icons["switch"]["pump"]["state"]["off"]
+    assert icons["sensor"]["pump_timer"]["default"].startswith("mdi:")
