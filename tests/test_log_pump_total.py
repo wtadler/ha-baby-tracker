@@ -103,8 +103,8 @@ async def test_a_total_shows_on_the_last_pump_sensor_without_side_amounts(
     assert last.state == "2026-10-26T08:00:00+00:00"
     assert last.attributes["amount"] == 6
     assert last.attributes["unit"] == "fl. oz."
-    assert "left_amount" not in last.attributes
-    assert "right_amount" not in last.attributes
+    assert last.attributes["left_amount"] is None
+    assert last.attributes["right_amount"] is None
 
 
 # --- minutes ----------------------------------------------------------------------------------

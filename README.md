@@ -18,6 +18,10 @@ timers. See
     bottles, nursing durations in minutes, `finish_side`, and `note`. The newest of nursing,
     formula, and pumped milk counts as the last feed.
   - Sleep: `duration_minutes` (0 while a sleep is in progress) and `note`.
+
+  Every attribute is always present. One with no value, such as the `note` of a record without one,
+  or `amount` on a nursing feed, is `null`, so a template can read it without checking that the key
+  exists. Before this change those keys were left out. The same goes for Last pump.
 - **Last pump**, on the account device: the newest pump on the account, whoever logged it. Pumps
   belong to the account, not a baby (the app stores no baby with them), so this isn't on a baby's
   device. Attributes: `amount`, `unit`, `left_amount` and `right_amount` (only when the sides were

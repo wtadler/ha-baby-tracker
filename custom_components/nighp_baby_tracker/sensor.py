@@ -31,11 +31,7 @@ FEED_KINDS = {"Nursing": "nursing", "Formula": "formula", "Pumped": "pumped"}
 SIDES = {0: "left", 1: "right"}
 
 
-def _present(attributes: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in attributes.items() if value is not None}
-
-
-def _note(record: Record) -> str | None:
+def _note(record: Record | None) -> str | None:
     note = getattr(record, "note", None)
     return note if isinstance(note, str) and note else None
 
@@ -45,47 +41,47 @@ def _label(labels: dict[int, str], code: object) -> str | None:
     return labels.get(code) if isinstance(code, int) else None
 
 
-def _diaper_attributes(record: Record) -> dict[str, Any]:
-    return _present(
-        {"type": _label(DIAPER_TYPES, getattr(record, "status", None)), "note": _note(record)}
-    )
+def _diaper_attributes(record: Record | None) -> dict[str, Any]:
+    return {
+        "type": _label(DIAPER_TYPES, getattr(record, "status", None)),
+        "note": _note(record),
+    }
 
 
-def _feed_attributes(record: Record) -> dict[str, Any]:
-    kind = FEED_KINDS.get(record.record_type)
-    attributes: dict[str, Any] = {"kind": kind}
-    if kind == "nursing":
-        attributes["left_duration_minutes"] = getattr(record, "left_duration", None)
-        attributes["right_duration_minutes"] = getattr(record, "right_duration", None)
-        attributes["both_duration_minutes"] = getattr(record, "both_duration", None)
-        attributes["finish_side"] = _label(SIDES, getattr(record, "finish_side", None))
-    else:
-        attributes["amount"], attributes["unit"] = volume_parts(getattr(record, "volume", None))
-    attributes["note"] = _note(record)
-    return _present(attributes)
+def _feed_attributes(record: Record | None) -> dict[str, Any]:
+    kind = FEED_KINDS.get(record.record_type) if record is not None else None
+    amount, unit = volume_parts(getattr(record, "volume", None))
+    return {
+        "kind": kind,
+        "left_duration_minutes": getattr(record, "left_duration", None),
+        "right_duration_minutes": getattr(record, "right_duration", None),
+        "both_duration_minutes": getattr(record, "both_duration", None),
+        "finish_side": _label(SIDES, getattr(record, "finish_side", None)),
+        "amount": amount,
+        "unit": unit,
+        "note": _note(record),
+    }
 
 
-def _pump_attributes(record: Record) -> dict[str, Any]:
+def _pump_attributes(record: Record | None) -> dict[str, Any]:
     amount, unit = volume_parts(getattr(record, "volume", None))
     if amount == 0:
         # A timed pump saved with no volume carries an amount of 0: that is no volume, not 0 fl. oz.
         amount = unit = None
-    return _present(
-        {
-            "amount": amount,
-            "unit": unit,
-            "left_amount": volume_parts(getattr(record, "left_volume", None))[0],
-            "right_amount": volume_parts(getattr(record, "right_volume", None))[0],
-            "left_duration_minutes": getattr(record, "left_duration", None),
-            "right_duration_minutes": getattr(record, "right_duration", None),
-            "sides": getattr(record, "sides", None),
-            "note": _note(record),
-        }
-    )
+    return {
+        "amount": amount,
+        "unit": unit,
+        "left_amount": volume_parts(getattr(record, "left_volume", None))[0],
+        "right_amount": volume_parts(getattr(record, "right_volume", None))[0],
+        "left_duration_minutes": getattr(record, "left_duration", None),
+        "right_duration_minutes": getattr(record, "right_duration", None),
+        "sides": getattr(record, "sides", None),
+        "note": _note(record),
+    }
 
 
-def _sleep_attributes(record: Record) -> dict[str, Any]:
-    return _present({"duration_minutes": getattr(record, "duration", None), "note": _note(record)})
+def _sleep_attributes(record: Record | None) -> dict[str, Any]:
+    return {"duration_minutes": getattr(record, "duration", None), "note": _note(record)}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -93,7 +89,7 @@ class BabyTrackerSensorDescription(SensorEntityDescription):
     """A sensor for one kind of record."""
 
     record_fn: Callable[[BabyData], Record | None]
-    attributes_fn: Callable[[Record], dict[str, Any]]
+    attributes_fn: Callable[[Record | None], dict[str, Any]]
 
 
 SENSORS: tuple[BabyTrackerSensorDescription, ...] = (
@@ -194,10 +190,9 @@ class BabyTrackerSensor(BabyTrackerBabyEntity, SensorEntity):
         return record.time if record is not None else None
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return the attributes of the baby's newest matching record."""
-        record = self._record
-        return self.entity_description.attributes_fn(record) if record is not None else None
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the attributes of the baby's newest matching record, each None when unset."""
+        return self.entity_description.attributes_fn(self._record)
 
 
 class BabyTrackerLastPumpSensor(BabyTrackerAccountEntity, SensorEntity):
@@ -214,10 +209,9 @@ class BabyTrackerLastPumpSensor(BabyTrackerAccountEntity, SensorEntity):
         return pump.time if pump is not None else None
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return the attributes of the last pump."""
-        pump = self.coordinator.data.last_pump
-        return _pump_attributes(pump) if pump is not None else None
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the attributes of the last pump, each None when unset."""
+        return _pump_attributes(self.coordinator.data.last_pump)
 
 
 PUMP_TIMER = SensorEntityDescription(
