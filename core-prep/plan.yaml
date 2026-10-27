@@ -28,7 +28,6 @@ integration_files:
   timer_state.py: 18
   guard.py: 18
   brand: hacs
-  pybabytracker: hacs
   translations: hacs
 
 # Files of tests/ whose module docstring doesn't name their PR. A test module's docstring starts

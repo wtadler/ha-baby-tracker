@@ -12,15 +12,15 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
+from pybabytracker import (
+    OP_ADD,
+    BabyTrackerConnectionError,
+    SyncEngine,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_json_array_fixture
 
 from custom_components.baby_tracker.const import (
     DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
-    OP_ADD,
-    BabyTrackerConnectionError,
-    SyncEngine,
 )
 
 from . import NOW, OWN_DEVICE, OWN_DEVICE_TWO

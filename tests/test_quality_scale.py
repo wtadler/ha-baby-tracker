@@ -7,10 +7,9 @@ import pkgutil
 import re
 from typing import Any
 
+import pybabytracker
 import pytest
 import yaml
-
-from custom_components.baby_tracker import pybabytracker
 
 from .helpers import INTEGRATION
 
@@ -191,9 +190,9 @@ def test_the_rules_the_ticket_names_are_never_exempt(rule: str) -> None:
     assert _status(_rules()[rule]) != "exempt"
 
 
-def test_dependency_transparency_stays_todo_while_the_library_is_bundled() -> None:
-    assert _manifest()["requirements"] == []
-    assert _status(_rules()["dependency-transparency"]) == "todo"
+def test_dependency_transparency_is_done_because_the_manifest_pins_the_library_on_pypi() -> None:
+    assert _manifest()["requirements"] == [f"pybabytracker=={pybabytracker.__version__}"]
+    assert _status(_rules()["dependency-transparency"]) == "done"
 
 
 def test_the_nursing_time_sensors_timer_makes_entity_event_setup_done_not_exempt() -> None:
@@ -237,9 +236,9 @@ def test_the_category_contributing_names_for_core_submission_is_one_core_lists()
     assert named.group(1) in CORE_CATEGORIES
 
 
-def test_the_manifest_names_the_bundled_librarys_loggers() -> None:
+def test_the_manifest_names_the_librarys_loggers() -> None:
     loggers = _manifest()["loggers"]
-    assert loggers == ["custom_components.baby_tracker.pybabytracker"]
+    assert loggers == ["pybabytracker"]
     for module in pkgutil.iter_modules(pybabytracker.__path__):
         name = f"{pybabytracker.__name__}.{module.name}"
         if module.name in {"__main__", "cli"}:
@@ -259,8 +258,10 @@ def test_the_manifest_declares_no_tier_a_rule_denies() -> None:
     assert TIER_ORDER.index(declared) <= TIER_ORDER.index(met)
 
 
-def test_bronze_does_not_hold_while_the_library_is_bundled_so_no_tier_is_declared() -> None:
-    assert _highest_tier_met() is None
+def test_every_tier_up_to_gold_holds_now_the_library_is_on_pypi_but_none_is_declared() -> None:
+    # A custom integration's manifest leaves quality_scale out: core adds it at submission, from
+    # the plan, and hassfest checks the file's shape for core integrations only.
+    assert _highest_tier_met() == "gold"
     assert "quality_scale" not in _manifest()
 
 

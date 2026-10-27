@@ -9,15 +9,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
+from pybabytracker import (
+    BabyTrackerConnectionError,
+)
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
 
 from custom_components.baby_tracker.const import DOMAIN
-from custom_components.baby_tracker.pybabytracker import (
-    BabyTrackerConnectionError,
-)
 
 from . import NOW
 from .factories import BABY_ONE_ID, BABY_TWO_ID

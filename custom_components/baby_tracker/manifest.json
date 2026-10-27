@@ -7,7 +7,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/wtadler/ha-baby-tracker/issues",
-  "loggers": ["custom_components.baby_tracker.pybabytracker"],
-  "requirements": [],
+  "loggers": ["pybabytracker"],
+  "requirements": ["pybabytracker==0.1.0"],
   "version": "0.1.0"
 }

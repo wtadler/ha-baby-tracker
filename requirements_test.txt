@@ -2,3 +2,4 @@ pytest-homeassistant-custom-component==0.13.375
 pytest-cov==7.1.0
 ruff==0.15.0
 mypy==2.4.0
+pybabytracker==0.1.0

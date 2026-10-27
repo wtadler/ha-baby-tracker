@@ -23,18 +23,18 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+from pybabytracker import (
+    OP_ADD,
+    BabyTrackerConnectionError,
+    Pump,
+    Volume,
+)
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
 
 from custom_components.baby_tracker.const import DOMAIN
-from custom_components.baby_tracker.pybabytracker import (
-    OP_ADD,
-    BabyTrackerConnectionError,
-    Pump,
-    Volume,
-)
 
 from . import NOW, sync_interval
 from .factories import volume

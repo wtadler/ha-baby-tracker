@@ -10,9 +10,7 @@ rules:
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
-  dependency-transparency:
-    status: todo
-    comment: Library bundled while private; goes to PyPI at go-public (#12).
+  dependency-transparency: done
   docs-actions: done
   docs-conditions:
     status: exempt
@@ -93,4 +91,4 @@ rules:
   inject-websession: done
   strict-typing:
     status: todo
-    comment: mypy --strict passes on the integration in CI, but it skips the bundled library's types, and sensor.py still probes record fields with getattr. Finish when the library is a PyPI package that ships py.typed (#12).
+    comment: mypy --strict passes on the integration in CI, now checking it against the library's own types, but sensor.py still probes record fields with getattr. Finish once that is cleaned up and the library is published to PyPI with py.typed (#12).

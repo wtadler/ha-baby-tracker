@@ -9,6 +9,7 @@ from homeassistant.helpers import entity_registry as er  # HACS-only: the regist
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType  # Core PR 9
+from pybabytracker import BabyTrackerClient
 
 from .const import (
     CONF_DEVICE_UUID,
@@ -23,7 +24,6 @@ from .coordinator import (
     BabyTrackerCoordinator,
     storage_key,
 )
-from .pybabytracker import BabyTrackerClient
 from .services import async_setup_services  # Core PR 9
 from .timer_state import (  # Core PR 18
     nursing_storage_key,

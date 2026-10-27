@@ -10,16 +10,16 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.baby_tracker.const import (
-    DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
+from pybabytracker import (
     OP_ADD,
     OP_DELETE,
     OP_UPDATE,
     BabyTrackerConnectionError,
+)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.baby_tracker.const import (
+    DOMAIN,
 )
 
 from . import NOW
@@ -137,7 +137,7 @@ async def _two_diapers(
 
 
 def _deleted(server: FakeServer) -> list[str]:
-    from custom_components.baby_tracker.pybabytracker import OP_DELETE
+    from pybabytracker import OP_DELETE
 
     return [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
 

@@ -67,8 +67,6 @@ CLAUSE = re.compile(r"(elif|else|except|finally|case)\b(?!\s*[=.,)\]])")
 CORE_LINE = re.compile(r"#\s*Core:\s?(?P<code>.*)$")
 MODULE_DOCSTRING_PR = re.compile(r'^(?P<quote>"""|\'\'\')Core PRs? [^:]*: ')
 IMPORT_REWRITES = (
-    ("custom_components.baby_tracker.pybabytracker", "pybabytracker"),
-    ("from .pybabytracker import", "from pybabytracker import"),
     ("custom_components.baby_tracker", "homeassistant.components.baby_tracker"),
     ("pytest_homeassistant_custom_component.", "pytest_homeassistant."),
 )
@@ -92,7 +90,10 @@ def _included(owner: Owner, pr: int) -> bool:
 
 
 def rewrite_imports(text: str) -> str:
-    """Point imports of the integration, the vendored library, and test helpers at core's."""
+    """Point imports of the integration and test helpers at core's.
+
+    The library is imported as ``pybabytracker`` here and in core, so those imports stay put.
+    """
     for old, new in IMPORT_REWRITES:
         text = text.replace(old, new)
     return text
@@ -313,11 +314,13 @@ def _at(changes: dict[int, Any], pr: int) -> Any:
 
 
 def library_version() -> str:
-    """Return the version of the vendored library, which core pins."""
-    text = (INTEGRATION / "pybabytracker" / "_version.py").read_text()
-    match = re.search(r'__version__ = "([^"]+)"', text)
-    assert match is not None
-    return match[1]
+    """Return the version of the library the manifest pins, which core pins too."""
+    requirements = json.loads((INTEGRATION / "manifest.json").read_text())["requirements"]
+    for requirement in requirements:
+        match = re.fullmatch(r"pybabytracker==(\S+)", requirement)
+        if match:
+            return match[1]
+    raise ValueError("manifest.json requirements pin no version of pybabytracker")
 
 
 def core_manifest(pr: int) -> dict[str, Any]:

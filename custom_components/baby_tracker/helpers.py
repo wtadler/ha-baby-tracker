@@ -1,9 +1,8 @@
 """Turn the library's volumes into attribute values."""
 
 from homeassistant.const import UnitOfVolume
-
-from .pybabytracker import Volume
-from .pybabytracker.models import UNIT_MILLILITERS, UNIT_OUNCES
+from pybabytracker import Volume
+from pybabytracker.models import UNIT_MILLILITERS, UNIT_OUNCES
 
 # The attribute's unit is an automation contract: these are Home Assistant's own constants.
 _UNITS = {
