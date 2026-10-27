@@ -212,10 +212,9 @@ async def test_turning_on_while_a_phone_sleep_is_not_yet_synced_starts_no_second
     )
 
     assert posted(server) == []
-    # Like the start_sleep action, the error doesn't publish; the next sync shows the sleep.
-    assert state(hass, SLEEP_SWITCH).state == "off"
-    await sync(hass, init_integration)
+    # The write's own sync found the sleep, so the switch shows it at once.
     assert state(hass, SLEEP_SWITCH).state == "on"
+    assert state(hass, ASLEEP).state == "on"
     assert state(hass, SLEEP_TIMER).attributes["object_id"] == PHONE_SLEEP
 
 
@@ -240,9 +239,10 @@ async def test_turning_off_after_the_app_already_ended_the_sleep_posts_nothing(
     await _expect_error(hass, SLEEP_SWITCH, "turn_off", "no_running_sleep", ServiceValidationError)
 
     assert posted(server) == []
-    # Like the stop_sleep action, the error doesn't publish; the next sync shows the end.
-    await sync(hass, init_integration)
+    # The write's own sync found the sleep ended, so the switch shows it at once.
     assert state(hass, SLEEP_SWITCH).state == "off"
+    assert state(hass, ASLEEP).state == "off"
+    assert state(hass, SLEEP_TIMER).state == "unknown"
     assert state(hass, LAST_SLEEP).attributes["duration_minutes"] == 38
 
 
@@ -621,3 +621,35 @@ async def test_a_timer_that_cannot_be_saved_still_turns_the_switch_on_and_says_s
         await _expect_error(hass, NURSE_LEFT, "turn_on", "nursing_not_saved", HomeAssistantError)
 
     assert state(hass, NURSE_LEFT).state == "on"
+
+
+async def test_the_stop_sleep_action_also_shows_the_fresh_state_when_refused_as_stale(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    phone_sleep(server, start=minutes(-40))
+    await sync(hass, init_integration)
+    phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=38, changed=minutes(-2))
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "stop_sleep",
+            {"device_id": get_baby_device(dr.async_get(hass), BABY_ONE_ID).id},  # type: ignore[union-attr]
+            blocking=True,
+        )
+
+    assert err.value.translation_key == "no_running_sleep"
+    assert state(hass, SLEEP_SWITCH).state == "off"
+    assert state(hass, ASLEEP).state == "off"
+
+
+async def test_a_failing_sync_before_a_write_publishes_nothing_new(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    phone_sleep(server, start=minutes(-1))  # a phone's sleep Home Assistant can't fetch now
+    server.request_error = BabyTrackerConnectionError("down")
+
+    await _expect_error(hass, SLEEP_SWITCH, "turn_on", "sync_failed", HomeAssistantError)
+
+    assert state(hass, SLEEP_SWITCH).state == "off"  # nothing was learned, so nothing changes
+    assert posted(server) == []

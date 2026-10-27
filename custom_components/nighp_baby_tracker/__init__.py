@@ -37,7 +37,8 @@ PLATFORMS: list[Platform] = [
 ]
 
 # Buttons an earlier version registered, as the ends of their unique IDs (``<baby_id>_<key>``).
-# The Sleep and Nursing switches replaced them.
+# The Sleep and Nursing switches replaced them. Matching is by suffix, so no button added later
+# may have a key that ends in one of these (a ``log_sleep`` button would be deleted on setup).
 REMOVED_BUTTONS = ("_sleep", "_nurse_left", "_nurse_right")
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)

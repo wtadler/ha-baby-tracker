@@ -111,8 +111,8 @@ any dashboard or automation that used one.
   - Turning on the side that's already running, or off a side that isn't, does nothing.
   - **The switches show only Home Assistant's own timer.** The app doesn't sync a running nursing
     timer, so Home Assistant can't see one running on a phone, and the phones see Home
-    Assistant's only when it stops. They do what the `start_nursing`, `switch_nursing_side`, and
-    `stop_nursing` actions do.
+    Assistant's only when it stops. They do what the `start_nursing` (which also switches
+    sides) and `stop_nursing` actions do.
   - The timer survives a restart (if it can't be saved, the change still happens and an error says
     so), and nursing while the baby is asleep is fine. A timer for a baby no longer in the account
     is dropped.

@@ -211,7 +211,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
 
         The engine state is saved after every attempt, failed ones included, because the engine's
         pending post and its grace window live only in that state. The new data reaches the
-        entities at once, without waiting for the next poll, but only after a success. Library
+        entities at once, without waiting for the next poll. A refused or failed write still
+        publishes what the sync before it learned. Library
         errors propagate as they are; a failed sync before the write is wrapped in
         ``SyncBeforeWriteError`` (an authentication error passes through as itself). Pass
         ``locked=True`` when the caller already holds ``exclusive()`` (a nursing stop).
@@ -231,7 +232,13 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 raise
             except BabyTrackerError as err:
                 raise SyncBeforeWriteError(str(err)) from err
-            result = await operation(self.engine, self.client)
+            try:
+                result = await operation(self.engine, self.client)
+            except Exception:
+                # The sync before the write succeeded, so what it learned is true even though the
+                # write was refused (a phone already ended the sleep): show it now.
+                self.async_set_updated_data(self._rebuild())
+                raise
         finally:
             await self._async_save()
         self.async_set_updated_data(self._rebuild())
