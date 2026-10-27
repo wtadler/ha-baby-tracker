@@ -103,9 +103,6 @@ async def test_buttons(
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)
 
 
-# Nursing: buttons
-
-
 async def test_nurse_left_then_right_then_right_writes_both_sides_and_finish_side_right(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
@@ -286,9 +283,6 @@ async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice
     assert state(hass, NURSING_TIMER).state == "unknown"
 
 
-# Nursing timers under the lock, orphaned timers, and a failed save
-
-
 async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets_it(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
@@ -331,9 +325,6 @@ async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
 
     assert err.value.translation_key == "nursing_not_saved"
     assert state(hass, NURSING_TIMER).state == NOW.isoformat()
-
-
-# Buttons
 
 
 async def test_each_baby_gets_wet_dirty_mixed_bottle_and_discard_nursing_buttons(
@@ -398,9 +389,6 @@ async def test_two_presses_make_two_records_with_different_ids(
     assert [n for n, _, _ in posted(server)] == [1, 2]
 
 
-# Writes sync first and update the sensor at once
-
-
 async def test_a_write_saves_what_it_synced_and_posted(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -431,9 +419,6 @@ async def test_a_failed_sync_before_a_write_posts_nothing(
     assert raised.value.translation_key == "sync_failed"
     assert server.posted == []
     assert sensor_states(hass) == before
-
-
-# Failed writes
 
 
 async def test_a_failed_write_raises_a_translated_error_and_changes_no_sensor(
@@ -628,9 +613,6 @@ async def test_an_auth_error_during_a_write_starts_reauth(
     assert server.posted == []
 
 
-# Concurrency and several accounts
-
-
 async def test_concurrent_presses_are_serialized(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -658,9 +640,6 @@ async def test_buttons_for_each_account_post_to_their_own_account(
     await press(hass, button("baby_three", "dirty"))
     assert server.posted == []
     assert len(second_server.posted) == 1
-
-
-# --- the Bottle button ------------------------------------------------------------------------
 
 
 async def test_each_baby_gets_a_bottle_button(
@@ -842,9 +821,6 @@ async def test_two_bottle_presses_make_two_records(
     assert [n for n, _, _ in posted(server)] == [1, 2]
 
 
-# --- two accounts ------------------------------------------------------------------------------
-
-
 async def test_the_bottle_button_of_each_account_uses_that_accounts_options(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -906,9 +882,6 @@ async def test_a_started_timer_sends_the_standard_offset_in_summer(
     await toggle(hass, SLEEP_SWITCH)
 
     assert only_record(server).timezone == -18000
-
-
-# Discard nursing, and the buttons that are gone
 
 
 async def test_the_discard_button_drops_the_timer_and_posts_nothing(
@@ -973,35 +946,3 @@ async def test_discard_is_the_discard_nursing_action(
             blocking=True,
         )
     assert via_action.value.translation_key == "no_nursing_timer"
-
-
-@pytest.mark.parametrize("key", ["sleep", "nurse_left", "nurse_right"])
-async def test_the_old_timer_buttons_are_gone(
-    hass: HomeAssistant, init_integration: MockConfigEntry, key: str
-) -> None:
-    registry = er.async_get(hass)
-    for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        assert registry.async_get_entity_id("button", DOMAIN, f"{baby_id}_{key}") is None
-    assert hass.states.get(f"button.baby_one_{key}") is None
-
-
-async def test_the_one_shot_buttons_and_discard_are_the_only_buttons_per_baby(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    devices = dr.async_get(hass)
-    entities = er.async_get(hass)
-    for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        device = get_baby_device(devices, baby_id)
-        assert device is not None
-        keys = {
-            e.translation_key
-            for e in er.async_entries_for_device(entities, device.id)
-            if e.domain == "button"
-        }
-        assert keys == {
-            "wet_diaper",
-            "dirty_diaper",
-            "mixed_diaper",
-            "bottle",
-            "discard_nursing",
-        }

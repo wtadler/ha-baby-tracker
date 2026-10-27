@@ -1,4 +1,5 @@
-"""The sensors: last activity, today's counts, timers, and the account's last pump."""
+"""Core PR 1: the sensor platform snapshot and entity naming. Later PRs add their entities to
+the snapshot."""
 
 from typing import Any
 from unittest.mock import patch
@@ -20,17 +21,13 @@ from syrupy.assertion import SnapshotAssertion
 from . import setup_integration
 from .factories import (
     BABY_ONE_ID,
-    BABY_THREE_ID,
     BABY_TWO_ID,
-    DEVICE_B,
     at,
-    baby_payload,
 )
 from .fake_server import FakeServer
 from .helpers import (
     NOW,
     get_baby_device,
-    tick,
 )
 
 KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
@@ -50,9 +47,6 @@ PER_BABY = len(KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
 READINGS = ("sensor", "binary_sensor")
 
 
-BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
-
-
 def _entity_id(baby: str, key: str) -> str:
     return f"sensor.{baby}_{key}"
 
@@ -61,10 +55,6 @@ def _sensor_state(hass: HomeAssistant, baby: str, key: str):
     state = hass.states.get(_entity_id(baby, key))
     assert state is not None, f"{_entity_id(baby, key)} does not exist"
     return state
-
-
-def _object_id(number: int) -> str:
-    return f"A0000000-0000-4000-8000-{number:012d}"
 
 
 @pytest.fixture(autouse=True)
@@ -149,31 +139,3 @@ async def test_the_sensors_are_timestamps(
 ) -> None:
     for key in KEYS:
         assert _sensor_state(hass, "baby_one", key).attributes["device_class"] == "timestamp"
-
-
-async def test_a_baby_that_appears_later_is_added_without_a_reload(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    assert hass.states.get(_entity_id("baby_three", "last_diaper")) is None
-    clients = len(server.clients)
-
-    server.add_record(DEVICE_B, "Diaper", _object_id(70), when=at(300), baby=BABY_THREE, status=1)
-    await tick(hass)
-
-    assert len(server.clients) == clients
-    assert _sensor_state(hass, "baby_three", "last_diaper").state == at(300).isoformat()
-    assert _sensor_state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
-    device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
-    assert device is not None
-    entries = er.async_entries_for_device(er.async_get(hass), device.id)
-    assert len([e for e in entries if e.domain in READINGS]) == PER_BABY
-
-
-async def test_syncing_again_does_not_duplicate_a_baby(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    server.add_record(DEVICE_B, "Diaper", _object_id(71), when=at(300), baby=BABY_THREE)
-    await tick(hass)
-    await tick(hass)
-    entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
-    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 2
