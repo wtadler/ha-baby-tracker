@@ -399,7 +399,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         for baby_id, (due, _) in list(self._guard_waiting.items()):
             if due <= now:
                 del self._guard_waiting[baby_id]
-        self.async_set_updated_data(self._rebuild())
+        # Like midnight: publish without touching ``last_update_success``, so entities that are
+        # unavailable because a sync is failing stay unavailable.
+        self.data = self._rebuild()
+        self.async_update_listeners()
 
     @callback
     def _async_stop_guarding(self) -> None:

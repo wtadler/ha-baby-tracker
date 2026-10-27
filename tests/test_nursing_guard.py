@@ -23,8 +23,10 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.nighp_baby_tracker.const import DOMAIN
+from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
 
-from .factories import BABY_ONE_ID, BABY_TWO_ID
+from . import BABY_TWO
+from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_B, OP_DELETE
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
@@ -41,6 +43,7 @@ from .helpers import (
     press,
     state,
     sync_interval,
+    tick,
 )
 
 ISSUE = "nursing_timer_long_{}_{}"
@@ -781,3 +784,54 @@ async def test_a_discard_that_cannot_be_saved_still_drops_the_timer_and_says_so(
     assert err.value.translation_key == "nursing_not_saved"
     assert state(hass, NURSING_TIMER).state == "unknown"
     assert posted(server) == []
+
+
+async def test_the_guard_firing_during_a_failing_sync_leaves_entities_unavailable(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    await press(hass, NURSE_LEFT)
+    server.request_error = BabyTrackerConnectionError("down")
+    await tick(hass)
+    assert state(hass, NURSING_TIMER).state == "unavailable"
+    freezer.move_to(minutes(61))
+
+    # The guard's own callback, without a poll: it must not mark the failed sync as a success.
+    init_integration.runtime_data._async_guard_due(minutes(61))  # noqa: SLF001
+    await hass.async_block_till_done()
+
+    assert state(hass, NURSING_TIMER).state == "unavailable"
+    assert _issue(hass, init_integration) is not None
+
+
+async def test_a_stop_then_a_fresh_start_inside_the_old_window_raises_no_early_repair(
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    await press(hass, NURSE_LEFT)
+    freezer.move_to(minutes(30))
+    await press(hass, NURSE_LEFT)  # stops it
+    freezer.move_to(minutes(40))
+    await press(hass, NURSE_LEFT)  # a fresh timer
+
+    await _at(hass, freezer, 60)  # the first timer's hour
+    assert _guard_issues(hass) == []
+    await _at(hass, freezer, 99)
+    assert _guard_issues(hass) == []
+    await _at(hass, freezer, 100)
+
+    assert _issue(hass, init_integration) is not None
+
+
+async def test_a_baby_deleted_while_flagged_clears_their_repair(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    await press(hass, "button.baby_two_nurse_left")
+    await _at(hass, freezer, 61)
+    assert _issue(hass, init_integration, BABY_TWO_ID) is not None
+
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+
+    assert _issue(hass, init_integration, BABY_TWO_ID) is None
