@@ -64,7 +64,7 @@ Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `tim
 | `Sleep` | `duration` (minutes; 0 while running) |
 | `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |
 
-**Metric writes aren't supported yet.** Only an ounce amount (`englishMeasure` "true") has been captured, so the library refuses to write milliliters until a metric record is captured on the test iPad (#20). Reading one still works, but how the app marks a milliliter amount (`englishMeasure` other than "true") is also an assumption, not verified.
+**Metric volumes (observed 2026-10-26).** With the app set to metric, a 120 mL formula bottle was sent as `"amount": {"BCObjectType": "VolumeMeasure", "englishMeasure": "false", "value": 120}`. That's the number as entered, with no conversion, and `englishMeasure` is the string `"false"`; ounces use `"true"`. Pumps use the same object for `amount`, `leftAmount`, and `rightAmount`, though a metric pump wasn't captured separately. The app's unit is a global preference, not per entry.
 
 **Volumes aren't plain numbers.** Each amount is an object: `{"BCObjectType": "VolumeMeasure", "englishMeasure": "true", "value": 4}`, where `englishMeasure` "true" means ounces. The local database's flat `Amount` and `IsEnglishScale` columns don't match the sync format.
 
@@ -98,7 +98,8 @@ Anonymized fixtures for all nine captured transactions are in the library's `tes
 ```
 
 - Field names match the columns of the matching `EasyLog.db` table, in lowerCamelCase (`Diaper.Status` becomes `status`).
-- `time` is when the event happened and `timestamp` is when the record was last changed. Both are UTC strings. `timezone` is the offset in seconds.
+- `time` is when the event happened and `timestamp` is when the record was last changed. Both are UTC strings.
+- `timezone` is the device zone's **standard** UTC offset in seconds, ignoring daylight saving, year-round (observed 2026-10-26 across about 4,300 real records). Eastern records carry -18000 in both summer and winter, and -21600 appears when the device is in Central time. To match the app, send the standard offset, not the offset in force at the time. pybabytracker's `standard_offset_seconds(tz, at)` computes it. Display isn't affected, since `time` is UTC.
 - Diaper `status`: 0 = wet, 1 = dirty, 2 = mixed (from the local data; dry not yet confirmed).
 - The sending device sets `newFlage` to `"true"` on an add and `"false"` on a delete.
 - The baby record is embedded in every entry.
