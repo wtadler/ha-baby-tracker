@@ -40,9 +40,14 @@ def _note(record: Record) -> str | None:
     return note if isinstance(note, str) and note else None
 
 
+def _label(labels: dict[int, str], code: object) -> str | None:
+    """Return the label for a record's numeric code, or None when it has no known code."""
+    return labels.get(code) if isinstance(code, int) else None
+
+
 def _diaper_attributes(record: Record) -> dict[str, Any]:
     return _present(
-        {"type": DIAPER_TYPES.get(getattr(record, "status", None)), "note": _note(record)}
+        {"type": _label(DIAPER_TYPES, getattr(record, "status", None)), "note": _note(record)}
     )
 
 
@@ -53,7 +58,7 @@ def _feed_attributes(record: Record) -> dict[str, Any]:
         attributes["left_duration_minutes"] = getattr(record, "left_duration", None)
         attributes["right_duration_minutes"] = getattr(record, "right_duration", None)
         attributes["both_duration_minutes"] = getattr(record, "both_duration", None)
-        attributes["finish_side"] = SIDES.get(getattr(record, "finish_side", None))
+        attributes["finish_side"] = _label(SIDES, getattr(record, "finish_side", None))
     else:
         attributes["amount"], attributes["unit"] = volume_parts(getattr(record, "volume", None))
     attributes["note"] = _note(record)

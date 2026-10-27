@@ -5,6 +5,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -119,14 +120,16 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         self.engine = SyncEngine(self._device_uuid)
         # Everything that uses the engine takes this lock, so a later write path can share it.
         self.lock = asyncio.Lock()
-        self._store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, storage_key(entry.entry_id)
+        )
         self._baby_names: dict[str, str | None] = {}
         # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
         # baby, so it isn't part of any BabyData.
         self.last_pump: Record | None = None
         # Home Assistant's own nursing timers, by baby ID (see timers.py).
         self.nursing: dict[str, NursingTimer] = {}
-        self._nursing_store: Store = Store(
+        self._nursing_store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)
         )
 

@@ -17,3 +17,15 @@ ignore = ["D202", "D203", "D213", "D406", "D407", "D417"]
 [tool.ruff.lint.per-file-ignores]
 # Test names carry the intent; core's own test suite is the only place D applies to tests.
 "tests/**" = ["D"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["custom_components/nighp_baby_tracker"]
+# The vendored library is checked in its own repo.
+exclude = ["custom_components/nighp_baby_tracker/pybabytracker/"]
+
+[[tool.mypy.overrides]]
+module = "custom_components.nighp_baby_tracker.pybabytracker.*"
+follow_imports = "skip"
+ignore_errors = true
