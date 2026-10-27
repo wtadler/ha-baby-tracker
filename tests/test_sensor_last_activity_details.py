@@ -3,14 +3,17 @@ note)."""
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
 )
 
+from . import BABY_ONE
 from .factories import (
     DEVICE_A,
     DEVICE_B,
+    OP_DELETE,
     OP_UPDATE,
     at,
     volume,
@@ -216,3 +219,92 @@ async def test_a_record_changed_by_another_phone_still_updates_the_sensor(
     await tick(hass)
     assert dict(hass.states.get(DIAPER).attributes) != before
     assert hass.states.get(DIAPER).attributes["type"] == "mixed"
+
+
+@pytest.mark.engine
+async def test_a_deleted_latest_diaper_falls_back_to_the_previous_one(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    server.add_record(DEVICE_A, "Diaper", _object_id(6), when=at(100), status=1)
+    await tick(hass)
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(100).isoformat()
+
+    server.add_record(DEVICE_A, "Diaper", _object_id(6), when=at(100), status=1, op=OP_DELETE)
+    await tick(hass)
+    state = _sensor_state(hass, "baby_one", "last_diaper")
+    assert state.state == at(0).isoformat()
+    assert state.attributes["type"] == "wet"
+
+
+async def test_deleting_every_diaper_leaves_the_sensor_unknown(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    server.add_record(
+        DEVICE_A,
+        "Diaper",
+        "D0000000-0000-4000-8000-000000000001",
+        when=at(0),
+        status=0,
+        op=OP_DELETE,
+    )
+    await tick(hass)
+    state = _sensor_state(hass, "baby_one", "last_diaper")
+    assert state.state == "unknown"
+    assert state.attributes["type"] is None
+
+
+async def test_the_last_feed_is_the_newest_of_nursing_formula_and_pumped(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    server.add_record(DEVICE_A, "Formula", _object_id(10), when=at(10), amount=volume(4))
+    server.add_record(DEVICE_A, "Nursing", _object_id(11), when=at(15), leftDuration=5)
+    server.add_record(DEVICE_A, "Pumped", _object_id(12), when=at(20), amount=volume(3))
+    await tick(hass)
+
+    state = _sensor_state(hass, "baby_one", "last_feed")
+    assert state.state == at(20).isoformat()
+    assert state.attributes["kind"] == "pumped"
+
+
+@pytest.mark.parametrize("newest", ["Nursing", "Formula", "Pumped"])
+async def test_each_feed_kind_can_be_the_newest(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, newest: str
+) -> None:
+    for number, kind in enumerate(["Nursing", "Formula", "Pumped"]):
+        when = at(100 if kind == newest else number)
+        server.add_record(DEVICE_A, kind, _object_id(20 + number), when=when)
+    await tick(hass)
+
+    state = _sensor_state(hass, "baby_one", "last_feed")
+    assert state.state == at(100).isoformat()
+    assert state.attributes["kind"] == newest.lower()
+
+
+async def test_a_baby_with_only_a_diaper_has_unknown_other_sensors(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    assert _sensor_state(hass, "baby_one", "last_diaper").state != "unknown"
+    for key, attribute in (("last_feed", "kind"), ("last_sleep", "duration_minutes")):
+        state = _sensor_state(hass, "baby_one", key)
+        assert state.state == "unknown"
+        assert state.attributes[attribute] is None
+
+
+@pytest.mark.engine
+async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    payload = {
+        "BCObjectType": "Formula",
+        "objectID": _object_id(80),
+        "time": at(500).strftime("%Y-%m-%d %H:%M:%S %z"),
+        "timestamp": "not a time",
+        "amount": volume(4),
+        "baby": BABY_ONE,
+    }
+    server.add_payload(DEVICE_A, payload)
+    await tick(hass)
+    assert init_integration.state is ConfigEntryState.LOADED
+    state = _sensor_state(hass, "baby_one", "last_feed")
+    assert state.state == "unknown"  # a raw record carries no baby, so it isn't shown
+    assert state.attributes["amount"] is None

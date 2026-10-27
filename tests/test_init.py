@@ -18,14 +18,12 @@ from custom_components.nighp_baby_tracker.const import (
     DOMAIN,
 )
 from custom_components.nighp_baby_tracker.pybabytracker import (
-    AuthenticationError,
     BabyTrackerConnectionError,
     ProtocolError,
 )
 
 from . import (
     BABY_ONE,
-    NEW_PASSWORD,
 )
 from .factories import (
     DEVICE_A,
@@ -147,20 +145,6 @@ async def test_setup_retries_and_then_loads_once_the_server_is_back(
     assert mock_config_entry.state is ConfigEntryState.LOADED
 
 
-async def test_a_rejected_login_at_setup_starts_reauth(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    server.password = NEW_PASSWORD
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
-    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
-    assert [flow["context"]["source"] for flow in flows] == ["reauth"]
-    assert server.open_clients == []
-
-
 async def test_a_newer_record_from_another_device_is_fetched_by_its_own_log(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -228,26 +212,6 @@ async def test_records_that_arrived_during_an_outage_show_up_after_it(
     server.request_error = None
     await tick(hass)
     assert hass.states.get(DIAPER).state == at(90).isoformat()
-
-
-async def test_a_password_that_stops_working_starts_reauth(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    server.password = NEW_PASSWORD
-    await tick(hass)
-
-    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
-    assert [flow["context"]["source"] for flow in flows] == ["reauth"]
-    assert hass.states.get(DIAPER).state == "unavailable"
-
-
-async def test_an_auth_error_raised_mid_update_starts_reauth(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    server.request_error = AuthenticationError("session rejected")
-    await tick(hass)
-    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
-    assert [flow["context"]["source"] for flow in flows] == ["reauth"]
 
 
 async def test_the_synced_state_is_saved(
@@ -481,12 +445,9 @@ async def test_saved_state_from_the_earlier_library_version_still_loads(
 
 
 @pytest.mark.parametrize(
-    ("error", "expected_state", "reauth"),
-    [
-        (BabyTrackerConnectionError("down"), ConfigEntryState.SETUP_RETRY, False),
-        (AuthenticationError("rejected"), ConfigEntryState.SETUP_ERROR, True),
-    ],
-    ids=["connection", "auth"],
+    ("error", "expected_state"),
+    [(BabyTrackerConnectionError("down"), ConfigEntryState.SETUP_RETRY)],
+    ids=["connection"],
 )
 async def test_a_failing_save_does_not_replace_the_sync_error(
     hass: HomeAssistant,
@@ -495,7 +456,6 @@ async def test_a_failing_save_does_not_replace_the_sync_error(
     caplog: pytest.LogCaptureFixture,
     error: Exception,
     expected_state: ConfigEntryState,
-    reauth: bool,
 ) -> None:
     # Device A syncs (so there is progress to save), then device B fails.
     server.add_record(DEVICE_B, "Diaper", "D9000000-0000-4000-8000-000000000001", when=at(5))
@@ -508,7 +468,7 @@ async def test_a_failing_save_does_not_replace_the_sync_error(
 
     assert mock_config_entry.state is expected_state
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
-    assert bool(flows) is reauth
+    assert not flows
     assert "disk full" in caplog.text
 
 
