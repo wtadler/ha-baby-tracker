@@ -63,11 +63,12 @@ on any Baby Tracker entity from an automation or a script. An earlier version's 
 ignored, and saving these options removes it.
 
 **Bottle size**, **Bottle unit**, and **Bottle type** set what each baby's **Bottle** button logs.
-They start at 4 fl. oz. of formula in every unit system. Metric isn't supported yet: the app's
-metric format hasn't been confirmed, so a bottle or pump in mL is refused with an error and the
-button does the same if its unit is mL. Today's bottle volume still shows in your unit system.
-A change applies to the next press, with no reload. Options that don't make
-sense fall back to those defaults.
+They start at 120 mL of formula in a metric unit system and 4 fl. oz. of formula otherwise. A
+saved choice is never changed. Today's bottle volume shows in your unit system. A change applies
+to the next press, with no reload. Options that don't make sense fall back to those defaults.
+
+Every record is written with the standard UTC offset of Home Assistant's time zone, with no
+daylight saving, as the app does.
 
 ### If your password changes
 
@@ -111,7 +112,7 @@ and the field to switch to: `device_id` for a baby, and `config_entry_id` for an
   `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
   zone), and an optional `note`.
 - `nighp_baby_tracker.log_bottle` takes `device_id`, `kind` (`formula` or `pumped`), `amount` (more than
-  zero), an optional `unit` (`fl. oz.`; `mL` is refused for now), an optional `time`, and an optional `note`.
+  zero), an optional `unit` (`fl. oz.` or `mL`), an optional `time`, and an optional `note`.
 - `nighp_baby_tracker.log_nursing` takes `device_id`, `left_minutes` and `right_minutes` (whole
   minutes; at least one above zero), an optional `finish_side` (`left` or `right`; default the last
   side used, right when both), an optional `end_time` (default now), and an optional `note`. The

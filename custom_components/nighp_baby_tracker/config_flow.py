@@ -46,7 +46,7 @@ from .writes import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 
 _LOGGER = logging.getLogger(__name__)
 
-MAX_BOTTLE_SIZE = 32  # fluid ounces: more than any bottle
+MAX_BOTTLE_SIZE = 1000  # milliliters (about 34 fl. oz.): more than any bottle
 
 CREDENTIALS_SCHEMA = probatio.Schema(
     {
@@ -178,7 +178,7 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                     CONF_BOTTLE_TYPE: user_input[CONF_BOTTLE_TYPE],
                 }
             )
-        size, unit, kind = configured_bottle(self.config_entry.options)
+        size, unit, kind = configured_bottle(self.hass, self.config_entry.options)
         schema = probatio.Schema(
             {
                 probatio.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(

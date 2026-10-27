@@ -67,19 +67,19 @@ async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
 # --- the library's limits, checked here first with translated errors ------------------------
 
 
-async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
+async def test_the_bottle_size_option_is_capped_at_1000(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     good = {
-        CONF_BOTTLE_SIZE: 32,
-        CONF_BOTTLE_UNIT: "fl. oz.",
+        CONF_BOTTLE_SIZE: 1000,
+        CONF_BOTTLE_UNIT: "mL",
         CONF_BOTTLE_TYPE: "formula",
     }
     await set_options(hass, init_integration, **good)
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(
-            result["flow_id"], {**good, CONF_BOTTLE_SIZE: 33}
+            result["flow_id"], {**good, CONF_BOTTLE_SIZE: 1001}
         )
 
 
@@ -577,7 +577,7 @@ async def test_options_errors_keep_the_form_open_and_the_flow_recovers(
 
     for bad in (
         {**good, CONF_BOTTLE_SIZE: 0},  # below the smallest bottle
-        {**good, CONF_BOTTLE_SIZE: 100},  # more than any bottle
+        {**good, CONF_BOTTLE_SIZE: 5000},  # more than any bottle
         {**good, CONF_BOTTLE_UNIT: "cups"},  # not a unit the form offers
         {**good, CONF_BOTTLE_TYPE: "juice"},  # not a bottle kind
     ):

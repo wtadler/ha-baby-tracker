@@ -51,6 +51,7 @@ from .pybabytracker import (
     WrongRecordTypeError,
 )
 from .pybabytracker.builders import MAX_MINUTES_PER_SIDE, MAX_SLEEP, START_SKEW
+from .pybabytracker.times import standard_offset_seconds
 from .timers import SIDES, NursingTimer, other_side
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ FINISH_SIDES = {"left": SIDE_LEFT, "right": SIDE_RIGHT}
 
 DEFAULT_BOTTLE_KIND = "formula"
 DEFAULT_BOTTLE_OUNCES = 4
+DEFAULT_BOTTLE_MILLILITERS = 120
 
 
 def _error(key: str, **placeholders: str) -> HomeAssistantError:
@@ -157,26 +159,30 @@ async def _write[T](
 
 
 def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
-    """Return the moment (default now) and its UTC offset in seconds, in Home Assistant's zone."""
+    """Return the moment (default now) and the offset to record for it.
+
+    The offset is the standard UTC offset (no daylight saving) of Home Assistant's zone at that
+    moment, which is what the app writes year-round.
+    """
     zone = dt_util.get_default_time_zone()
     if time is None:
         time = dt_util.now()
     elif time.tzinfo is None:
         time = time.replace(tzinfo=zone)
-    offset = time.astimezone(zone).utcoffset()
-    assert offset is not None
-    return time, int(offset.total_seconds())
+    return time, standard_offset_seconds(zone, time)
 
 
-def default_bottle() -> tuple[float, str, str]:
+def default_bottle(hass: HomeAssistant) -> tuple[float, str, str]:
     """Return the bottle size, unit, and type used until the options say otherwise.
 
-    Fluid ounces in every unit system: milliliter writes aren't supported yet.
+    120 mL in a metric unit system, 4 fl. oz. otherwise.
     """
+    if hass.config.units.volume_unit == UnitOfVolume.LITERS:
+        return DEFAULT_BOTTLE_MILLILITERS, MILLILITERS, DEFAULT_BOTTLE_KIND
     return DEFAULT_BOTTLE_OUNCES, OUNCES, DEFAULT_BOTTLE_KIND
 
 
-def configured_bottle(options: Mapping[str, Any]) -> tuple[float, str, str]:
+def configured_bottle(hass: HomeAssistant, options: Mapping[str, Any]) -> tuple[float, str, str]:
     """Return the bottle the options describe.
 
     Saved options that don't make sense (any one of the three) give the defaults.
@@ -193,15 +199,12 @@ def configured_bottle(options: Mapping[str, Any]) -> tuple[float, str, str]:
         and kind in BOTTLE_KINDS
     ):
         return size, unit, kind
-    return default_bottle()
+    return default_bottle(hass)
 
 
 def _volume(amount: float, unit: str | None) -> Volume:
     """Convert an amount in a Home Assistant unit (default fl. oz.) to a library volume."""
     chosen = unit if unit is not None else OUNCES
-    if chosen == MILLILITERS:
-        # The library refuses metric writes until the app's metric format is confirmed.
-        raise validation_error("metric_not_supported")
     if chosen not in VOLUME_UNITS:
         raise validation_error("invalid_unit")
     return Volume(amount, VOLUME_UNITS[chosen])
@@ -285,7 +288,7 @@ async def async_log_bottle(
 ) -> None:
     """Add a formula or pumped-milk bottle.
 
-    ``unit`` is fl. oz. (the default); mL is refused for now (``metric_not_supported``).
+    ``unit`` is fl. oz. (the default) or mL.
     ``time`` defaults to now.
     """
     if kind not in BOTTLE_KINDS:
@@ -310,7 +313,7 @@ async def async_log_bottle(
 
 async def async_log_configured_bottle(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
     """Log the bottle the options describe, right now (the Bottle button)."""
-    size, unit, kind = configured_bottle(coordinator.config_entry.options)
+    size, unit, kind = configured_bottle(coordinator.hass, coordinator.config_entry.options)
     await async_log_bottle(coordinator, baby_id, kind, size, unit=unit)
 
 

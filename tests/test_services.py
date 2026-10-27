@@ -1362,7 +1362,7 @@ async def test_undo_with_two_config_entries_only_touches_the_named_one(
 async def test_each_action_posts_a_record_matching_the_captured_format(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
-    await hass.config.async_set_time_zone(CHICAGO)
+    await hass.config.async_set_time_zone("America/New_York")
     _, label, tweaks = VALID[name]
 
     await run_valid(hass, name, note="a note")

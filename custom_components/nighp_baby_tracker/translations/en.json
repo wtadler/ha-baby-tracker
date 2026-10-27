@@ -45,8 +45,8 @@
           "bottle_type": "Bottle type"
         },
         "data_description": {
-          "bottle_size": "How much the Bottle button logs for each press. New installs start at 4 fl. oz. of formula.",
-          "bottle_unit": "The unit of the bottle size. Only fl. oz. works for now: metric isn't supported yet, and pressing the button with mL shows an error.",
+          "bottle_size": "How much the Bottle button logs for each press. New installs start at 120 mL of formula in a metric unit system and 4 fl. oz. otherwise.",
+          "bottle_unit": "The unit of the bottle size: fl. oz. or mL.",
           "bottle_type": "Whether the Bottle button logs formula or pumped milk."
         }
       }
@@ -205,7 +205,7 @@
         },
         "unit": {
           "name": "Unit",
-          "description": "The unit of the amount. Defaults to fl. oz. mL is accepted but refused for now, because metric isn't supported yet."
+          "description": "The unit of the amount. Defaults to fl. oz."
         },
         "time": {
           "name": "Time",
@@ -299,7 +299,7 @@
         },
         "unit": {
           "name": "Unit",
-          "description": "The unit of the amounts. Defaults to fl. oz. mL is accepted but refused for now, because metric isn't supported yet."
+          "description": "The unit of the amounts. Defaults to fl. oz."
         },
         "left_minutes": {
           "name": "Left side (minutes)",
@@ -486,9 +486,6 @@
     },
     "no_amount": {
       "message": "Give the amount for at least one side."
-    },
-    "metric_not_supported": {
-      "message": "Metric amounts aren't supported yet, because the app's metric format hasn't been confirmed. Use fl. oz."
     },
     "minutes_too_long": {
       "message": "Nursing and pump minutes can be at most 240 per side."
