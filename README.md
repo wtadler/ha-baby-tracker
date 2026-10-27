@@ -53,7 +53,7 @@ On first setup, Home Assistant loads your account's full history in one go. It s
 seen, so a restart fetches only what's new.
 
 Home Assistant signs in as its own device named "Home Assistant" and never borrows a phone's
-identity. It doesn't appear in the app's device list until a later version writes its first record.
+identity. It doesn't appear in the app's device list until it writes its first record.
 
 ### Options
 
@@ -197,6 +197,139 @@ sends no notifications; the blueprint does, from the timer sensors.
   blueprint sends nothing new until the timer changes; ending it still ends the activity.
 - A sync failure mid-timer (running, then unavailable, then unknown) still ends the activity; going unavailable and back to the same running timer leaves it alone.
 - The blueprint runs queued, so a start, a switch, and an end are sent in order.
+
+## Use cases
+
+The examples use a baby named "Baby", so the entity IDs read `sensor.baby_last_diaper` and so on.
+Yours follow your baby's name.
+
+**A crib-side button.** Put the **Wet diaper**, **Dirty diaper**, and **Bottle** buttons on a
+dashboard, or map a physical button to `button.press` on one of them. One press logs the record
+now, and the phones show it after their next sync. A mistaken press is fixed with
+`nighp_baby_tracker.undo`.
+
+**A 3 a.m. dashboard.** One card with **Last diaper**, **Last feed**, and **Asleep**, plus the
+buttons. The last-activity sensors are timestamps, so the card can show "23 minutes ago" instead of
+a clock time. **Sleep** starts or ends a sleep, so a night wake-up needs one tap.
+
+**Quiet notifications while the baby sleeps.** Mute announcements, or dim a hallway light, while
+`binary_sensor.baby_asleep` is on. It turns on for a sleep started from any phone as well as from
+Home Assistant, after the next sync.
+
+```yaml
+automation:
+  - alias: Quiet the house while Baby sleeps
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.baby_asleep
+        to: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.quiet_mode
+  - alias: Back to normal when Baby wakes
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.baby_asleep
+        to: "off"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.quiet_mode
+```
+
+Make `input_boolean.quiet_mode` a helper (**Settings > Devices & services > Helpers**), then check
+it in the conditions of the automations that make noise.
+
+**A live activity on the lock screen.** The blueprint described in
+[Live activity on your iPhone](#live-activity-on-your-iphone) shows a running sleep or nursing
+timer as an iOS Live Activity.
+
+**A daily intake check.** **Diapers today**, **Feeds today**, and **Bottle volume today** count
+from local midnight. This sends a message at 8 p.m. if there have been fewer than four feeds:
+
+```yaml
+automation:
+  - alias: Few feeds today
+    triggers:
+      - trigger: time
+        at: "20:00:00"
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.baby_feeds_today
+        below: 4
+    actions:
+      - action: notify.mobile_app_your_phone
+        data:
+          message: Baby has had fewer than four feeds today.
+```
+
+Change the number to suit your baby, and use your own phone's `notify` action, as described under
+[Live activity on your iPhone](#live-activity-on-your-iphone).
+
+## Known limitations
+
+- **A running nursing timer on a phone isn't visible.** The app doesn't sync one until it stops.
+  Home Assistant shows only its own nursing timer (the **Nurse left** and **Nurse right**
+  buttons). A sleep timer is synced, so it shows from any device.
+- **Records arrive on a schedule, not instantly.** Home Assistant checks for new records every 5
+  minutes, and every minute while a sleep or nursing timer runs. No option changes this. Records
+  Home Assistant writes show at once. Call `homeassistant.update_entity` to check sooner.
+- **A sleep is at most 24 hours.** Stopping a sleep later than that saves 24 hours. Fix the length
+  in the app. A sleep can't start in the future or more than 24 hours ago, and nursing and pump
+  minutes are capped at 240 per side.
+- **The service has no public API.** The integration speaks the app's own sync protocol, which
+  `PROTOCOL.md` documents from observed traffic. Nighp can change it without notice, and a change
+  may stop the integration until it's updated.
+- **The iPhone live activity needs the Companion app,** iOS 17.2 or later, and Home Assistant
+  2026.7.0 or later. See [Live activity on your iPhone](#live-activity-on-your-iphone).
+- **Undo only removes Home Assistant's own entries.** `nighp_baby_tracker.undo` can't delete a
+  record a phone made. Delete those in the app.
+- **Pumps belong to the account,** not a baby, so **Last pump** is on the account device.
+- **Home Assistant is its own device** in the account, named "Home Assistant". It never uses a
+  phone's identity, so it doesn't appear in the app's device list until it writes its first
+  record.
+
+## Troubleshooting
+
+**The integration asks you to sign in again.** The service rejected the saved password, usually
+because it changed. Follow the prompt in **Settings > Devices & services** and enter the current
+password. See [If your password changes](#if-your-password-changes).
+
+**A repair says Baby Tracker can't write for your account.** Home Assistant's own log in the
+account has entries it can't read back, and every write has failed for over an hour. Writing is
+paused so nothing is skipped or overwritten. To fix it:
+
+1. Go to **Settings > Devices & services** and open **Baby Tracker (Nighp)**.
+2. Open the menu next to your account, choose **Delete**, and confirm.
+3. Add **Baby Tracker (Nighp)** again with the same email and password.
+
+Adding it again reloads the account's history, and Home Assistant appears as a new device in the
+app. The old "Home Assistant" device stays in the app's device list. A shorter gap shows only an
+error on the write.
+
+**A repair says an automation uses an old field.** The `baby` field (and `device` on `log_pump`)
+still works for one more release. The repair names the action and the field to switch to:
+`device_id` for a baby, and `config_entry_id` for an account. Edit the automation, script, or
+dashboard button that calls the action, save it, and run it again. The repair clears on its own
+after the next restart unless something still uses the old field.
+
+**A write says "the last entry is still being confirmed."** The service didn't answer the last
+write. Wait a minute and try again. Reusing the same `object_id` on a retry adds the record once.
+
+**A sensor looks stale.** Phone records arrive at the next sync, within 5 minutes (1 minute while a
+timer runs). To check now, call `homeassistant.update_entity` on any Baby Tracker entity. If the
+sensors say unavailable, the sync is failing: look in the Home Assistant log for the error. A baby
+deleted in the app disappears at the next sync, as described under
+[Removing a baby](#removing-a-baby).
+
+**A press or action shows an error.** The message says why. Common causes are a sleep already
+running or already ended on another device, no nursing timer running, and an amount or length out
+of range.
+
+**Download diagnostics** for a bug report: on the integration's page, choose **Download
+diagnostics**. See [Diagnostics](#diagnostics) for what it holds and redacts. Report problems at
+<https://github.com/wtadler/ha-baby-tracker/issues>.
 
 ## Removing a baby
 

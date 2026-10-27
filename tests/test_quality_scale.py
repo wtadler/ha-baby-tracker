@@ -281,3 +281,30 @@ def test_the_readme_lists_what_changes_in_the_manifest_at_core_submission() -> N
         "loggers",
     ):
         assert f"`{key}`" in section, key
+
+
+# --- the gold documentation rules and the entity default ----------------------------------------
+
+DOCS_RULES = {
+    "docs-known-limitations": "## Known limitations",
+    "docs-troubleshooting": "## Troubleshooting",
+    "docs-use-cases": "## Use cases",
+}
+
+
+@pytest.mark.parametrize(("rule", "heading"), DOCS_RULES.items())
+def test_a_docs_rule_is_done_only_with_its_section_in_the_readme(rule: str, heading: str) -> None:
+    from .helpers import ROOT
+
+    headings = (ROOT / "README.md").read_text().splitlines()
+    assert heading in headings
+    assert _status(_rules()[rule]) == "done"
+
+
+def test_no_entity_starts_disabled_so_the_default_rule_is_done_with_its_reason() -> None:
+    entry = _rules()["entity-disabled-by-default"]
+    assert isinstance(entry, dict)
+    assert entry["status"] == "done"
+    assert entry["comment"].strip().endswith(".")
+    for path in (INTEGRATION).glob("*.py"):
+        assert "entity_registry_enabled_default" not in path.read_text(), path.name
