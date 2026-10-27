@@ -128,55 +128,6 @@ LAST_PUMP = SensorEntityDescription(
 )
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: BabyTrackerConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
-) -> None:
-    """Add the account's last-pump and pump timer sensors, and every baby's sensors.
-
-    Babies that appear in later syncs get theirs when they appear.
-    """
-    coordinator = entry.runtime_data
-    async_add_entities(
-        [
-            BabyTrackerLastPumpSensor(coordinator, LAST_PUMP),
-            BabyTrackerPumpTimerSensor(coordinator, PUMP_TIMER),
-        ]
-    )
-    known: set[str] = set()
-
-    @callback
-    def _add_new_babies() -> None:
-        # A baby that left (its device is removed with it) is new again if it's added back.
-        known.intersection_update(coordinator.data.babies)
-        new = [baby_id for baby_id in coordinator.data.babies if baby_id not in known]
-        known.update(new)
-        async_add_entities(
-            BabyTrackerSensor(coordinator, description, baby_id)
-            for baby_id in new
-            for description in SENSORS
-        )
-        async_add_entities(
-            BabyTrackerTodaySensor(coordinator, description, baby_id)
-            for baby_id in new
-            for description in TODAY_SENSORS
-        )
-        async_add_entities(
-            BabyTrackerTimerSensor(coordinator, description, baby_id)
-            for baby_id in new
-            for description in TIMER_SENSORS
-        )
-        async_add_entities(
-            BabyTrackerNursingTimeSensor(coordinator, description, baby_id)
-            for baby_id in new
-            for description in NURSING_TIME_SENSORS
-        )
-
-    _add_new_babies()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))
-
-
 class BabyTrackerSensor(BabyTrackerBabyEntity, SensorEntity):
     """When a baby's last diaper, feed, or sleep happened, with its details."""
 
@@ -428,3 +379,54 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
         left, right = baby.nursing.totals(dt_util.utcnow())
         seconds = left if self.entity_description.side == LEFT else right
         return round(seconds / 60, 1)
+
+
+# One row per kind of sensor: its descriptions and the entity class built from each.
+ACCOUNT_SENSORS: tuple[
+    tuple[tuple[SensorEntityDescription, ...], type[BabyTrackerAccountEntity]], ...
+] = (
+    ((LAST_PUMP,), BabyTrackerLastPumpSensor),
+    ((PUMP_TIMER,), BabyTrackerPumpTimerSensor),
+)
+BABY_SENSORS: tuple[
+    tuple[tuple[SensorEntityDescription, ...], type[BabyTrackerBabyEntity]], ...
+] = (
+    (SENSORS, BabyTrackerSensor),
+    (TODAY_SENSORS, BabyTrackerTodaySensor),
+    (TIMER_SENSORS, BabyTrackerTimerSensor),
+    (NURSING_TIME_SENSORS, BabyTrackerNursingTimeSensor),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: BabyTrackerConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Add the account's sensors, and every baby's sensors.
+
+    Babies that appear in later syncs get theirs when they appear.
+    """
+    coordinator = entry.runtime_data
+    async_add_entities(
+        entity_class(coordinator, description)
+        for descriptions, entity_class in ACCOUNT_SENSORS
+        for description in descriptions
+    )
+    known: set[str] = set()
+
+    @callback
+    def _add_new_babies() -> None:
+        # A baby that left (its device is removed with it) is new again if it's added back.
+        known.intersection_update(coordinator.data.babies)
+        new = [baby_id for baby_id in coordinator.data.babies if baby_id not in known]
+        known.update(new)
+        for descriptions, entity_class in BABY_SENSORS:
+            async_add_entities(
+                entity_class(coordinator, description, baby_id)
+                for baby_id in new
+                for description in descriptions
+            )
+
+    _add_new_babies()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))

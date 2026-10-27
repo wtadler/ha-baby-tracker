@@ -10,6 +10,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import service
 
+from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES
 from .const import (
     DOMAIN,
     SERVICE_DISCARD_NURSING,
@@ -30,11 +31,8 @@ from .const import (
 )
 from .coordinator import BabyTrackerCoordinator
 from .writes import (
-    BOTTLE_KINDS,
     DIAPER_STATUS,
     FINISH_SIDES,
-    MILLILITERS,
-    OUNCES,
     async_discard_nursing,
     async_log_bottle,
     async_log_diaper,

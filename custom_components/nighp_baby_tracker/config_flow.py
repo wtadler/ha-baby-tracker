@@ -27,6 +27,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 from .const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
@@ -42,7 +43,6 @@ from .pybabytracker import (
     BabyTrackerClient,
     BabyTrackerConnectionError,
 )
-from .writes import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 
 _LOGGER = logging.getLogger(__name__)
 
