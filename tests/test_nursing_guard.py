@@ -797,7 +797,7 @@ async def test_the_guard_firing_during_a_failing_sync_leaves_entities_unavailabl
     freezer.move_to(minutes(61))
 
     # The guard's own callback, without a poll: it must not mark the failed sync as a success.
-    init_integration.runtime_data._async_guard_due(minutes(61))  # noqa: SLF001
+    init_integration.runtime_data.guard.async_due(minutes(61))
     await hass.async_block_till_done()
 
     assert state(hass, NURSING_TIMER).state == "unavailable"
