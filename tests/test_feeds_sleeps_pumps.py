@@ -21,7 +21,6 @@ from custom_components.nighp_baby_tracker.const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
     CONF_BOTTLE_UNIT,
-    CONF_SCAN_INTERVAL,
     DOMAIN,
 )
 from custom_components.nighp_baby_tracker.pybabytracker import (
@@ -79,7 +78,7 @@ async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **d
         await hass.services.async_call(DOMAIN, action, data, blocking=True)
         return
     await hass.services.async_call(
-        DOMAIN, action, {"baby": device_id(hass, baby_id), **data}, blocking=True
+        DOMAIN, action, {"device_id": device_id(hass, baby_id), **data}, blocking=True
     )
 
 
@@ -610,7 +609,6 @@ async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     good = {
-        CONF_SCAN_INTERVAL: 5,
         CONF_BOTTLE_SIZE: 32,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "formula",
@@ -667,7 +665,7 @@ async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
     data, _, _ = VALID[name]
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
-            DOMAIN, ACTION_OF.get(name, name), {"baby": "nope", **data}, blocking=True
+            DOMAIN, ACTION_OF.get(name, name), {"device_id": "nope", **data}, blocking=True
         )
     assert key_of(raised) == "baby_not_found"
     assert server.posted == []  # type: ignore[attr-defined]
@@ -825,7 +823,7 @@ async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
     assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(6 * 29.5735, abs=0.1)
     assert hass.states.get("sensor.baby_two_feeds_today").state == "0"
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert hass.states.get(FEEDS_TODAY).state == "1"
     assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(4 * 29.5735, abs=0.1)
 
@@ -873,7 +871,7 @@ async def test_undo_removes_a_bottle_and_the_sensor_goes_back(
     )
     assert hass.states.get(LAST_FEED).state == "2026-10-26T09:15:00+00:00"
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     assert hass.states.get(LAST_FEED).state == "unknown"
     [(_, op_add, added), (number, op_delete, deleted)] = posted(server)
@@ -902,7 +900,7 @@ async def test_undo_by_record_id_removes_a_bottle_among_other_writes(
     await run_valid(hass, "log_bottle", object_id=RETRY_ID)
     await run_valid(hass, "log_sleep")
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=RETRY_ID)
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=RETRY_ID)
 
     [_, _, (_, op, deleted)] = posted(server)
     assert (op, deleted.object_id) == (2, RETRY_ID)
@@ -1115,7 +1113,6 @@ async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
         defaults[CONF_BOTTLE_UNIT],
         defaults[CONF_BOTTLE_TYPE],
     ) == expected
-    assert defaults[CONF_SCAN_INTERVAL] == 5
 
 
 async def test_options_show_the_saved_bottle(
@@ -1133,36 +1130,31 @@ async def test_options_show_the_saved_bottle(
     assert defaults[CONF_BOTTLE_TYPE] == "pumped"
 
 
-async def test_options_save_the_bottle_next_to_the_interval(
+async def test_options_save_only_the_bottle(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     await set_options(
         hass,
         setup_entry,
-        **{
-            CONF_SCAN_INTERVAL: 10,
-            CONF_BOTTLE_SIZE: 5.5,
-            CONF_BOTTLE_UNIT: "fl. oz.",
-            CONF_BOTTLE_TYPE: "pumped",
-        },
+        **{CONF_BOTTLE_SIZE: 5.5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 
     assert setup_entry.options == {
-        CONF_SCAN_INTERVAL: 10,
         CONF_BOTTLE_SIZE: 5.5,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "pumped",
     }
 
 
-async def test_saving_only_the_interval_still_saves_the_default_bottle(
+async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_formula(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     hass.config.units = METRIC_SYSTEM
+    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    defaults = schema_defaults(result)
 
-    await set_options(hass, setup_entry, **{CONF_SCAN_INTERVAL: 7})
+    await set_options(hass, setup_entry, **defaults)
 
-    assert setup_entry.options[CONF_SCAN_INTERVAL] == 7
     assert setup_entry.options[CONF_BOTTLE_SIZE] == 4
     assert setup_entry.options[CONF_BOTTLE_UNIT] == "fl. oz."
     assert setup_entry.options[CONF_BOTTLE_TYPE] == "formula"
@@ -1182,7 +1174,6 @@ async def test_options_reject_a_bad_bottle(
     hass: HomeAssistant, setup_entry: MockConfigEntry, bad: dict[str, Any]
 ) -> None:
     good = {
-        CONF_SCAN_INTERVAL: 5,
         CONF_BOTTLE_SIZE: 4,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "formula",
@@ -1241,9 +1232,17 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "stop_nursing",
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
-    assert fields["log_bottle"] == {"baby", "kind", "amount", "unit", "time", "note", "object_id"}
+    assert fields["log_bottle"] == {
+        "device_id",
+        "kind",
+        "amount",
+        "unit",
+        "time",
+        "note",
+        "object_id",
+    }
     assert fields["log_nursing"] == {
-        "baby",
+        "device_id",
         "left_minutes",
         "right_minutes",
         "finish_side",
@@ -1251,10 +1250,9 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "note",
         "object_id",
     }
-    assert fields["log_sleep"] == {"baby", "start", "end", "note", "object_id"}
+    assert fields["log_sleep"] == {"device_id", "start", "end", "note", "object_id"}
     assert fields["log_pump"] == {
         "config_entry_id",
-        "device",
         "left_amount",
         "right_amount",
         "unit",
@@ -1270,7 +1268,7 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
     assert bottle["amount"]["required"] is True
     assert bottle["unit"]["selector"]["select"]["options"] == ["fl. oz.", "mL"]
     for action in ("log_bottle", "log_nursing", "log_sleep"):
-        assert services[action]["fields"]["baby"]["selector"]["device"]["filter"] == [
+        assert services[action]["fields"]["device_id"]["selector"]["device"]["filter"] == [
             {"integration": DOMAIN}
         ]
 

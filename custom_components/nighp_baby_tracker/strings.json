@@ -15,13 +15,11 @@
       },
       "reauth_confirm": {
         "title": "Sign in to Baby Tracker again",
-        "description": "Home Assistant can no longer sign in. Enter the account's current email and password.",
+        "description": "Home Assistant can no longer sign in to {email}. Enter that account's current password.",
         "data": {
-          "email": "Email",
           "password": "Password"
         },
         "data_description": {
-          "email": "The email address of the account this entry was set up with.",
           "password": "The current password of your Baby Tracker account."
         }
       }
@@ -34,7 +32,7 @@
     "abort": {
       "already_configured": "This Baby Tracker account is already set up.",
       "reauth_successful": "Signed in again. Syncing resumes.",
-      "wrong_account": "That is a different account than the one this entry was set up with. Add it as a new entry instead."
+      "unique_id_mismatch": "That is a different account than the one this entry was set up with. Add it as a new entry instead."
     }
   },
   "options": {
@@ -42,13 +40,11 @@
       "init": {
         "title": "Baby Tracker options",
         "data": {
-          "scan_interval": "Sync interval (minutes)",
           "bottle_size": "Bottle size",
           "bottle_unit": "Bottle unit",
           "bottle_type": "Bottle type"
         },
         "data_description": {
-          "scan_interval": "How often Home Assistant checks for new records. The minimum is 1 minute.",
           "bottle_size": "How much the Bottle button logs for each press. New installs start at 4 fl. oz. of formula.",
           "bottle_unit": "The unit of the bottle size. Only fl. oz. works for now: metric isn't supported yet, and pressing the button with mL shows an error.",
           "bottle_type": "Whether the Bottle button logs formula or pumped milk."
@@ -143,7 +139,7 @@
       "name": "Log diaper",
       "description": "Adds a diaper record for a baby, as Home Assistant's own device in the Baby Tracker account.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -173,9 +169,9 @@
           "name": "Account",
           "description": "The Baby Tracker account to undo in. Use this or a baby."
         },
-        "baby": {
+        "device_id": {
           "name": "Baby",
-          "description": "A baby's device. With no object ID, only that baby's most recent record is deleted."
+          "description": "A baby's device. With no record ID, only that baby's most recent record is deleted. Use this or an account."
         },
         "object_id": {
           "name": "Record ID",
@@ -187,7 +183,7 @@
       "name": "Log bottle",
       "description": "Adds a formula or pumped-milk bottle for a baby, as Home Assistant's own device in the Baby Tracker account.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -221,7 +217,7 @@
       "name": "Log nursing",
       "description": "Adds a finished nursing session for a baby. Give the minutes on one side or both.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -255,7 +251,7 @@
       "name": "Log sleep",
       "description": "Adds a finished sleep for a baby. The length is rounded to whole minutes.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -279,15 +275,11 @@
     },
     "log_pump": {
       "name": "Log pump",
-      "description": "Adds a pumping session to a Baby Tracker account. A pump belongs to the account, not a baby. Name the account with its entry or with one of its devices. Give the amount for one side or both; the total is their sum.",
+      "description": "Adds a pumping session to a Baby Tracker account. A pump belongs to the account, not a baby. Give the amount for one side or both; the total is their sum.",
       "fields": {
         "config_entry_id": {
           "name": "Account",
-          "description": "The Baby Tracker account to log the pump to. Give this or a device, not both."
-        },
-        "device": {
-          "name": "Device",
-          "description": "The account's device, or one of its babies' devices (the pump still goes to the account, not that baby). Give this or an account, not both."
+          "description": "The Baby Tracker account to log the pump to."
         },
         "left_amount": {
           "name": "Left amount",
@@ -331,7 +323,7 @@
       "name": "Start sleep",
       "description": "Starts a sleep timer for a baby. It syncs at once, so the phones show the sleep running.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -353,7 +345,7 @@
       "name": "Stop sleep",
       "description": "Ends the baby's running sleep, whether it started in Home Assistant or on a phone.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -367,7 +359,7 @@
       "name": "Start nursing",
       "description": "Starts Home Assistant's nursing timer on a side, or switches to that side if the timer is on the other one. Nothing is saved until the timer stops.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -381,7 +373,7 @@
       "name": "Switch nursing side",
       "description": "Moves the running nursing timer to the other side, keeping the time on the first.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         }
@@ -391,7 +383,7 @@
       "name": "Stop nursing",
       "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it ended on, and the start time.",
       "fields": {
-        "baby": {
+        "device_id": {
           "name": "Baby",
           "description": "The baby's device."
         },
@@ -432,12 +424,6 @@
   "exceptions": {
     "baby_not_found": {
       "message": "That isn't a Baby Tracker baby. Pick a baby's device."
-    },
-    "entry_not_found": {
-      "message": "No Baby Tracker account matches that ID."
-    },
-    "entry_not_loaded": {
-      "message": "That Baby Tracker account isn't loaded right now. Check its status in the integration's settings."
     },
     "nothing_to_undo": {
       "message": "Home Assistant hasn't created any record to undo."
@@ -530,7 +516,11 @@
   "issues": {
     "own_log_gap": {
       "title": "Baby Tracker can't write for {account}",
-      "description": "The service says Home Assistant's own log for {account} is longer than what Home Assistant can read back, so writing is paused to avoid skipping or overwriting entries. This may be a short delay on the service's side that clears after the next successful write. If it persists for more than an hour, remove this integration entry and add it again. That reloads the account's history, and Home Assistant appears as a new device in the Baby Tracker app, while the old Home Assistant device stays in its list."
+      "description": "For more than an hour, every attempt to write to {account} has failed. The service says Home Assistant's own log for this account is longer than what Home Assistant can read back, so writing is paused to avoid skipping or overwriting entries.\n\nTo fix it:\n\n1. Go to Settings, then Devices & services, and open Baby Tracker (Nighp).\n2. Open the menu next to {account} and choose Delete, then confirm.\n3. Add Baby Tracker (Nighp) again with the same email and password.\n\nAdding it again reloads the account's history, and Home Assistant appears as a new device in the Baby Tracker app. The old Home Assistant device stays in the app's device list."
+    },
+    "deprecated_action_field": {
+      "title": "An automation uses an old field of {action}",
+      "description": "Something called the Baby Tracker action {action} with the field {field}, which is deprecated and will stop working in a later release. To fix it:\n\n1. Find the automation, script, or dashboard button that calls {action}.\n2. Replace {field} with {replacement}, and pick the same baby or account.\n3. Save it, then run it again.\n\nThis notice goes away on its own after the next restart, unless something still uses the old field."
     }
   }
 }

@@ -10,13 +10,15 @@ import logging
 import math
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.const import UnitOfVolume
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
+from homeassistant.util.hass_dict import HassKey
 
 from .const import (
     CONF_BOTTLE_SIZE,
@@ -88,17 +90,33 @@ def _reauth(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
     return _error("auth_failed")
 
 
+# A gap in the device's own log can clear by itself, so it only becomes a repair once it has
+# kept writes failing for this long. The clock runs per entry, from the first failure, and stops
+# at the next write that succeeds. It lives in memory, so a restart starts it again.
+GAP_REPAIR_AFTER = timedelta(hours=1)
+_GAP_SINCE: HassKey[dict[str, datetime]] = HassKey(f"{DOMAIN}_own_log_gap_since")
+
+
+def forget_gap(hass: HomeAssistant, entry_id: str) -> None:
+    """Stop timing an entry's gap and remove its repair issue, if it has one."""
+    hass.data.get(_GAP_SINCE, {}).pop(entry_id, None)
+    ir.async_delete_issue(hass, DOMAIN, issue_id(entry_id))
+
+
 def _own_log_gap(coordinator: BabyTrackerCoordinator) -> HomeAssistantError:
     entry = coordinator.config_entry
-    ir.async_create_issue(
-        coordinator.hass,
-        DOMAIN,
-        issue_id(coordinator.config_entry.entry_id),
-        is_fixable=False,
-        severity=ir.IssueSeverity.ERROR,
-        translation_key="own_log_gap",
-        translation_placeholders={"account": entry.data[CONF_EMAIL]},
-    )
+    now = dt_util.utcnow()
+    since = coordinator.hass.data.setdefault(_GAP_SINCE, {}).setdefault(entry.entry_id, now)
+    if now - since > GAP_REPAIR_AFTER:
+        ir.async_create_issue(
+            coordinator.hass,
+            DOMAIN,
+            issue_id(entry.entry_id),
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="own_log_gap",
+            translation_placeholders={"account": entry.data[CONF_EMAIL]},
+        )
     return _error("own_log_gap")
 
 
@@ -135,7 +153,7 @@ async def _write[T](
         raise _own_log_gap(coordinator) from err
     except BabyTrackerError as err:
         raise _error("write_failed", error=str(err)) from err
-    ir.async_delete_issue(coordinator.hass, DOMAIN, issue_id(coordinator.config_entry.entry_id))
+    forget_gap(coordinator.hass, coordinator.config_entry.entry_id)
     return result
 
 

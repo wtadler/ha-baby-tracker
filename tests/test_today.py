@@ -20,7 +20,6 @@ from custom_components.nighp_baby_tracker.const import (
     CONF_DEVICE_UUID,
     CONF_EMAIL,
     CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
     DOMAIN,
 )
 from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
@@ -101,7 +100,13 @@ def empty(server: FakeServer) -> FakeServer:
 
 
 @pytest.fixture
-def entry(hass: HomeAssistant, clock: FrozenDateTimeFactory) -> MockConfigEntry:
+def entry(
+    hass: HomeAssistant, clock: FrozenDateTimeFactory, monkeypatch: pytest.MonkeyPatch
+) -> MockConfigEntry:
+    # A day-long interval, so a sync can never be what moves a count at midnight.
+    monkeypatch.setattr(
+        "custom_components.nighp_baby_tracker.coordinator.SCAN_INTERVAL", timedelta(days=1)
+    )
     entry = MockConfigEntry(
         domain=DOMAIN,
         title=EMAIL,
@@ -111,8 +116,6 @@ def entry(hass: HomeAssistant, clock: FrozenDateTimeFactory) -> MockConfigEntry:
             CONF_PASSWORD: PASSWORD,
             CONF_DEVICE_UUID: "EEEEEEEE-0000-4000-8000-0000000000EE",
         },
-        # A day-long interval, so a sync can never be what moves a count at midnight.
-        options={CONF_SCAN_INTERVAL: 1440},
     )
     entry.add_to_hass(hass)
     return entry

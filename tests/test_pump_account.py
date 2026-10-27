@@ -494,7 +494,7 @@ async def test_log_pump_for_an_unknown_account_is_a_validation_error(
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await log_pump(hass, config_entry_id="no-such-entry", left_amount=3)
-    assert raised.value.translation_key == "entry_not_found"
+    assert raised.value.translation_key == "service_config_entry_not_found"
     assert server.posted == []  # type: ignore[attr-defined]
 
 
@@ -507,10 +507,10 @@ async def test_log_pump_for_an_account_that_is_not_loaded_is_a_validation_error(
 
     with pytest.raises(ServiceValidationError) as raised:
         await log_pump(hass, device=device.id, left_amount=3)
-    assert raised.value.translation_key == "entry_not_loaded"
+    assert raised.value.translation_key == "service_config_entry_not_loaded"
     with pytest.raises(ServiceValidationError) as raised:
         await log_pump(hass, config_entry_id=setup_entry.entry_id, left_amount=3)
-    assert raised.value.translation_key == "entry_not_loaded"
+    assert raised.value.translation_key == "service_config_entry_not_loaded"
 
 
 @pytest.mark.parametrize("device", ["nope", "00000000000000000000000000000000"])
@@ -557,7 +557,7 @@ async def test_a_baby_service_given_the_account_device_is_a_validation_error(
         await hass.services.async_call(
             DOMAIN,
             "log_diaper",
-            {"baby": account_device(hass, setup_entry).id, "type": "wet"},
+            {"device_id": account_device(hass, setup_entry).id, "type": "wet"},
             blocking=True,
         )
     assert raised.value.translation_key == "baby_not_found"
@@ -582,10 +582,10 @@ async def test_undo_for_a_baby_never_picks_a_pump(
     pump_id = posted(server)[0][2].object_id
 
     with pytest.raises(ServiceValidationError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert raised.value.translation_key == "nothing_to_undo"
     with pytest.raises(ServiceValidationError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=pump_id)
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=pump_id)
     assert raised.value.translation_key == "record_not_for_baby"
     assert len(posted(server)) == 1
 

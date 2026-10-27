@@ -33,12 +33,8 @@ from .const import (
     CONF_DEVICE_UUID,
     CONF_EMAIL,
     CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL_MINUTES,
     DEVICE_NAME,
     DOMAIN,
-    MAX_SCAN_INTERVAL_MINUTES,
-    MIN_SCAN_INTERVAL_MINUTES,
 )
 from .pybabytracker import (
     AuthenticationError,
@@ -56,6 +52,14 @@ CREDENTIALS_SCHEMA = probatio.Schema(
         probatio.Required(CONF_EMAIL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="username")
         ),
+        probatio.Required(CONF_PASSWORD): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
+        ),
+    }
+)
+
+REAUTH_SCHEMA = probatio.Schema(
+    {
         probatio.Required(CONF_PASSWORD): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
         ),
@@ -136,57 +140,45 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Ask for the account's password again and update the entry."""
         entry = self._get_reauth_entry()
+        email = entry.data[CONF_EMAIL]
+        # The account is the one the entry was set up with: stop if its unique ID names another.
+        await self.async_set_unique_id(email.strip().lower())
+        self._abort_if_unique_id_mismatch()
         errors: dict[str, str] = {}
         if user_input is not None:
-            email = user_input[CONF_EMAIL].strip()
-            await self.async_set_unique_id(email.lower())
-            self._abort_if_unique_id_mismatch(reason="wrong_account")
             # Sign in as the same device as before, so Home Assistant stays one device.
             error = await _check_login(
                 self.hass, email, user_input[CONF_PASSWORD], entry.data[CONF_DEVICE_UUID]
             )
             if error is None:
                 return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates={CONF_EMAIL: email, CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}
                 )
             errors["base"] = error
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=self.add_suggested_values_to_schema(
-                CREDENTIALS_SCHEMA, user_input or {CONF_EMAIL: entry.data[CONF_EMAIL]}
-            ),
+            data_schema=REAUTH_SCHEMA,
+            description_placeholders={"email": email},
             errors=errors,
         )
 
 
 class BabyTrackerOptionsFlow(OptionsFlow):
-    """Adjust how often Home Assistant checks for new records, and what the Bottle button logs."""
+    """Choose what the Bottle button logs."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show and save the options."""
         if user_input is not None:
             return self.async_create_entry(
                 data={
-                    CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
                     CONF_BOTTLE_SIZE: float(user_input[CONF_BOTTLE_SIZE]),
                     CONF_BOTTLE_UNIT: user_input[CONF_BOTTLE_UNIT],
                     CONF_BOTTLE_TYPE: user_input[CONF_BOTTLE_TYPE],
                 }
             )
-        current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES)
         size, unit, kind = configured_bottle(self.config_entry.options)
         schema = probatio.Schema(
             {
-                probatio.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
-                    NumberSelectorConfig(
-                        min=MIN_SCAN_INTERVAL_MINUTES,
-                        max=MAX_SCAN_INTERVAL_MINUTES,
-                        step=1,
-                        mode=NumberSelectorMode.BOX,
-                        unit_of_measurement="min",
-                    )
-                ),
                 probatio.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
                     NumberSelectorConfig(
                         min=0.1, max=MAX_BOTTLE_SIZE, step="any", mode=NumberSelectorMode.BOX

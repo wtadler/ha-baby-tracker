@@ -18,9 +18,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_DEVICE_UUID,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
+    SCAN_INTERVAL,
     STORAGE_VERSION,
 )
 from .pybabytracker import (
@@ -76,11 +75,6 @@ def nursing_storage_key(entry_id: str) -> str:
     return f"{DOMAIN}.{entry_id}.nursing"
 
 
-def scan_interval(entry: ConfigEntry) -> timedelta:
-    """Return the sync interval an entry's options configure."""
-    return timedelta(minutes=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES))
-
-
 def _newest(records: list[Record]) -> Record | None:
     def key(record: Record) -> tuple[float, float]:
         assert record.time is not None  # latest_records only returns records with a time
@@ -112,7 +106,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             _LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=scan_interval(entry),
+            update_interval=SCAN_INTERVAL,
         )
         self.client = client
         self.session = session
@@ -221,7 +215,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
         return result
 
     def wanted_interval(self, data: dict[str, BabyData] | None = None) -> timedelta:
-        """Return the sync interval: one minute while a timer runs, else the configured one.
+        """Return the sync interval: one minute while a timer runs, else five.
 
         A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running.
         """
@@ -230,7 +224,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             baby.running_sleep is not None for baby in babies.values()
         ):
             return TIMER_INTERVAL
-        return scan_interval(self.config_entry)
+        return SCAN_INTERVAL
 
     def exclusive(self) -> asyncio.Lock:
         """Return the lock that syncs and writes take.

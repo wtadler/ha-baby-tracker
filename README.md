@@ -57,8 +57,10 @@ identity. It doesn't appear in the app's device list until a later version write
 
 ### Options
 
-**Sync interval** sets how often Home Assistant checks for new records. The default is 5 minutes
-and the minimum is 1 minute. Changing it takes effect without a reload.
+There is no sync interval option. Home Assistant checks for new records every 5 minutes, and every
+minute while a sleep or nursing timer runs. To check sooner, call `homeassistant.update_entity`
+on any Baby Tracker entity from an automation or a script. An earlier version's saved interval is
+ignored, and saving these options removes it.
 
 **Bottle size**, **Bottle unit**, and **Bottle type** set what each baby's **Bottle** button logs.
 They start at 4 fl. oz. of formula in every unit system. Metric isn't supported yet: the app's
@@ -69,8 +71,8 @@ sense fall back to those defaults.
 
 ### If your password changes
 
-Home Assistant asks you to sign in again. Enter the account's current password. If you enter a
-different account's email, the sign-in is refused.
+Home Assistant asks you to sign in again. Enter the account's current password. The email is the
+one the entry was set up with, and it isn't asked again.
 
 ## Buttons and actions
 
@@ -93,54 +95,59 @@ Home Assistant's own device in your account.
   survives a restart (if it can't be saved, the press still works and shows an error), and nursing
   while the baby is asleep is fine. A timer for a baby no longer in the account is dropped.
 - While any sleep or nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
-  up quickly. It returns to your sync interval when none is running.
+  up quickly. It returns to every 5 minutes when none is running.
 - A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a
   forgotten timer can always be stopped; fix the length in the app.
 
-The actions do the same and more:
+The actions do the same and more. A baby action takes the baby's device as `device_id`. The
+account actions (`log_pump`, and `undo` for a whole account) take `config_entry_id`.
 
-- `nighp_baby_tracker.log_diaper` takes `baby` (the baby's device), `type` (`wet`, `dirty`, or
+**Upgrading automations:** the old `baby` field (and `device` on `log_pump`) still works for one
+more release. Using it raises a repair in **Settings > System > Repairs** that names the action
+and the field to switch to: `device_id` for a baby, and `config_entry_id` for an account.
+
+
+- `nighp_baby_tracker.log_diaper` takes `device_id` (the baby's device), `type` (`wet`, `dirty`, or
   `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
   zone), and an optional `note`.
-- `nighp_baby_tracker.log_bottle` takes `baby`, `kind` (`formula` or `pumped`), `amount` (more than
+- `nighp_baby_tracker.log_bottle` takes `device_id`, `kind` (`formula` or `pumped`), `amount` (more than
   zero), an optional `unit` (`fl. oz.`; `mL` is refused for now), an optional `time`, and an optional `note`.
-- `nighp_baby_tracker.log_nursing` takes `baby`, `left_minutes` and `right_minutes` (whole
+- `nighp_baby_tracker.log_nursing` takes `device_id`, `left_minutes` and `right_minutes` (whole
   minutes; at least one above zero), an optional `finish_side` (`left` or `right`; default the last
   side used, right when both), an optional `end_time` (default now), and an optional `note`. The
   record starts at the end time minus the total minutes.
-- `nighp_baby_tracker.log_sleep` takes `baby`, `start` and `end` (the end must be after the start),
+- `nighp_baby_tracker.log_sleep` takes `device_id`, `start` and `end` (the end must be after the start),
   and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
   than 1.
-- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account) or `device` (the account's
-  device, or a baby's, which resolves to its account; `baby` still works as an alias of `device`; give
-  one of the three), `left_amount` and/or
+- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account), `left_amount` and/or
   `right_amount`, an optional `unit`, `left_minutes` and `right_minutes`, an optional
   `finish_side`, an optional `time` (the start; default now), and an optional `note`. The total is
   the sum of the two sides. A pump belongs to the account, so no baby is saved with it.
-- `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `baby` or
+- `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `device_id` (a baby) or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
-  recent record Home Assistant created (for that baby, if you gave `baby`). Run it again and it
+  recent record Home Assistant created (for that baby, if you gave `device_id`). Run it again and it
   deletes the next older Home Assistant entry, and so on, until none are left. If you give both
-  `baby` and `object_id`, the record must belong to that baby. It can't delete records the phones
+  `device_id` and `object_id`, the record must belong to that baby. It can't delete records the phones
   made.
-- `nighp_baby_tracker.start_sleep` takes `baby`, an optional `start` (default now; not in the
+- `nighp_baby_tracker.start_sleep` takes `device_id`, an optional `start` (default now; not in the
   future or more than 24 hours ago), an optional `note`, and an optional `object_id`. It's refused
   while the baby's newest sleep is running.
-- `nighp_baby_tracker.stop_sleep` takes `baby` and an optional `end` (default now). It ends the
+- `nighp_baby_tracker.stop_sleep` takes `device_id` and an optional `end` (default now). It ends the
   baby's running sleep, whether Home Assistant or a phone started it, and is refused when none is
   running.
-- `nighp_baby_tracker.start_nursing` takes `baby` and `side` (`left` or `right`). With the timer on
+- `nighp_baby_tracker.start_nursing` takes `device_id` and `side` (`left` or `right`). With the timer on
   the other side, it switches; on the same side, nothing changes.
-- `nighp_baby_tracker.switch_nursing_side` takes `baby` and moves the timer to the other side.
-- `nighp_baby_tracker.stop_nursing` takes `baby` and an optional `note`, and saves the nursing
+- `nighp_baby_tracker.switch_nursing_side` takes `device_id` and moves the timer to the other side.
+- `nighp_baby_tracker.stop_nursing` takes `device_id` and an optional `note`, and saves the nursing
   record. Switching or stopping with no timer running is refused.
 - Every `log_*` action, and `start_sleep`, also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
   Send the same one to retry a write that may have landed: it's added once, never twice.
 
 Each write syncs first, then posts, and the sensors update at once. If a write gets no answer from
 the service, the next one says "the last entry is still being confirmed"; try again in a minute. If
-Home Assistant's own log in your account can't be read back, writing pauses and a repair appears in
-**Settings > System > Repairs**. A rejected login starts the sign-in flow again.
+Home Assistant's own log in your account can't be read back, writing pauses. If that lasts more
+than an hour, a repair appears in **Settings > System > Repairs** with the steps to fix it; a
+shorter gap raises an error on the write and no repair. A rejected login starts the sign-in flow again.
 
 ## Live activity on your iPhone
 

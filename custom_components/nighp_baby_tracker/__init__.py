@@ -4,7 +4,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
@@ -24,8 +23,8 @@ from .coordinator import (
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
-from .services import async_register_services
-from .writes import issue_id
+from .services import async_setup_services
+from .writes import forget_gap
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR]
 
@@ -34,7 +33,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the actions, which belong to the integration rather than to one entry."""
-    async_register_services(hass)
+    async_setup_services(hass)
     return True
 
 
@@ -59,7 +58,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
     entry.runtime_data = coordinator
     _remove_per_baby_last_pumps(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
 
 
@@ -81,20 +79,6 @@ def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEnt
             registry.async_remove(entity.entity_id)
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Apply a new sync interval right away, without reloading the entry.
-
-    While a timer runs, syncing stays at one minute and the new interval takes over when it
-    stops.
-    """
-    coordinator = entry.runtime_data
-    interval = coordinator.wanted_interval()
-    if interval != coordinator.update_interval:
-        coordinator.update_interval = interval
-        # The setter doesn't reschedule, so refresh now: that also schedules the next one.
-        await coordinator.async_request_refresh()
-
-
 async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
     """Stop syncing and free the client."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -105,6 +89,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry)
 
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
     """Delete the saved sync state, the saved nursing timers, and any repair about this entry."""
-    ir.async_delete_issue(hass, DOMAIN, issue_id(entry.entry_id))
+    forget_gap(hass, entry.entry_id)
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
     await Store(hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)).async_remove()
