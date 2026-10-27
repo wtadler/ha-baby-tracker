@@ -488,7 +488,7 @@ hassfest checks the file's shape for core integrations only.
 ## Development
 
 ```sh
-uv venv --python 3.13 .venv
+uv venv --python 3.14 .venv
 uv pip install -r requirements_test.txt
 .venv/bin/pytest
 .venv/bin/ruff check .
