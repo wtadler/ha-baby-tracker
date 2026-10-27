@@ -90,11 +90,11 @@ async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
     ("units", "expected"),
     [
         (US_CUSTOMARY_SYSTEM, (4, "fl. oz.", "formula")),
-        (METRIC_SYSTEM, (4, "fl. oz.", "formula")),
+        (METRIC_SYSTEM, (120, "mL", "formula")),
     ],
     ids=["us-customary", "metric"],
 )
-async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
+async def test_options_default_the_bottle_to_4_oz_in_us_customary_and_120_ml_in_metric(
     hass: HomeAssistant, init_integration: MockConfigEntry, units: Any, expected: tuple[Any, ...]
 ) -> None:
     hass.config.units = units
@@ -124,7 +124,7 @@ async def test_options_show_the_saved_bottle(
     assert defaults[CONF_BOTTLE_TYPE] == "pumped"
 
 
-async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_formula(
+async def test_saving_the_default_bottle_in_a_metric_home_saves_120_ml_of_formula(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     hass.config.units = METRIC_SYSTEM
@@ -133,9 +133,24 @@ async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_f
 
     await set_options(hass, init_integration, **defaults)
 
-    assert init_integration.options[CONF_BOTTLE_SIZE] == 4
-    assert init_integration.options[CONF_BOTTLE_UNIT] == "fl. oz."
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 120
+    assert init_integration.options[CONF_BOTTLE_UNIT] == "mL"
     assert init_integration.options[CONF_BOTTLE_TYPE] == "formula"
+
+
+async def test_saved_ounce_options_are_shown_unchanged_in_a_metric_home(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    hass.config_entries.async_update_entry(
+        init_integration,
+        options={CONF_BOTTLE_SIZE: 3, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
+    )
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    defaults = schema_defaults(result)
+    assert (defaults[CONF_BOTTLE_SIZE], defaults[CONF_BOTTLE_UNIT]) == (3, "fl. oz.")
 
 
 @pytest.mark.parametrize(

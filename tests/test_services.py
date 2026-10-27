@@ -487,15 +487,14 @@ async def test_log_pump_for_another_integrations_device_is_a_validation_error(
     assert server.posted == []
 
 
-async def test_log_pump_still_requires_an_amount_and_a_unit_it_supports(
+async def test_log_pump_still_requires_an_amount_and_a_unit_it_knows(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await log_pump(hass, config_entry_id=init_integration.entry_id, left_minutes=5)
     assert raised.value.translation_key == "no_amount"
-    with pytest.raises(ServiceValidationError) as raised:
-        await log_pump(hass, config_entry_id=init_integration.entry_id, left_amount=60, unit="mL")
-    assert raised.value.translation_key == "metric_not_supported"
+    with pytest.raises(probatio.MultipleInvalid):
+        await log_pump(hass, config_entry_id=init_integration.entry_id, left_amount=60, unit="cups")
     assert server.posted == []
 
 
@@ -817,7 +816,7 @@ async def test_log_diaper_reads_a_time_without_an_offset_in_the_home_assistant_t
 
     [(_, _, record)] = posted(server)
     assert record.time == datetime(2026, 10, 26, 14, 30, tzinfo=UTC)
-    assert record.timezone == -14400
+    assert record.timezone == -18000
 
 
 async def test_log_diaper_without_a_time_uses_now_in_the_home_assistant_time_zone(
@@ -1421,28 +1420,43 @@ async def test_log_bottle_writes_formula_or_pumped_by_kind(
 
 
 @pytest.mark.parametrize(
-    ("action", "data"),
+    ("action", "data", "key"),
     [
-        ("log_bottle", {"kind": "formula", "amount": 120}),
-        ("log_bottle", {"kind": "pumped", "amount": 90}),
-        ("log_pump", {"left_amount": 60, "right_amount": 75}),
-        ("log_pump", {"left_amount": 60}),
+        ("log_bottle", {"kind": "formula", "amount": 120}, "amount"),
+        ("log_bottle", {"kind": "pumped", "amount": 90}, "amount"),
+        ("log_pump", {"left_amount": 60, "right_amount": 75}, "leftAmount"),
+        ("log_pump", {"left_amount": 60}, "leftAmount"),
     ],
     ids=["formula", "pumped", "pump", "pump-one-side"],
 )
-async def test_a_milliliter_write_is_refused_with_a_translated_error_and_no_request(
+async def test_a_milliliter_write_is_accepted_and_sent_as_metric(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
     action: str,
     data: dict[str, Any],
+    key: str,
 ) -> None:
-    sent = len(server.calls)
-    with pytest.raises(ServiceValidationError) as raised:
-        await call(hass, action, unit="mL", **data)
-    assert raised.value.translation_key == "metric_not_supported"
-    assert server.posted == []
-    assert len(server.calls) == sent  # not even a sync
+    await call(hass, action, unit="mL", **data)
+
+    payload = only_record(server).to_payload()
+    first = data.get("amount", data.get("left_amount"))
+    assert payload[key] == {
+        "BCObjectType": "VolumeMeasure",
+        "englishMeasure": "false",
+        "value": first,
+    }
+
+
+async def test_log_bottle_in_milliliters_writes_the_value_as_given(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    await call(hass, "log_bottle", kind="formula", amount=118.5, unit="mL")
+
+    record = only_record(server)
+    assert record.volume == Volume(118.5, "ml")
+    assert record.to_payload()["amount"]["englishMeasure"] == "false"
+    assert record.to_payload()["amount"]["value"] == 118.5
 
 
 async def test_log_bottle_in_ounces_writes_english_measure_true(
@@ -1494,7 +1508,7 @@ async def test_log_bottle_time_defaults_to_now_and_reads_a_naive_time_in_the_ha_
     [(_, _, now_record), (_, _, naive_record)] = posted(server)
     assert now_record.time == NOW
     assert naive_record.time.isoformat() == "2026-10-26T13:00:00+00:00"
-    assert (now_record.timezone, naive_record.timezone) == (-14400, -14400)
+    assert (now_record.timezone, naive_record.timezone) == (-18000, -18000)
 
 
 # --- log_nursing -----------------------------------------------------------------------------
@@ -1532,7 +1546,7 @@ async def test_log_nursing_reads_a_naive_end_time_in_the_ha_zone(
 
     record = only_record(server)
     assert record.time.isoformat() == "2026-10-26T13:00:00+00:00"
-    assert record.timezone == -14400
+    assert record.timezone == -18000
 
 
 # --- log_sleep -------------------------------------------------------------------------------
@@ -1562,7 +1576,7 @@ async def test_log_sleep_reads_naive_times_in_the_ha_zone(
     record = only_record(server)
     assert record.time.isoformat() == "2026-10-26T00:00:00+00:00"
     assert record.duration == 600
-    assert record.timezone == -14400
+    assert record.timezone == -18000
 
 
 # --- log_pump --------------------------------------------------------------------------------
@@ -2322,3 +2336,43 @@ async def test_setting_up_the_actions_registers_every_one_of_them(hass: HomeAssi
     async_setup_services(hass)
 
     assert set(hass.services.async_services_for_domain(DOMAIN)) == set(ALL_ACTIONS)
+
+
+@pytest.mark.parametrize(
+    ("zone", "time", "expected"),
+    [
+        ("America/New_York", "2026-07-15T12:00:00", -18000),
+        ("America/New_York", "2026-01-15T12:00:00", -18000),
+        ("America/New_York", "2026-07-15T16:00:00+00:00", -18000),
+        ("America/Chicago", "2026-07-15T12:00:00", -21600),
+        ("Asia/Kolkata", "2026-07-15T12:00:00", 19800),
+        ("UTC", "2026-07-15T12:00:00", 0),
+        ("Australia/Sydney", "2026-01-15T12:00:00", 36000),
+    ],
+    ids=["july", "january", "aware-july", "chicago", "no-dst", "utc", "southern-dst"],
+)
+async def test_a_write_sends_the_standard_offset_of_the_records_own_moment(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    zone: str,
+    time: str,
+    expected: int,
+) -> None:
+    await hass.config.async_set_time_zone(zone)
+
+    await log_diaper(hass, BABY_ONE_ID, "wet", time=time)
+
+    assert only_record(server).timezone == expected
+
+
+async def test_a_backdated_write_uses_the_standard_offset_not_the_offset_now(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to(datetime(2026, 1, 20, 12, 0, tzinfo=UTC))
+
+    await log_diaper(hass, BABY_ONE_ID, "wet", time="2026-01-19T08:00:00")
+    await call(hass, "log_sleep", start="2026-01-19T20:00:00", end="2026-01-19T22:00:00")
+
+    assert [r.timezone for _, _, r in posted(server)] == [-18000, -18000]
