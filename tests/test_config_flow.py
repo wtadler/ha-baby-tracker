@@ -15,7 +15,8 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     ProtocolError,
 )
 
-from .conftest import EMAIL, NEW_PASSWORD, PASSWORD, FakeServer
+from . import EMAIL, NEW_PASSWORD, PASSWORD
+from .fake_server import FakeServer
 
 
 async def _start(hass: HomeAssistant):
@@ -120,9 +121,9 @@ async def test_the_form_recovers_after_an_error(hass: HomeAssistant, server: Fak
 
 
 async def test_an_account_already_set_up_aborts(
-    hass: HomeAssistant, config_entry: MockConfigEntry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    config_entry.add_to_hass(hass)
+    mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"])
 
@@ -131,9 +132,9 @@ async def test_an_account_already_set_up_aborts(
 
 
 async def test_the_same_account_in_a_different_case_aborts(
-    hass: HomeAssistant, config_entry: MockConfigEntry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    config_entry.add_to_hass(hass)
+    mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], email=EMAIL.upper())
 
@@ -151,9 +152,9 @@ async def test_the_unique_id_is_the_lowercased_email(
 
 
 async def test_a_second_account_can_be_added(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    config_entry.add_to_hass(hass)
+    mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
     result = await _submit(hass, result["flow_id"], email="other@example.com")
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -168,47 +169,49 @@ async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
     return await entry.start_reauth_flow(hass)
 
 
-async def test_reauth_asks_for_the_password_only(hass: HomeAssistant, config_entry) -> None:
-    result = await _start_reauth(hass, config_entry)
+async def test_reauth_asks_for_the_password_only(hass: HomeAssistant, mock_config_entry) -> None:
+    result = await _start_reauth(hass, mock_config_entry)
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
     assert {str(key) for key in result["data_schema"].schema} == {CONF_PASSWORD}
 
 
-async def test_reauth_shows_the_email_as_a_placeholder(hass: HomeAssistant, config_entry) -> None:
-    result = await _start_reauth(hass, config_entry)
+async def test_reauth_shows_the_email_as_a_placeholder(
+    hass: HomeAssistant, mock_config_entry
+) -> None:
+    result = await _start_reauth(hass, mock_config_entry)
 
     assert result["description_placeholders"]["email"] == EMAIL
 
 
-async def test_reauth_refuses_an_email_field(hass: HomeAssistant, config_entry) -> None:
-    result = await _start_reauth(hass, config_entry)
+async def test_reauth_refuses_an_email_field(hass: HomeAssistant, mock_config_entry) -> None:
+    result = await _start_reauth(hass, mock_config_entry)
 
     with pytest.raises(InvalidData):
         await _submit(hass, result["flow_id"], password=NEW_PASSWORD)
 
 
 async def test_reauth_with_a_new_password_restores_the_entry(
-    hass: HomeAssistant, config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
-    result = await _start_reauth(hass, config_entry)
+    result = await _start_reauth(hass, mock_config_entry)
     result = await _submit_password(hass, result["flow_id"], NEW_PASSWORD)
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
-    assert config_entry.data[CONF_PASSWORD] == NEW_PASSWORD
-    assert config_entry.data[CONF_EMAIL] == EMAIL
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.data[CONF_PASSWORD] == NEW_PASSWORD
+    assert mock_config_entry.data[CONF_EMAIL] == EMAIL
+    assert mock_config_entry.state is ConfigEntryState.LOADED
 
 
 async def test_reauth_signs_in_with_the_entrys_email(
-    hass: HomeAssistant, config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
-    result = await _start_reauth(hass, config_entry)
+    result = await _start_reauth(hass, mock_config_entry)
     await _submit_password(hass, result["flow_id"], NEW_PASSWORD)
     await hass.async_block_till_done()
 
@@ -216,28 +219,28 @@ async def test_reauth_signs_in_with_the_entrys_email(
     assert server.sign_ins[0]["password"] == NEW_PASSWORD
 
 
-async def test_reauth_keeps_the_device_id(hass: HomeAssistant, config_entry, server) -> None:
-    original = config_entry.data[CONF_DEVICE_UUID]
+async def test_reauth_keeps_the_device_id(hass: HomeAssistant, mock_config_entry, server) -> None:
+    original = mock_config_entry.data[CONF_DEVICE_UUID]
     server.password = NEW_PASSWORD
-    result = await _start_reauth(hass, config_entry)
+    result = await _start_reauth(hass, mock_config_entry)
     await _submit_password(hass, result["flow_id"], NEW_PASSWORD)
     await hass.async_block_till_done()
 
-    assert config_entry.data[CONF_DEVICE_UUID] == original
+    assert mock_config_entry.data[CONF_DEVICE_UUID] == original
     assert {sign_in["device_uuid"] for sign_in in server.sign_ins} == {original}
 
 
 async def test_reauth_with_the_wrong_password_shows_invalid_auth(
-    hass: HomeAssistant, config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
-    result = await _start_reauth(hass, config_entry)
+    result = await _start_reauth(hass, mock_config_entry)
     result = await _submit_password(hass, result["flow_id"], "test-still-wrong")
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
     assert result["description_placeholders"]["email"] == EMAIL
-    assert config_entry.data[CONF_PASSWORD] == PASSWORD
+    assert mock_config_entry.data[CONF_PASSWORD] == PASSWORD
 
 
 async def test_reauth_for_a_different_account_aborts_with_unique_id_mismatch(
@@ -262,9 +265,9 @@ async def test_reauth_for_a_different_account_aborts_with_unique_id_mismatch(
 
 
 async def test_reauth_with_an_unreachable_server_shows_cannot_connect(
-    hass: HomeAssistant, config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry, server: FakeServer
 ) -> None:
-    result = await _start_reauth(hass, config_entry)
+    result = await _start_reauth(hass, mock_config_entry)
     server.sign_in_error = BabyTrackerConnectionError("down")
     result = await _submit_password(hass, result["flow_id"])
 
@@ -276,7 +279,7 @@ async def test_reauth_with_an_unreachable_server_shows_cannot_connect(
 # test_feeds_sleeps_pumps.py)
 
 
-async def test_options_show_one_form(hass: HomeAssistant, setup_entry) -> None:
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+async def test_options_show_one_form(hass: HomeAssistant, init_integration) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"

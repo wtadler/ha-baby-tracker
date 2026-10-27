@@ -13,8 +13,9 @@ from syrupy.assertion import SnapshotAssertion
 
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID
 
-from .conftest import BABY_ONE, BABY_TWO, EMAIL, NEW_PASSWORD, PASSWORD, FakeServer
+from . import BABY_ONE, BABY_TWO, EMAIL, NEW_PASSWORD, PASSWORD
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, at
+from .fake_server import FakeServer
 from .helpers import tick
 
 
@@ -27,16 +28,16 @@ async def _diagnostics(
 async def test_diagnostics_match_the_snapshot(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     snapshot: SnapshotAssertion,
 ) -> None:
-    assert await _diagnostics(hass, hass_client, setup_entry) == snapshot
+    assert await _diagnostics(hass, hass_client, init_integration) == snapshot
 
 
 async def test_diagnostics_hold_no_email_or_password(
-    hass: HomeAssistant, hass_client: ClientSessionGenerator, setup_entry: MockConfigEntry
+    hass: HomeAssistant, hass_client: ClientSessionGenerator, init_integration: MockConfigEntry
 ) -> None:
-    diagnostics = await _diagnostics(hass, hass_client, setup_entry)
+    diagnostics = await _diagnostics(hass, hass_client, init_integration)
     text = json.dumps(diagnostics)
     assert EMAIL not in text
     assert PASSWORD not in text
@@ -46,17 +47,17 @@ async def test_diagnostics_hold_no_email_or_password(
 
 
 async def test_diagnostics_hold_no_baby_name_or_id_and_no_device_id(
-    hass: HomeAssistant, hass_client: ClientSessionGenerator, setup_entry: MockConfigEntry
+    hass: HomeAssistant, hass_client: ClientSessionGenerator, init_integration: MockConfigEntry
 ) -> None:
-    text = json.dumps(await _diagnostics(hass, hass_client, setup_entry))
+    text = json.dumps(await _diagnostics(hass, hass_client, init_integration))
     for secret in (
         BABY_ONE["name"],
         BABY_TWO["name"],
         BABY_ONE_ID,
         BABY_TWO_ID,
         DEVICE_A,
-        setup_entry.data[CONF_DEVICE_UUID],
-        setup_entry.entry_id,
+        init_integration.data[CONF_DEVICE_UUID],
+        init_integration.entry_id,
     ):
         assert secret not in text, secret
 
@@ -64,7 +65,7 @@ async def test_diagnostics_hold_no_baby_name_or_id_and_no_device_id(
 async def test_diagnostics_hold_no_notes(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
-    config_entry: MockConfigEntry,
+    mock_config_entry: MockConfigEntry,
     server: FakeServer,
 ) -> None:
     server.add_record(
@@ -75,17 +76,17 @@ async def test_diagnostics_hold_no_notes(
         note="a private note about the baby",
         status=0,
     )
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    text = json.dumps(await _diagnostics(hass, hass_client, config_entry))
+    text = json.dumps(await _diagnostics(hass, hass_client, mock_config_entry))
     assert "private note" not in text
 
 
 async def test_diagnostics_count_the_records_and_babies(
-    hass: HomeAssistant, hass_client: ClientSessionGenerator, setup_entry: MockConfigEntry
+    hass: HomeAssistant, hass_client: ClientSessionGenerator, init_integration: MockConfigEntry
 ) -> None:
-    diagnostics = await _diagnostics(hass, hass_client, setup_entry)
+    diagnostics = await _diagnostics(hass, hass_client, init_integration)
     assert diagnostics["coordinator"]["babies"] == 2
     assert diagnostics["coordinator"]["last_update_success"] is True
     assert diagnostics["coordinator"]["update_interval_seconds"] == 300
@@ -95,10 +96,10 @@ async def test_diagnostics_count_the_records_and_babies(
 async def test_diagnostics_report_a_failed_sync(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
 ) -> None:
     server.password = NEW_PASSWORD
     await tick(hass)
-    diagnostics = await _diagnostics(hass, hass_client, setup_entry)
+    diagnostics = await _diagnostics(hass, hass_client, init_integration)
     assert diagnostics["coordinator"]["last_update_success"] is False

@@ -40,51 +40,53 @@ def _device(hass: HomeAssistant, entry: MockConfigEntry, identifier: str) -> dr.
 
 
 async def test_a_baby_no_longer_in_the_account_can_be_removed(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_ws_client: WebSocketGenerator
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_ws_client: WebSocketGenerator
 ) -> None:
     stale = dr.async_get(hass).async_get_or_create(
-        config_entry_id=setup_entry.entry_id, identifiers={(DOMAIN, GONE_ID)}, name="Gone"
+        config_entry_id=init_integration.entry_id, identifiers={(DOMAIN, GONE_ID)}, name="Gone"
     )
 
-    response = await _remove(hass, hass_ws_client, setup_entry, stale.id)
+    response = await _remove(hass, hass_ws_client, init_integration, stale.id)
 
     assert response["success"], response
     assert dr.async_get(hass).async_get(stale.id) is None
 
 
 async def test_a_baby_still_in_the_account_cannot_be_removed(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_ws_client: WebSocketGenerator
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_ws_client: WebSocketGenerator
 ) -> None:
-    present = _device(hass, setup_entry, BABY_ONE_ID)
+    present = _device(hass, init_integration, BABY_ONE_ID)
 
-    response = await _remove(hass, hass_ws_client, setup_entry, present.id)
+    response = await _remove(hass, hass_ws_client, init_integration, present.id)
 
     assert not response["success"]
     assert dr.async_get(hass).async_get(present.id) is not None
 
 
 async def test_the_account_device_cannot_be_removed(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_ws_client: WebSocketGenerator
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_ws_client: WebSocketGenerator
 ) -> None:
-    account = _device(hass, setup_entry, f"{setup_entry.entry_id}_account")
+    account = _device(hass, init_integration, f"{init_integration.entry_id}_account")
 
-    response = await _remove(hass, hass_ws_client, setup_entry, account.id)
+    response = await _remove(hass, hass_ws_client, init_integration, account.id)
 
     assert not response["success"]
     assert dr.async_get(hass).async_get(account.id) is not None
 
 
 async def test_removing_a_stale_baby_leaves_the_others_alone(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_ws_client: WebSocketGenerator
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_ws_client: WebSocketGenerator
 ) -> None:
     registry = dr.async_get(hass)
     stale = registry.async_get_or_create(
-        config_entry_id=setup_entry.entry_id, identifiers={(DOMAIN, BABY_THREE_ID)}, name="Three"
+        config_entry_id=init_integration.entry_id,
+        identifiers={(DOMAIN, BABY_THREE_ID)},
+        name="Three",
     )
-    before = {d.id for d in dr.async_entries_for_config_entry(registry, setup_entry.entry_id)}
+    before = {d.id for d in dr.async_entries_for_config_entry(registry, init_integration.entry_id)}
 
-    response = await _remove(hass, hass_ws_client, setup_entry, stale.id)
+    response = await _remove(hass, hass_ws_client, init_integration, stale.id)
 
     assert response["success"], response
-    after = {d.id for d in dr.async_entries_for_config_entry(registry, setup_entry.entry_id)}
+    after = {d.id for d in dr.async_entries_for_config_entry(registry, init_integration.entry_id)}
     assert after == before - {stale.id}

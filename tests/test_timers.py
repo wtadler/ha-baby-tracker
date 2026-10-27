@@ -31,20 +31,10 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Sleep,
 )
 
-from .conftest import BABY_ONE, BABY_TWO, FakeServer
+from . import BABY_ONE, BABY_TWO
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, record_payload
-from .helpers import get_baby_device, tick
-from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
-    NOW,
-    device_id,
-    fake_client,
-    posted,
-    press,
-    second_entry,
-    second_server,
-    server,
-    undo,
-)
+from .fake_server import FakeServer
+from .helpers import NOW, device_id, get_baby_device, posted, press, tick, undo
 
 PHONE_SLEEP = "5EE90000-0000-4000-8000-000000000001"
 PHONE_SLEEP_TWO = "5EE90000-0000-4000-8000-000000000002"
@@ -130,7 +120,7 @@ async def nurse(hass: HomeAssistant, freezer: Any, *steps: tuple[float, str]) ->
 
 
 async def test_each_baby_gets_sleep_and_nurse_buttons_and_two_timer_sensors(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
@@ -153,12 +143,12 @@ async def test_each_baby_gets_sleep_and_nurse_buttons_and_two_timer_sensors(
 
 
 async def test_a_running_sleep_synced_from_a_phone_turns_asleep_on_and_shows_its_start(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
 
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     assert state(hass, ASLEEP).state == "on"
     timer = state(hass, SLEEP_TIMER)
@@ -167,11 +157,11 @@ async def test_a_running_sleep_synced_from_a_phone_turns_asleep_on_and_shows_its
 
 
 async def test_a_sleep_a_phone_ends_while_home_assistant_shows_it_running_clears_next_sync(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
     assert state(hass, ASLEEP).state == "on"
 
     phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=40, changed=NOW)
@@ -186,7 +176,7 @@ async def test_a_sleep_a_phone_ends_while_home_assistant_shows_it_running_clears
 
 
 async def test_a_sleep_press_with_no_running_sleep_starts_one_now(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -205,11 +195,11 @@ async def test_a_sleep_press_with_no_running_sleep_starts_one_now(
 
 
 async def test_a_sleep_press_while_a_phone_started_sleep_runs_ends_it_now(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     await press(hass, SLEEP_BUTTON)
 
@@ -221,11 +211,11 @@ async def test_a_sleep_press_while_a_phone_started_sleep_runs_ends_it_now(
     assert record.timestamp == NOW
     assert state(hass, ASLEEP).state == "off"
     assert state(hass, SLEEP_TIMER).state == "unknown"
-    assert len(sleeps(setup_entry, PHONE_SLEEP)) == 1
+    assert len(sleeps(init_integration, PHONE_SLEEP)) == 1
 
 
 async def test_a_second_sleep_press_ends_the_sleep_home_assistant_started(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
@@ -241,12 +231,12 @@ async def test_a_second_sleep_press_ends_the_sleep_home_assistant_started(
 
 
 async def test_a_sleep_press_after_a_phone_already_ended_the_sleep_starts_nothing(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     """The press meant "stop": the sync before the write finds it stopped, so it's done."""
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
     phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=38, changed=minutes(-2))
 
     with pytest.raises(ServiceValidationError) as err:
@@ -258,7 +248,7 @@ async def test_a_sleep_press_after_a_phone_already_ended_the_sleep_starts_nothin
 
 
 async def test_a_sleep_press_after_a_phone_already_started_a_sleep_starts_no_second_one(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     """The press meant "start": the sync before the write finds one running, so it's done."""
     freezer.move_to(NOW)
@@ -274,11 +264,11 @@ async def test_a_sleep_press_after_a_phone_already_started_a_sleep_starts_no_sec
 
 
 async def test_a_failed_end_keeps_the_sleep_running_and_the_next_press_lands_once(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
     server.post_errors.append((BabyTrackerConnectionError("down"), False))
 
     with pytest.raises(HomeAssistantError):
@@ -291,11 +281,11 @@ async def test_a_failed_end_keeps_the_sleep_running_and_the_next_press_lands_onc
 
 
 async def test_a_phone_and_home_assistant_ending_one_sleep_leave_one_finished_sleep(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
     # The phone's end lands after Home Assistant's pre-write sync, just before its post.
     server.before_post.append(
         lambda: phone_ends_sleep(
@@ -304,20 +294,20 @@ async def test_a_phone_and_home_assistant_ending_one_sleep_leave_one_finished_sl
     )
 
     await press(hass, SLEEP_BUTTON)
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
-    [only] = sleeps(setup_entry, PHONE_SLEEP)
+    [only] = sleeps(init_integration, PHONE_SLEEP)
     assert not only.is_running
     assert only.duration == 39  # the phone's end is newer, so it wins
     assert [(n, op) for n, op, _ in posted(server)] == [(1, OP_UPDATE)]
     assert state(hass, ASLEEP).state == "off"
     assert [
-        s for s in setup_entry.runtime_data.engine.records.values() if isinstance(s, Sleep)
+        s for s in init_integration.runtime_data.engine.records.values() if isinstance(s, Sleep)
     ] == [only]
 
 
 async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
@@ -335,7 +325,7 @@ async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
 
 
 async def test_start_sleep_with_a_past_start_and_a_note(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
 
@@ -350,7 +340,7 @@ async def test_start_sleep_with_a_past_start_and_a_note(
 
 
 async def test_start_sleep_with_an_object_id_retries_safely(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     object_id = "5EE90000-0000-4000-8000-0000000000AA"
@@ -363,11 +353,11 @@ async def test_start_sleep_with_an_object_id_retries_safely(
 
 
 async def test_start_sleep_while_a_sleep_is_running_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, "start_sleep")
@@ -377,7 +367,7 @@ async def test_start_sleep_while_a_sleep_is_running_is_refused(
 
 
 async def test_start_sleep_more_than_24_hours_ago_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
 
@@ -389,11 +379,11 @@ async def test_start_sleep_more_than_24_hours_ago_is_refused(
 
 
 async def test_stop_sleep_ends_a_phone_started_sleep_at_the_given_end(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     await call(hass, "stop_sleep", end=minutes(-5).isoformat())
 
@@ -403,7 +393,7 @@ async def test_stop_sleep_ends_a_phone_started_sleep_at_the_given_end(
 
 
 async def test_stop_sleep_defaults_to_now(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_sleep")
@@ -416,11 +406,11 @@ async def test_stop_sleep_defaults_to_now(
 
 
 async def test_stop_sleep_with_no_running_sleep_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-90), duration=30)  # finished
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, "stop_sleep")
@@ -430,11 +420,11 @@ async def test_stop_sleep_with_no_running_sleep_is_a_validation_error(
 
 
 async def test_stop_sleep_with_an_end_before_the_start_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, "stop_sleep", end=minutes(-50).isoformat())
@@ -444,11 +434,11 @@ async def test_stop_sleep_with_an_end_before_the_start_is_refused(
 
 
 async def test_stop_sleep_past_24_hours_writes_24_hours(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-60 * 23))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
     freezer.move_to(minutes(60 * 3))
 
     await call(hass, "stop_sleep")
@@ -458,7 +448,7 @@ async def test_stop_sleep_past_24_hours_writes_24_hours(
 
 
 async def test_two_babies_sleep_timers_run_independently(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
@@ -482,7 +472,7 @@ async def test_two_babies_sleep_timers_run_independently(
 
 
 async def test_nurse_left_then_right_then_right_writes_both_sides_and_finish_side_right(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "right"), (12, "right"))
 
@@ -497,7 +487,7 @@ async def test_nurse_left_then_right_then_right_writes_both_sides_and_finish_sid
 
 
 async def test_a_nursing_timer_posts_nothing_until_it_stops(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "right"), (7, "left"))
 
@@ -506,7 +496,7 @@ async def test_a_nursing_timer_posts_nothing_until_it_stops(
 
 
 async def test_pressing_the_running_side_again_stops_with_only_that_side(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "right"), (9, "right"))
 
@@ -515,7 +505,7 @@ async def test_pressing_the_running_side_again_stops_with_only_that_side(
 
 
 async def test_switching_sides_several_times_adds_up_each_side(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (2, "right"), (5, "left"), (9, "right"), (10, "right"))
 
@@ -526,7 +516,7 @@ async def test_switching_sides_several_times_adds_up_each_side(
 
 
 async def test_ending_on_the_left_sets_finish_side_left(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "right"), (4, "left"), (6, "left"))
 
@@ -535,7 +525,7 @@ async def test_ending_on_the_left_sets_finish_side_left(
 
 
 async def test_the_nursing_timer_sensor_shows_start_side_and_seconds(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     timer = state(hass, NURSING_TIMER)
@@ -556,7 +546,7 @@ async def test_the_nursing_timer_sensor_shows_start_side_and_seconds(
 
 
 async def test_stopping_under_30_seconds_writes_one_minute_on_that_side(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (0.25, "left"))
 
@@ -565,7 +555,7 @@ async def test_stopping_under_30_seconds_writes_one_minute_on_that_side(
 
 
 async def test_each_side_rounds_to_whole_minutes_half_up(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     # Left 89 seconds (1 minute), right 90 seconds (2 minutes).
     await nurse(hass, freezer, (0, "left"), (89 / 60, "right"), (179 / 60, "right"))
@@ -575,7 +565,7 @@ async def test_each_side_rounds_to_whole_minutes_half_up(
 
 
 async def test_a_short_first_side_rounds_to_zero_but_still_counts_the_other(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (0.25, "right"), (10.25, "right"))
 
@@ -584,7 +574,7 @@ async def test_a_short_first_side_rounds_to_zero_but_still_counts_the_other(
 
 
 async def test_a_forgotten_nursing_timer_clamps_each_side_to_240_minutes(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (300, "right"), (600, "right"))
 
@@ -593,11 +583,11 @@ async def test_a_forgotten_nursing_timer_clamps_each_side_to_240_minutes(
 
 
 async def test_a_nurse_press_while_the_baby_is_asleep_is_allowed(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     await nurse(hass, freezer, (0, "left"), (8, "left"))
 
@@ -608,7 +598,7 @@ async def test_a_nurse_press_while_the_baby_is_asleep_is_allowed(
 
 
 async def test_two_babies_nursing_timers_run_independently(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     freezer.move_to(minutes(1))
@@ -625,7 +615,7 @@ async def test_two_babies_nursing_timers_run_independently(
 
 
 async def test_a_failed_nursing_write_keeps_the_timer_and_the_retry_lands_once(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     server.post_errors.append((BabyTrackerConnectionError("down"), False))
@@ -645,7 +635,7 @@ async def test_a_failed_nursing_write_keeps_the_timer_and_the_retry_lands_once(
 
 
 async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     # The post lands but the answer is lost, and the landing check fails too.
@@ -662,7 +652,7 @@ async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice
 
 
 async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "left"))
 
@@ -671,14 +661,14 @@ async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
     [(_, op1, added), (_, op2, deleted)] = posted(server)
     assert (op1, op2) == (OP_ADD, OP_DELETE)
     assert deleted.object_id == added.object_id
-    assert added.object_id not in setup_entry.runtime_data.engine.records
+    assert added.object_id not in init_integration.runtime_data.engine.records
 
 
 # Nursing: the actions
 
 
 async def test_start_switch_and_stop_nursing_actions(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_nursing", side="right")
@@ -696,7 +686,7 @@ async def test_start_switch_and_stop_nursing_actions(
 
 
 async def test_start_nursing_on_the_running_side_changes_nothing_and_on_the_other_switches(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_nursing", side="left")
@@ -715,7 +705,7 @@ async def test_start_nursing_on_the_running_side_changes_nothing_and_on_the_othe
 
 @pytest.mark.parametrize("action", ["switch_nursing_side", "stop_nursing"])
 async def test_switch_or_stop_with_no_nursing_timer_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, action)
@@ -725,7 +715,7 @@ async def test_switch_or_stop_with_no_nursing_timer_is_a_validation_error(
 
 
 async def test_start_nursing_needs_a_side(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     import voluptuous as vol
 
@@ -739,13 +729,13 @@ async def test_start_nursing_needs_a_side(
 
 
 async def test_a_nursing_timer_survives_a_restart(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (4, "right"))
 
-    await hass.config_entries.async_reload(setup_entry.entry_id)
+    await hass.config_entries.async_reload(init_integration.entry_id)
     await hass.async_block_till_done()
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
     timer = state(hass, NURSING_TIMER)
     assert timer.state == NOW.isoformat()
     assert timer.attributes["side"] == "right"
@@ -758,27 +748,30 @@ async def test_a_nursing_timer_survives_a_restart(
 
 
 async def test_a_corrupt_saved_nursing_timer_is_ignored(
-    hass: HomeAssistant, config_entry: MockConfigEntry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    store: Store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.nursing")
+    store: Store = Store(hass, 1, f"{DOMAIN}.{mock_config_entry.entry_id}.nursing")
     await store.async_save({BABY_ONE_ID: {"side": "middle"}})
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
     assert state(hass, NURSING_TIMER).state == "unknown"
 
 
 async def test_removing_the_entry_deletes_the_saved_nursing_timers(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any, hass_storage: dict[str, Any]
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    freezer: Any,
+    hass_storage: dict[str, Any],
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
-    key = f"{DOMAIN}.{setup_entry.entry_id}.nursing"
+    key = f"{DOMAIN}.{init_integration.entry_id}.nursing"
     await hass.async_block_till_done()
     assert key in hass_storage
 
-    await hass.config_entries.async_remove(setup_entry.entry_id)
+    await hass.config_entries.async_remove(init_integration.entry_id)
     await hass.async_block_till_done()
 
     assert key not in hass_storage
@@ -788,9 +781,9 @@ async def test_removing_the_entry_deletes_the_saved_nursing_timers(
 
 
 async def test_a_running_synced_sleep_polls_every_minute_and_then_returns_to_the_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     assert coordinator.update_interval == timedelta(minutes=5)
     start = dt_util.utcnow().replace(microsecond=0) - timedelta(minutes=10)
     phone_sleep(server, start=start)
@@ -813,9 +806,9 @@ async def test_a_running_synced_sleep_polls_every_minute_and_then_returns_to_the
 
 
 async def test_a_nursing_timer_polls_every_minute_and_then_returns_to_the_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     await nurse(hass, freezer, (0, "left"))
     assert coordinator.update_interval == timedelta(minutes=1)
     calls = server.device_list_calls
@@ -829,25 +822,25 @@ async def test_a_nursing_timer_polls_every_minute_and_then_returns_to_the_interv
 
 
 async def test_a_sleep_home_assistant_starts_switches_polling_at_once(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=1)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
     freezer.move_to(minutes(3))
     await press(hass, SLEEP_BUTTON)
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=5)
 
 
 async def test_a_second_account_polls_on_its_own_schedule(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
     freezer: Any,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
 
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=1)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
     assert second_entry.runtime_data.update_interval == timedelta(minutes=5)
 
 
@@ -855,12 +848,12 @@ async def test_a_second_account_polls_on_its_own_schedule(
 
 
 async def test_a_running_sleep_for_one_baby_leaves_the_other_awake(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, PHONE_SLEEP_TWO, start=minutes(-15), baby=BABY_TWO)
 
-    await sync(hass, setup_entry)
+    await sync(hass, init_integration)
 
     assert state(hass, TWO_ASLEEP).state == "on"
     assert state(hass, TWO_SLEEP_TIMER).state == minutes(-15).isoformat()
@@ -872,10 +865,10 @@ async def test_a_running_sleep_for_one_baby_leaves_the_other_awake(
 
 
 async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets_it(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     freezer.move_to(minutes(5))
     async with coordinator.lock:  # a sync is running
         stop = hass.async_create_task(press(hass, NURSE_LEFT))
@@ -889,7 +882,7 @@ async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets
 
 
 async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     gate = asyncio.Event()
@@ -915,9 +908,9 @@ async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
 
 
 async def test_a_saved_nursing_timer_for_a_baby_no_longer_in_the_account_is_dropped(
-    hass: HomeAssistant, config_entry: MockConfigEntry, hass_storage: dict[str, Any]
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, hass_storage: dict[str, Any]
 ) -> None:
-    key = f"{DOMAIN}.{config_entry.entry_id}.nursing"
+    key = f"{DOMAIN}.{mock_config_entry.entry_id}.nursing"
     gone = "99999999-0000-4000-8000-000000000099"
     timer = {
         "object_id": "AB000000-0000-4000-8000-000000000001",
@@ -928,20 +921,20 @@ async def test_a_saved_nursing_timer_for_a_baby_no_longer_in_the_account_is_drop
         "right_seconds": 0,
     }
     hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": {gone: timer}}
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = config_entry.runtime_data
+    coordinator = mock_config_entry.runtime_data
     assert coordinator.update_interval == timedelta(minutes=5)
     assert gone not in coordinator.nursing
     assert gone not in hass_storage[key]["data"]
 
 
 async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     freezer.move_to(NOW)
     with (
         patch.object(coordinator._nursing_store, "async_save", side_effect=OSError("disk full")),

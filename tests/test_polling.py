@@ -19,14 +19,9 @@ from custom_components.nighp_baby_tracker.const import (
     DOMAIN,
 )
 
-from .conftest import EMAIL, PASSWORD, FakeServer
-from .helpers import tick
-from .test_writes import (  # noqa: F401  (fixtures: a fake that can post)
-    fake_client,
-    press,
-    second_server,
-    server,
-)
+from . import EMAIL, PASSWORD
+from .fake_server import FakeServer
+from .helpers import press, tick
 
 # The option an earlier version saved. It is no longer a setting, so these tests spell it out.
 LEGACY_INTERVAL = "scan_interval"
@@ -122,7 +117,7 @@ async def test_a_running_nursing_timer_polls_every_minute_and_five_when_it_stops
 
 
 async def test_a_running_timer_syncs_every_minute(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await press(hass, SLEEP_BUTTON)
     calls = server.device_list_calls
@@ -136,18 +131,18 @@ async def test_a_running_timer_syncs_every_minute(
 
 
 async def test_the_options_flow_has_the_bottle_fields_and_no_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
 
     assert result["type"] is FlowResultType.FORM
     assert {str(key) for key in result["data_schema"].schema} == BOTTLE_OPTIONS
 
 
 async def test_the_options_flow_refuses_an_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
 
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(
@@ -162,16 +157,16 @@ async def test_the_options_flow_refuses_an_interval(
 
 
 async def test_saving_the_options_saves_only_the_bottle(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {CONF_BOTTLE_SIZE: 5.5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert setup_entry.options == {
+    assert init_integration.options == {
         CONF_BOTTLE_SIZE: 5.5,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "pumped",
@@ -195,38 +190,38 @@ async def test_saving_the_options_drops_a_legacy_interval(hass: HomeAssistant) -
 
 
 async def test_an_options_change_leaves_a_running_timer_at_one_minute(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     await press(hass, SLEEP_BUTTON)
 
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     await hass.config_entries.options.async_configure(
         result["flow_id"],
         {CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
     )
     await hass.async_block_till_done()
 
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=1)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
 
 
 async def test_no_update_listener_is_left_to_apply_an_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    assert not setup_entry.update_listeners
+    assert not init_integration.update_listeners
 
 
 async def test_saving_the_options_neither_reloads_nor_syncs(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     calls = server.device_list_calls
 
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     await hass.config_entries.options.async_configure(
         result["flow_id"],
         {CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
     )
     await hass.async_block_till_done()
 
-    assert setup_entry.runtime_data is coordinator
+    assert init_integration.runtime_data is coordinator
     assert server.device_list_calls == calls

@@ -20,7 +20,7 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
 
-from .conftest import BABY_ONE, BABY_TWO, EMAIL, PASSWORD, FakeServer
+from . import BABY_ONE, BABY_TWO, EMAIL, PASSWORD
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -32,6 +32,7 @@ from .factories import (
     baby_payload,
     volume,
 )
+from .fake_server import FakeServer
 from .helpers import get_baby_device, tick
 
 NEW_YORK = ZoneInfo("America/New_York")

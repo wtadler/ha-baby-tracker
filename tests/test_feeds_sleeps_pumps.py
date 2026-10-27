@@ -34,22 +34,9 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
-from .conftest import FakeServer
 from .factories import BABY_ONE_ID, BABY_TWO_ID
-from .helpers import get_baby_device
-from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
-    NOW,
-    OTHER_DEVICES_RECORD,
-    button,
-    device_id,
-    fake_client,
-    posted,
-    press,
-    second_entry,
-    second_server,
-    server,
-    undo,
-)
+from .fake_server import FakeServer
+from .helpers import NOW, OTHER_DEVICES_RECORD, device_id, get_baby_device, posted, press, undo
 
 CAPTURE = json.loads((Path(__file__).parent / "fixtures" / "captured_payloads.json").read_text())
 IGNORED = ("objectID", "timestamp", "note", "baby")
@@ -151,7 +138,7 @@ async def run_valid(hass: HomeAssistant, name: str, **extra: Any) -> None:
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_posts_a_record_matching_the_captured_format(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     await hass.config.async_set_time_zone(CHICAGO)
     _, label, tweaks = VALID[name]
@@ -172,7 +159,7 @@ async def test_each_action_posts_a_record_matching_the_captured_format(
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_posts_an_add_under_the_next_number_with_a_new_uppercase_id(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     await run_valid(hass, name)
     await run_valid(hass, name)
@@ -186,7 +173,7 @@ async def test_each_action_posts_an_add_under_the_next_number_with_a_new_upperca
 
 @pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_goes_to_the_baby_named(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     data, _, _ = VALID[name]
     await call(hass, ACTION_OF.get(name, name), BABY_TWO_ID, **data)
@@ -198,7 +185,7 @@ async def test_each_action_goes_to_the_baby_named(
 
 
 async def test_log_bottle_writes_formula_or_pumped_by_kind(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(hass, "log_bottle", kind="formula", amount=4, unit="fl. oz.")
     await call(hass, "log_bottle", kind="pumped", amount=3, unit="fl. oz.")
@@ -222,21 +209,21 @@ async def test_log_bottle_writes_formula_or_pumped_by_kind(
 )
 async def test_a_milliliter_write_is_refused_with_a_translated_error_and_no_request(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     action: str,
     data: dict[str, Any],
 ) -> None:
-    sent = len(server.calls)  # type: ignore[attr-defined]
+    sent = len(server.calls)
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, action, unit="mL", **data)
     assert raised.value.translation_key == "metric_not_supported"
-    assert server.posted == []  # type: ignore[attr-defined]
-    assert len(server.calls) == sent  # type: ignore[attr-defined]  # not even a sync
+    assert server.posted == []
+    assert len(server.calls) == sent  # not even a sync
 
 
 async def test_log_bottle_in_ounces_writes_english_measure_true(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(hass, "log_bottle", kind="formula", amount=2.5, unit="fl. oz.")
 
@@ -257,7 +244,7 @@ async def test_log_bottle_in_ounces_writes_english_measure_true(
 )
 async def test_log_bottle_without_a_unit_uses_fluid_ounces_in_any_unit_system(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     units: Any,
     unit: str,
@@ -271,7 +258,7 @@ async def test_log_bottle_without_a_unit_uses_fluid_ounces_in_any_unit_system(
 
 
 async def test_log_bottle_time_defaults_to_now_and_reads_a_naive_time_in_the_ha_zone(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -291,7 +278,7 @@ async def test_log_bottle_time_defaults_to_now_and_reads_a_naive_time_in_the_ha_
 
 
 async def test_log_nursing_with_only_one_side_writes_zero_for_the_other(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(hass, "log_nursing", left_minutes=12, end_time="2026-10-26T12:30:00+00:00")
 
@@ -302,7 +289,7 @@ async def test_log_nursing_with_only_one_side_writes_zero_for_the_other(
 
 
 async def test_log_nursing_without_an_end_time_ends_now(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
 
@@ -314,7 +301,7 @@ async def test_log_nursing_without_an_end_time_ends_now(
 
 
 async def test_log_nursing_reads_a_naive_end_time_in_the_ha_zone(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
 
@@ -329,7 +316,7 @@ async def test_log_nursing_reads_a_naive_end_time_in_the_ha_zone(
 
 
 async def test_log_sleep_writes_the_start_and_a_whole_minute_duration(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(
         hass, "log_sleep", start="2026-10-26T01:00:00+00:00", end="2026-10-26T03:30:30+00:00"
@@ -343,7 +330,7 @@ async def test_log_sleep_writes_the_start_and_a_whole_minute_duration(
 
 
 async def test_log_sleep_reads_naive_times_in_the_ha_zone(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
 
@@ -359,7 +346,7 @@ async def test_log_sleep_reads_naive_times_in_the_ha_zone(
 
 
 async def test_log_pump_totals_the_two_sides_and_decodes_back(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(
         hass,
@@ -380,7 +367,7 @@ async def test_log_pump_totals_the_two_sides_and_decodes_back(
 
 
 async def test_log_pump_with_one_side_only_writes_zero_for_the_other(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(hass, "log_pump", left_amount=3, unit="fl. oz.", left_minutes=15)
 
@@ -390,7 +377,7 @@ async def test_log_pump_with_one_side_only_writes_zero_for_the_other(
 
 
 async def test_log_pump_without_a_unit_uses_the_unit_systems_bottle_unit(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     hass.config.units = US_CUSTOMARY_SYSTEM
 
@@ -409,20 +396,20 @@ def key_of(raised: pytest.ExceptionInfo[ServiceValidationError]) -> str | None:
 @pytest.mark.parametrize("amount", [-1, 0, -0.5, math.inf, math.nan])
 async def test_log_bottle_with_a_non_positive_or_non_finite_amount_is_a_validation_error(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     amount: float,
 ) -> None:
-    sent = len(server.calls)  # type: ignore[attr-defined]
+    sent = len(server.calls)
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_bottle", kind="formula", amount=amount, unit="fl. oz.")
     assert key_of(raised) == "invalid_amount"
-    assert server.posted == []  # type: ignore[attr-defined]
-    assert len(server.calls) == sent  # type: ignore[attr-defined]  # not even a sync
+    assert server.posted == []
+    assert len(server.calls) == sent  # not even a sync
 
 
 async def test_log_bottle_with_a_negative_amount_gives_the_translated_amount_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_bottle", kind="formula", amount=-1, unit="fl. oz.")
@@ -431,24 +418,24 @@ async def test_log_bottle_with_a_negative_amount_gives_the_translated_amount_err
 
 @pytest.mark.parametrize("kind", ["milk", "", "FORMULA", "nursing"])
 async def test_log_bottle_with_an_unknown_kind_is_rejected(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, kind: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, kind: str
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", kind=kind, amount=4, unit="fl. oz.")
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 @pytest.mark.parametrize("unit", ["cups", "oz", "ml", "", "L"])
 async def test_log_bottle_with_an_unknown_unit_is_rejected(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, unit: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, unit: str
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", kind="formula", amount=4, unit=unit)
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 async def test_log_bottle_needs_a_kind_and_an_amount(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_bottle", amount=4)
@@ -466,18 +453,18 @@ async def test_log_bottle_needs_a_kind_and_an_amount(
     ids=["end-before-start", "end-equals-start", "one-second-early"],
 )
 async def test_log_sleep_with_the_end_before_the_start_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, start: str, end: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, start: str, end: str
 ) -> None:
-    sent = len(server.calls)  # type: ignore[attr-defined]
+    sent = len(server.calls)
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_sleep", start=start, end=end)
     assert key_of(raised) == "end_before_start"
-    assert server.posted == []  # type: ignore[attr-defined]
-    assert len(server.calls) == sent  # type: ignore[attr-defined]
+    assert server.posted == []
+    assert len(server.calls) == sent
 
 
 async def test_log_sleep_with_a_naive_end_before_a_zoned_start_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     with pytest.raises(ServiceValidationError) as raised:
@@ -488,7 +475,7 @@ async def test_log_sleep_with_a_naive_end_before_a_zoned_start_is_a_validation_e
 
 @pytest.mark.parametrize("missing", ["start", "end"])
 async def test_log_sleep_needs_both_times(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, missing: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, missing: str
 ) -> None:
     data = {"start": "2026-10-26T01:00:00+00:00", "end": "2026-10-26T02:00:00+00:00"}
     del data[missing]
@@ -497,14 +484,14 @@ async def test_log_sleep_needs_both_times(
 
 
 async def test_log_nursing_with_no_minutes_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_nursing")
     assert key_of(raised) == "no_duration"
     with pytest.raises(ServiceValidationError):
         await call(hass, "log_nursing", left_minutes=0, right_minutes=0)
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 # --- the library's limits, checked here first with translated errors ------------------------
@@ -548,21 +535,21 @@ LIMITS = {
 @pytest.mark.parametrize("case", list(LIMITS))
 async def test_a_value_past_a_limit_is_a_translated_validation_error_with_no_sync(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     case: str,
     with_id: bool,
 ) -> None:
     action, data, key = LIMITS[case]
     extra = {"object_id": RETRY_ID} if with_id else {}
-    sent = len(server.calls)  # type: ignore[attr-defined]
+    sent = len(server.calls)
 
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, action, **data, **extra)
 
     assert raised.value.translation_key == key
-    assert server.posted == []  # type: ignore[attr-defined]
-    assert len(server.calls) == sent  # type: ignore[attr-defined]
+    assert server.posted == []
+    assert len(server.calls) == sent
 
 
 @pytest.mark.parametrize(
@@ -577,7 +564,7 @@ async def test_a_value_past_a_limit_is_a_translated_validation_error_with_no_syn
 )
 async def test_the_values_at_the_limits_are_accepted(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     action: str,
     data: dict[str, Any],
@@ -589,7 +576,7 @@ async def test_the_values_at_the_limits_are_accepted(
 
 @pytest.mark.parametrize("action", ["log_bottle", "log_nursing", "log_sleep", "log_pump"])
 async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, action: str
 ) -> None:
     engine_method = {
         "log_bottle": "add_formula",
@@ -606,15 +593,15 @@ async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
 
 
 async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     good = {
         CONF_BOTTLE_SIZE: 32,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "formula",
     }
-    await set_options(hass, setup_entry, **good)
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    await set_options(hass, init_integration, **good)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(
             result["flow_id"], {**good, CONF_BOTTLE_SIZE: 33}
@@ -623,22 +610,22 @@ async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
 
 @pytest.mark.parametrize("minutes", [-1, 2.5, "ten"])
 async def test_log_nursing_rejects_negative_or_fractional_minutes(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, minutes: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, minutes: Any
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_nursing", left_minutes=minutes)
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 async def test_log_nursing_rejects_an_unknown_finish_side(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_nursing", left_minutes=5, finish_side="both")
 
 
 async def test_log_pump_with_no_amount_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_pump", left_minutes=10)
@@ -646,21 +633,21 @@ async def test_log_pump_with_no_amount_is_a_validation_error(
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_pump", left_amount=0, right_amount=0)
     assert key_of(raised) == "invalid_amount"
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 async def test_log_pump_with_a_negative_side_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await call(hass, "log_pump", left_amount=-2, right_amount=5)
     assert key_of(raised) == "invalid_amount"
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 @pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     data, _, _ = VALID[name]
     with pytest.raises(ServiceValidationError) as raised:
@@ -668,7 +655,7 @@ async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
             DOMAIN, ACTION_OF.get(name, name), {"device_id": "nope", **data}, blocking=True
         )
     assert key_of(raised) == "baby_not_found"
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 # --- retries and failures --------------------------------------------------------------------
@@ -676,7 +663,7 @@ async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_a_retry_with_the_same_object_id_does_not_post_twice(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     await run_valid(hass, name, object_id=RETRY_ID)
     await run_valid(hass, name, object_id=RETRY_ID.lower())
@@ -687,43 +674,43 @@ async def test_a_retry_with_the_same_object_id_does_not_post_twice(
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_rejects_an_object_id_that_is_not_a_uuid(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await run_valid(hass, name, object_id="retry-1")
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_an_object_id_that_belongs_to_another_record_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await run_valid(hass, name, object_id=OTHER_DEVICES_RECORD)
     assert key_of(raised) == "object_id_in_use"
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_a_failed_write_raises_a_translated_error_and_changes_no_sensor(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     before = {s.entity_id: (s.state, dict(s.attributes)) for s in hass.states.async_all()}
-    server.post_errors.append((BabyTrackerConnectionError("the service answered 500"), False))  # type: ignore[attr-defined]
+    server.post_errors.append((BabyTrackerConnectionError("the service answered 500"), False))
 
     with pytest.raises(HomeAssistantError) as raised:
         await run_valid(hass, name)
 
     assert raised.value.translation_key == "write_failed"
     assert {s.entity_id: (s.state, dict(s.attributes)) for s in hass.states.async_all()} == before
-    assert server.posted == []  # type: ignore[attr-defined]
+    assert server.posted == []
 
 
 # --- sensors update at once -------------------------------------------------------------------
 
 
 async def test_a_bottle_updates_the_last_feed_sensor_without_a_poll(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     assert hass.states.get(LAST_FEED).state == "unknown"
 
@@ -746,7 +733,7 @@ async def test_a_bottle_updates_the_last_feed_sensor_without_a_poll(
 
 
 async def test_nursing_updates_the_last_feed_sensor_without_a_poll(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(
         hass,
@@ -766,7 +753,7 @@ async def test_nursing_updates_the_last_feed_sensor_without_a_poll(
 
 
 async def test_a_pump_updates_the_last_pump_sensor_without_a_poll(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(
         hass,
@@ -788,7 +775,7 @@ async def test_a_pump_updates_the_last_pump_sensor_without_a_poll(
 
 
 async def test_a_sleep_updates_the_last_sleep_sensor_and_leaves_the_baby_awake(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     assert hass.states.get(ASLEEP).state == "off"
 
@@ -803,7 +790,7 @@ async def test_a_sleep_updates_the_last_sleep_sensor_and_leaves_the_baby_awake(
 
 
 async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     # Metric display: the sensor still shows today's volume in mL, converted from the ounces.
     hass.config.units = METRIC_SYSTEM
@@ -829,7 +816,7 @@ async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
 
 
 async def test_nursing_counts_as_a_feed_today_and_adds_no_bottle_volume(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -841,7 +828,7 @@ async def test_nursing_counts_as_a_feed_today_and_adds_no_bottle_volume(
 
 
 async def test_a_pump_and_a_sleep_are_not_feeds_today(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -859,7 +846,7 @@ async def test_a_pump_and_a_sleep_are_not_feeds_today(
 
 
 async def test_undo_removes_a_bottle_and_the_sensor_goes_back(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await call(
         hass,
@@ -881,12 +868,12 @@ async def test_undo_removes_a_bottle_and_the_sensor_goes_back(
 
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_undo_removes_a_record_of_every_new_type(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, name: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
 ) -> None:
     await run_valid(hass, name)
     added = only_record(server)
 
-    await undo(hass, config_entry_id=setup_entry.entry_id)
+    await undo(hass, config_entry_id=init_integration.entry_id)
 
     [_, (_, op, deleted)] = posted(server)
     assert op == 2
@@ -895,7 +882,7 @@ async def test_undo_removes_a_record_of_every_new_type(
 
 
 async def test_undo_by_record_id_removes_a_bottle_among_other_writes(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await run_valid(hass, "log_bottle", object_id=RETRY_ID)
     await run_valid(hass, "log_sleep")
@@ -910,7 +897,7 @@ async def test_undo_by_record_id_removes_a_bottle_among_other_writes(
 
 
 async def test_each_baby_gets_a_bottle_button(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
@@ -930,13 +917,13 @@ async def test_each_baby_gets_a_bottle_button(
 
 async def test_a_bottle_press_with_a_4_oz_formula_option_logs_a_4_oz_formula_bottle(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     freezer: Any,
 ) -> None:
     freezer.move_to(NOW)
     hass.config_entries.async_update_entry(
-        setup_entry,
+        init_integration,
         options={CONF_BOTTLE_SIZE: 4, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
     )
 
@@ -958,7 +945,7 @@ async def test_a_bottle_press_with_a_4_oz_formula_option_logs_a_4_oz_formula_bot
 )
 async def test_a_bottle_press_with_no_options_logs_a_4_oz_formula_bottle_in_any_unit_system(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     units: Any,
     volume: Volume,
@@ -973,18 +960,18 @@ async def test_a_bottle_press_with_no_options_logs_a_4_oz_formula_bottle_in_any_
 
 
 async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await press(hass, BOTTLE_BUTTON)
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
     await press(hass, BOTTLE_BUTTON)
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 6, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
     )
     await press(hass, BOTTLE_BUTTON)
@@ -996,22 +983,22 @@ async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
 
 
 async def test_changing_the_bottle_options_does_not_reload_the_entry(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
 
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 
-    assert setup_entry.runtime_data is coordinator
-    assert setup_entry.options[CONF_BOTTLE_SIZE] == 5
+    assert init_integration.runtime_data is coordinator
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 5
 
 
 async def test_a_bottle_press_is_for_its_own_baby_and_counts_in_todays_totals(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     hass.config.units = METRIC_SYSTEM
@@ -1028,11 +1015,11 @@ async def test_a_bottle_press_is_for_its_own_baby_and_counts_in_todays_totals(
 
 
 async def test_a_bottle_press_with_bad_saved_options_falls_back_to_the_defaults(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     hass.config.units = METRIC_SYSTEM
     hass.config_entries.async_update_entry(
-        setup_entry,
+        init_integration,
         options={CONF_BOTTLE_SIZE: -3, CONF_BOTTLE_UNIT: "cups", CONF_BOTTLE_TYPE: "milk"},
     )
 
@@ -1044,28 +1031,28 @@ async def test_a_bottle_press_with_bad_saved_options_falls_back_to_the_defaults(
 
 
 async def test_a_bottle_press_with_milliliter_options_is_refused_with_a_translated_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 4, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
     )
-    sent = len(server.calls)  # type: ignore[attr-defined]
+    sent = len(server.calls)
 
     with pytest.raises(ServiceValidationError) as raised:
         await press(hass, BOTTLE_BUTTON)
 
     assert raised.value.translation_key == "metric_not_supported"
-    assert server.posted == []  # type: ignore[attr-defined]
-    assert len(server.calls) == sent  # type: ignore[attr-defined]
+    assert server.posted == []
+    assert len(server.calls) == sent
 
 
 async def test_a_failed_bottle_press_raises_a_translated_error_and_changes_no_sensor(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     before = hass.states.get(LAST_FEED)
-    server.post_errors.append((BabyTrackerConnectionError("the service answered 500"), False))  # type: ignore[attr-defined]
+    server.post_errors.append((BabyTrackerConnectionError("the service answered 500"), False))
 
     with pytest.raises(HomeAssistantError) as raised:
         await press(hass, BOTTLE_BUTTON)
@@ -1075,7 +1062,7 @@ async def test_a_failed_bottle_press_raises_a_translated_error_and_changes_no_se
 
 
 async def test_two_bottle_presses_make_two_records(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await press(hass, BOTTLE_BUTTON)
     await press(hass, BOTTLE_BUTTON)
@@ -1101,11 +1088,11 @@ def schema_defaults(result: Any) -> dict[str, Any]:
     ids=["us-customary", "metric"],
 )
 async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, units: Any, expected: tuple[Any, ...]
+    hass: HomeAssistant, init_integration: MockConfigEntry, units: Any, expected: tuple[Any, ...]
 ) -> None:
     hass.config.units = units
 
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
 
     defaults = schema_defaults(result)
     assert (
@@ -1116,14 +1103,14 @@ async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
 
 
 async def test_options_show_the_saved_bottle(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     hass.config_entries.async_update_entry(
-        setup_entry,
+        init_integration,
         options={CONF_BOTTLE_SIZE: 90, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "pumped"},
     )
 
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
 
     defaults = schema_defaults(result)
     assert (defaults[CONF_BOTTLE_SIZE], defaults[CONF_BOTTLE_UNIT]) == (90, "mL")
@@ -1131,15 +1118,15 @@ async def test_options_show_the_saved_bottle(
 
 
 async def test_options_save_only_the_bottle(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 5.5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 
-    assert setup_entry.options == {
+    assert init_integration.options == {
         CONF_BOTTLE_SIZE: 5.5,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "pumped",
@@ -1147,17 +1134,17 @@ async def test_options_save_only_the_bottle(
 
 
 async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_formula(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     hass.config.units = METRIC_SYSTEM
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     defaults = schema_defaults(result)
 
-    await set_options(hass, setup_entry, **defaults)
+    await set_options(hass, init_integration, **defaults)
 
-    assert setup_entry.options[CONF_BOTTLE_SIZE] == 4
-    assert setup_entry.options[CONF_BOTTLE_UNIT] == "fl. oz."
-    assert setup_entry.options[CONF_BOTTLE_TYPE] == "formula"
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 4
+    assert init_integration.options[CONF_BOTTLE_UNIT] == "fl. oz."
+    assert init_integration.options[CONF_BOTTLE_TYPE] == "formula"
 
 
 @pytest.mark.parametrize(
@@ -1171,14 +1158,14 @@ async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_f
     ids=["zero-size", "negative-size", "unknown-unit", "unknown-type"],
 )
 async def test_options_reject_a_bad_bottle(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, bad: dict[str, Any]
+    hass: HomeAssistant, init_integration: MockConfigEntry, bad: dict[str, Any]
 ) -> None:
     good = {
         CONF_BOTTLE_SIZE: 4,
         CONF_BOTTLE_UNIT: "fl. oz.",
         CONF_BOTTLE_TYPE: "formula",
     }
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(result["flow_id"], {**good, **bad})
 
@@ -1188,14 +1175,14 @@ async def test_options_reject_a_bad_bottle(
 
 async def test_the_bottle_button_of_each_account_uses_that_accounts_options(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
     server: FakeServer,
     second_server: FakeServer,
 ) -> None:
     await set_options(
         hass,
-        setup_entry,
+        init_integration,
         **{CONF_BOTTLE_SIZE: 7, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 

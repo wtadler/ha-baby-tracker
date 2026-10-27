@@ -22,8 +22,9 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     ProtocolError,
 )
 
-from .conftest import BABY_ONE, NEW_PASSWORD, FakeServer
+from . import BABY_ONE, NEW_PASSWORD
 from .factories import DEVICE_A, DEVICE_B, OP_DELETE, at, volume
+from .fake_server import FakeServer
 from .helpers import tick
 
 DIAPER = "sensor.baby_one_last_diaper"
@@ -36,19 +37,21 @@ def _storage_key(entry: MockConfigEntry) -> str:
 # Setup
 
 
-async def test_setup_loads_the_entry(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
-    assert setup_entry.state is ConfigEntryState.LOADED
+async def test_setup_loads_the_entry(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    assert init_integration.state is ConfigEntryState.LOADED
 
 
 async def test_setup_backfills_each_device_from_the_start(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     assert server.reads_from_start() == [(DEVICE_A, 0)]
     assert hass.states.get(DIAPER).state != "unknown"
 
 
 async def test_first_setup_pages_through_a_long_log_in_one_sync(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     for number in range(1, 1201):
         server.add_record(
@@ -58,26 +61,26 @@ async def test_first_setup_pages_through_a_long_log_in_one_sync(
             when=at(number),
             status=0,
         )
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
     assert server.device_list_calls == 1
     assert [since for _, since in server.transaction_reads] == [0, 500, 1000]
     assert hass.states.get(DIAPER).state == at(1200).isoformat()
 
 
 async def test_the_client_signs_in_as_its_own_device_named_home_assistant(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     sign_in = server.sign_ins[0]
     assert sign_in["device_name"] == "Home Assistant"
-    assert sign_in["device_uuid"] == setup_entry.data[CONF_DEVICE_UUID]
+    assert sign_in["device_uuid"] == init_integration.data[CONF_DEVICE_UUID]
 
 
 async def test_the_client_uses_its_own_http_session(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     session = server.clients[0].kwargs["session"]
     assert session is not async_get_clientsession(hass)
@@ -85,52 +88,52 @@ async def test_the_client_uses_its_own_http_session(
 
 
 async def test_a_connection_error_at_setup_retries_later(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.sign_in_error = BabyTrackerConnectionError("down")
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
     assert server.open_clients == []
     assert all(client.kwargs["session"].closed for client in server.clients)
 
 
 async def test_a_reply_in_the_wrong_shape_at_setup_retries_later(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.request_error = ProtocolError("odd")
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_setup_retries_and_then_loads_once_the_server_is_back(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.sign_in_error = BabyTrackerConnectionError("down")
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
 
     server.sign_in_error = None
     await tick(hass, minutes=2)
     await hass.async_block_till_done(wait_background_tasks=True)
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
 
 
 async def test_a_rejected_login_at_setup_starts_reauth(
-    hass: HomeAssistant, config_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.SETUP_ERROR
+    assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
     assert [flow["context"]["source"] for flow in flows] == ["reauth"]
     assert server.open_clients == []
@@ -140,7 +143,7 @@ async def test_a_rejected_login_at_setup_starts_reauth(
 
 
 async def test_a_newer_record_from_another_device_is_fetched_by_its_own_log(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_record(DEVICE_B, "Diaper", "D2000000-0000-4000-8000-000000000001", when=at(60))
     await tick(hass)
@@ -149,7 +152,7 @@ async def test_a_newer_record_from_another_device_is_fetched_by_its_own_log(
 
 
 async def test_an_idle_sync_fetches_no_transactions(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     reads = len(server.transaction_reads)
     calls = server.device_list_calls
@@ -159,7 +162,7 @@ async def test_an_idle_sync_fetches_no_transactions(
 
 
 async def test_a_sync_reads_only_what_is_newer_than_what_was_seen(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", "D3000000-0000-4000-8000-000000000001", when=at(30))
     await tick(hass)
@@ -167,15 +170,15 @@ async def test_a_sync_reads_only_what_is_newer_than_what_was_seen(
 
 
 async def test_syncs_run_on_the_default_five_minute_interval(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=5)
 
 
 async def test_engine_use_is_serialized_behind_one_lock(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = setup_entry.runtime_data
+    coordinator = init_integration.runtime_data
     calls = server.device_list_calls
 
     async with coordinator.lock:
@@ -193,13 +196,13 @@ async def test_engine_use_is_serialized_behind_one_lock(
 
 
 async def test_an_update_failure_makes_entities_unavailable_then_recovers(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     before = hass.states.get(DIAPER).state
     server.request_error = BabyTrackerConnectionError("down")
     await tick(hass)
     assert hass.states.get(DIAPER).state == "unavailable"
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
 
     server.request_error = None
     await tick(hass)
@@ -207,7 +210,7 @@ async def test_an_update_failure_makes_entities_unavailable_then_recovers(
 
 
 async def test_a_protocol_error_during_an_update_also_recovers(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.request_error = ProtocolError("odd")
     await tick(hass)
@@ -218,7 +221,7 @@ async def test_a_protocol_error_during_an_update_also_recovers(
 
 
 async def test_records_that_arrived_during_an_outage_show_up_after_it(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.request_error = BabyTrackerConnectionError("down")
     server.add_record(DEVICE_A, "Diaper", "D4000000-0000-4000-8000-000000000001", when=at(90))
@@ -229,7 +232,7 @@ async def test_records_that_arrived_during_an_outage_show_up_after_it(
 
 
 async def test_a_password_that_stops_working_starts_reauth(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
     await tick(hass)
@@ -240,7 +243,7 @@ async def test_a_password_that_stops_working_starts_reauth(
 
 
 async def test_an_auth_error_raised_mid_update_starts_reauth(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.request_error = AuthenticationError("session rejected")
     await tick(hass)
@@ -252,47 +255,47 @@ async def test_an_auth_error_raised_mid_update_starts_reauth(
 
 
 async def test_the_synced_state_is_saved(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_storage: dict[str, Any]
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_storage: dict[str, Any]
 ) -> None:
-    saved = hass_storage[_storage_key(setup_entry)]["data"]
+    saved = hass_storage[_storage_key(init_integration)]["data"]
     assert saved["last_seen"] == {DEVICE_A: 2}
     assert len(saved["records"]) == 2
 
 
 async def test_new_records_are_saved_after_a_sync(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
 ) -> None:
     server.add_record(DEVICE_B, "Diaper", "D5000000-0000-4000-8000-000000000001", when=at(45))
     await tick(hass)
-    saved = hass_storage[_storage_key(setup_entry)]["data"]
+    saved = hass_storage[_storage_key(init_integration)]["data"]
     assert saved["last_seen"] == {DEVICE_A: 2, DEVICE_B: 1}
 
 
 async def test_a_restart_loads_the_saved_state_and_does_not_reload_history(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
     server.transaction_reads.clear()
 
-    assert await hass.config_entries.async_setup(setup_entry.entry_id)
+    assert await hass.config_entries.async_setup(init_integration.entry_id)
     await hass.async_block_till_done()
 
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
     assert server.transaction_reads == []
     assert hass.states.get(DIAPER).state == at(0).isoformat()
 
 
 async def test_a_restart_fetches_only_what_is_newer(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
     server.add_record(DEVICE_A, "Diaper", "D6000000-0000-4000-8000-000000000001", when=at(120))
     server.transaction_reads.clear()
 
-    assert await hass.config_entries.async_setup(setup_entry.entry_id)
+    assert await hass.config_entries.async_setup(init_integration.entry_id)
     await hass.async_block_till_done()
 
     assert server.transaction_reads == [(DEVICE_A, 2)]
@@ -311,21 +314,21 @@ async def test_a_restart_fetches_only_what_is_newer(
 )
 async def test_corrupt_storage_falls_back_to_a_fresh_backfill_with_a_warning(
     hass: HomeAssistant,
-    config_entry: MockConfigEntry,
+    mock_config_entry: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
     caplog: pytest.LogCaptureFixture,
     corrupt: Any,
 ) -> None:
-    key = _storage_key(config_entry)
+    key = _storage_key(mock_config_entry)
     hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": corrupt}
-    config_entry.add_to_hass(hass)
+    mock_config_entry.add_to_hass(hass)
 
     with caplog.at_level(logging.WARNING):
-        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
     assert server.reads_from_start() == [(DEVICE_A, 0)]
     assert hass.states.get(DIAPER).state == at(0).isoformat()
     assert any(
@@ -336,35 +339,35 @@ async def test_corrupt_storage_falls_back_to_a_fresh_backfill_with_a_warning(
 
 
 async def test_removing_the_entry_removes_its_saved_state(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_storage: dict[str, Any]
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_storage: dict[str, Any]
 ) -> None:
-    key = _storage_key(setup_entry)
+    key = _storage_key(init_integration)
     assert key in hass_storage
 
-    await hass.config_entries.async_remove(setup_entry.entry_id)
+    await hass.config_entries.async_remove(init_integration.entry_id)
     await hass.async_block_till_done()
     assert key not in hass_storage
 
 
 async def test_unloading_keeps_the_saved_state(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, hass_storage: dict[str, Any]
+    hass: HomeAssistant, init_integration: MockConfigEntry, hass_storage: dict[str, Any]
 ) -> None:
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
-    assert _storage_key(setup_entry) in hass_storage
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    assert _storage_key(init_integration) in hass_storage
 
 
 # Unloading
 
 
 async def test_unloading_stops_syncing_and_frees_the_client(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     session = server.clients[0].kwargs["session"]
 
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
 
-    assert setup_entry.state is ConfigEntryState.NOT_LOADED
+    assert init_integration.state is ConfigEntryState.NOT_LOADED
     assert server.open_clients == []
     assert session.closed
 
@@ -374,32 +377,32 @@ async def test_unloading_stops_syncing_and_frees_the_client(
 
 
 async def test_entities_go_unavailable_on_unload(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get(DIAPER).state == "unavailable"
 
 
 async def test_an_entry_can_be_set_up_again_after_unloading(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    assert await hass.config_entries.async_unload(setup_entry.entry_id)
-    assert await hass.config_entries.async_setup(setup_entry.entry_id)
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    assert await hass.config_entries.async_setup(init_integration.entry_id)
     await hass.async_block_till_done()
 
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
     assert hass.states.get(DIAPER).state == at(0).isoformat()
     assert len(server.open_clients) == 1
 
 
 async def test_repeated_reloads_leave_one_open_client(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     for _ in range(2):
-        assert await hass.config_entries.async_reload(setup_entry.entry_id)
+        assert await hass.config_entries.async_reload(init_integration.entry_id)
         await hass.async_block_till_done()
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
     assert len(server.open_clients) == 1
 
 
@@ -407,7 +410,7 @@ async def test_repeated_reloads_leave_one_open_client(
 
 
 async def test_a_deleted_record_from_another_device_is_dropped(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_record(
         DEVICE_B,
@@ -432,7 +435,7 @@ async def test_a_deleted_record_from_another_device_is_dropped(
 
 
 async def test_volumes_in_the_sync_format_do_not_break_a_sync(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_record(
         DEVICE_A,
@@ -442,7 +445,7 @@ async def test_volumes_in_the_sync_format_do_not_break_a_sync(
         amount=volume(4),
     )
     await tick(hass)
-    assert setup_entry.state is ConfigEntryState.LOADED
+    assert init_integration.state is ConfigEntryState.LOADED
     assert hass.states.get("sensor.baby_one_last_feed").state == at(15).isoformat()
 
 
@@ -451,7 +454,7 @@ async def test_volumes_in_the_sync_format_do_not_break_a_sync(
 
 async def test_saved_state_from_the_earlier_library_version_still_loads(
     hass: HomeAssistant,
-    config_entry: MockConfigEntry,
+    mock_config_entry: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
 ) -> None:
@@ -467,7 +470,7 @@ async def test_saved_state_from_the_earlier_library_version_still_loads(
             "payload": payload,
         }
 
-    key = _storage_key(config_entry)
+    key = _storage_key(mock_config_entry)
     state = {
         "version": 3,
         "last_seen": {DEVICE_A: 2},
@@ -478,11 +481,11 @@ async def test_saved_state_from_the_earlier_library_version_still_loads(
         "tombstones": [],
     }
     hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": state}
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
     assert server.transaction_reads == []
     assert hass.states.get(DIAPER).state == at(10).isoformat()
 
@@ -500,7 +503,7 @@ async def test_saved_state_from_the_earlier_library_version_still_loads(
 )
 async def test_a_failing_save_does_not_replace_the_sync_error(
     hass: HomeAssistant,
-    config_entry: MockConfigEntry,
+    mock_config_entry: MockConfigEntry,
     server: FakeServer,
     caplog: pytest.LogCaptureFixture,
     error: Exception,
@@ -510,13 +513,13 @@ async def test_a_failing_save_does_not_replace_the_sync_error(
     # Device A syncs (so there is progress to save), then device B fails.
     server.add_record(DEVICE_B, "Diaper", "D9000000-0000-4000-8000-000000000001", when=at(5))
     server.read_errors[DEVICE_B] = error
-    config_entry.add_to_hass(hass)
+    mock_config_entry.add_to_hass(hass)
 
     with patch("homeassistant.helpers.storage.Store.async_save", side_effect=OSError("disk full")):
-        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    assert config_entry.state is expected_state
+    assert mock_config_entry.state is expected_state
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
     assert bool(flows) is reauth
     assert "disk full" in caplog.text

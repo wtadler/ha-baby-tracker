@@ -23,16 +23,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.nighp_baby_tracker.const import DOMAIN
 
 from .factories import BABY_ONE_ID, BABY_THREE_ID
-from .test_pump_account import account_device
-from .test_writes import (  # noqa: F401  (fixtures: a fake that can post, and a second account)
-    device_id,
-    fake_client,
-    posted,
-    press,
-    second_entry,
-    second_server,
-    server,
-)
+from .helpers import account_device, device_id, posted, press
 
 INTEGRATION = Path(__file__).resolve().parent.parent / "custom_components" / "nighp_baby_tracker"
 NOW = datetime(2026, 10, 26, 15, 0, 0, tzinfo=UTC)
@@ -82,7 +73,7 @@ async def _call(hass: HomeAssistant, action: str, data: dict[str, Any]) -> None:
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_works_with_device_id_and_raises_no_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, freezer: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any, action: str
 ) -> None:
     await _prepare(hass, action, freezer)
     before = _effect(hass, server)
@@ -97,7 +88,7 @@ async def test_a_baby_action_works_with_device_id_and_raises_no_repair(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_the_deprecated_baby_field_still_works_and_raises_a_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, freezer: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any, action: str
 ) -> None:
     await _prepare(hass, action, freezer)
     before = _effect(hass, server)
@@ -118,7 +109,7 @@ async def test_the_deprecated_baby_field_still_works_and_raises_a_repair(
 
 
 async def test_using_the_alias_again_keeps_a_single_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     for _ in range(3):
         await _call(hass, "log_diaper", {"baby": device_id(hass, BABY_ONE_ID), "type": "wet"})
@@ -127,7 +118,7 @@ async def test_using_the_alias_again_keeps_a_single_repair(
 
 
 async def test_each_action_gets_its_own_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     baby = device_id(hass, BABY_ONE_ID)
     await _call(hass, "log_diaper", {"baby": baby, "type": "wet"})
@@ -141,7 +132,7 @@ async def test_each_action_gets_its_own_repair(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_with_both_fields_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
 ) -> None:
     baby = device_id(hass, BABY_ONE_ID)
     with pytest.raises(vol.Invalid, match="at most one"):
@@ -152,7 +143,7 @@ async def test_a_baby_action_with_both_fields_is_refused(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_with_no_target_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, action, dict(BABY_ACTIONS[action][0]))
@@ -161,7 +152,7 @@ async def test_a_baby_action_with_no_target_is_refused(
 
 @pytest.mark.parametrize("field", ["device_id", "baby"])
 async def test_an_unknown_baby_device_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, field: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, field: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await _call(hass, "log_diaper", {field: "0" * 32, "type": "wet"})
@@ -171,24 +162,24 @@ async def test_an_unknown_baby_device_is_a_validation_error(
 
 @pytest.mark.parametrize("field", ["device_id", "baby"])
 async def test_the_account_device_is_not_a_baby(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, field: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, field: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await _call(
             hass,
             "log_diaper",
-            {field: account_device(hass, setup_entry).id, "type": "wet"},
+            {field: account_device(hass, init_integration).id, "type": "wet"},
         )
     assert raised.value.translation_key == "baby_not_found"
     assert server.posted == []
 
 
 async def test_a_baby_of_an_unloaded_account_says_the_account_is_not_loaded(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
 ) -> None:
     baby = device_id(hass, BABY_ONE_ID)
-    await hass.config_entries.async_unload(setup_entry.entry_id)
-    assert setup_entry.state is ConfigEntryState.NOT_LOADED
+    await hass.config_entries.async_unload(init_integration.entry_id)
+    assert init_integration.state is ConfigEntryState.NOT_LOADED
 
     with pytest.raises(ServiceValidationError) as raised:
         await _call(hass, "log_diaper", {"device_id": baby, "type": "wet"})
@@ -198,7 +189,7 @@ async def test_a_baby_of_an_unloaded_account_says_the_account_is_not_loaded(
 
 async def test_the_device_id_of_a_second_account_writes_to_that_account(
     hass: HomeAssistant,
-    setup_entry: MockConfigEntry,
+    init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
     server: Any,
     second_server: Any,
@@ -215,9 +206,9 @@ async def test_the_device_id_of_a_second_account_writes_to_that_account(
 
 
 async def test_log_pump_takes_an_account_with_config_entry_id(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
 ) -> None:
-    await _call(hass, "log_pump", {"config_entry_id": setup_entry.entry_id, "left_amount": 3})
+    await _call(hass, "log_pump", {"config_entry_id": init_integration.entry_id, "left_amount": 3})
 
     assert len(server.posted) == 1
     assert _issues(hass) == []
@@ -225,9 +216,11 @@ async def test_log_pump_takes_an_account_with_config_entry_id(
 
 @pytest.mark.parametrize("alias", ["device", "baby"])
 async def test_log_pump_still_takes_a_device_and_raises_a_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, alias: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, alias: str
 ) -> None:
-    await _call(hass, "log_pump", {alias: account_device(hass, setup_entry).id, "left_amount": 3})
+    await _call(
+        hass, "log_pump", {alias: account_device(hass, init_integration).id, "left_amount": 3}
+    )
 
     assert len(server.posted) == 1
     issue = ir.async_get(hass).async_get_issue(DOMAIN, f"deprecated_log_pump_{alias}")
@@ -244,7 +237,7 @@ async def test_log_pump_still_takes_a_device_and_raises_a_repair(
 
 @pytest.mark.parametrize("alias", ["device", "baby"])
 async def test_log_pump_with_a_babys_device_still_reaches_the_account(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, alias: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, alias: str
 ) -> None:
     await _call(hass, "log_pump", {alias: device_id(hass, BABY_ONE_ID), "left_amount": 3})
 
@@ -256,11 +249,11 @@ async def test_log_pump_with_a_babys_device_still_reaches_the_account(
     [("config_entry_id", "device"), ("config_entry_id", "baby"), ("device", "baby")],
 )
 async def test_log_pump_with_two_targets_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, fields: tuple[str, str]
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, fields: tuple[str, str]
 ) -> None:
     values = {
-        "config_entry_id": setup_entry.entry_id,
-        "device": account_device(hass, setup_entry).id,
+        "config_entry_id": init_integration.entry_id,
+        "device": account_device(hass, init_integration).id,
         "baby": device_id(hass, BABY_ONE_ID),
     }
     with pytest.raises(vol.Invalid, match="at most one"):
@@ -271,7 +264,7 @@ async def test_log_pump_with_two_targets_is_refused(
 
 
 async def test_log_pump_with_no_target_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, "log_pump", {"left_amount": 3})
@@ -298,7 +291,7 @@ def _deleted(server: Any) -> list[str]:
 
 
 async def test_undo_with_device_id_removes_that_babys_latest_write(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
 ) -> None:
     first, _ = await _two_diapers(hass, freezer, server)
 
@@ -309,18 +302,18 @@ async def test_undo_with_device_id_removes_that_babys_latest_write(
 
 
 async def test_undo_with_config_entry_id_removes_the_accounts_latest_write(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
 ) -> None:
     _, second = await _two_diapers(hass, freezer, server)
 
-    await _call(hass, "undo", {"config_entry_id": setup_entry.entry_id})
+    await _call(hass, "undo", {"config_entry_id": init_integration.entry_id})
 
     assert _deleted(server) == [second]
     assert _issues(hass) == []
 
 
 async def test_undo_still_takes_baby_and_raises_a_repair(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
 ) -> None:
     first, _ = await _two_diapers(hass, freezer, server)
 
@@ -338,7 +331,7 @@ async def test_undo_still_takes_baby_and_raises_a_repair(
 
 
 async def test_undo_with_no_target_is_refused(
-    hass: HomeAssistant, setup_entry: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, "undo", {})
@@ -349,7 +342,7 @@ async def test_undo_with_no_target_is_refused(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_an_unknown_account_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
 ) -> None:
     data = {
         "config_entry_id": "no-such-entry",
@@ -364,11 +357,11 @@ async def test_an_unknown_account_is_a_validation_error(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_an_account_that_is_not_loaded_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
 ) -> None:
-    await hass.config_entries.async_unload(setup_entry.entry_id)
+    await hass.config_entries.async_unload(init_integration.entry_id)
     data = {
-        "config_entry_id": setup_entry.entry_id,
+        "config_entry_id": init_integration.entry_id,
         **({"left_amount": 3} if action == "log_pump" else {}),
     }
     with pytest.raises(ServiceValidationError) as raised:
@@ -379,7 +372,7 @@ async def test_an_account_that_is_not_loaded_is_a_validation_error(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_another_integrations_entry_is_a_validation_error(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
 ) -> None:
     other = MockConfigEntry(domain="other_integration")
     other.add_to_hass(hass)
