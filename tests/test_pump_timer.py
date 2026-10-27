@@ -286,8 +286,8 @@ async def test_the_stopped_pump_is_the_last_pump_and_can_be_undone(
     assert last.state == NOW.isoformat()
     assert last.attributes["left_duration_minutes"] == 8
     assert last.attributes["right_duration_minutes"] == 8
-    assert "amount" not in last.attributes  # an amount of 0 is no volume, not a 0 fl. oz. pump
-    assert "unit" not in last.attributes
+    assert last.attributes["amount"] is None  # an amount of 0 is no volume, not a 0 fl. oz. pump
+    assert last.attributes["unit"] is None
 
     await undo(hass, config_entry_id=init_integration.entry_id)
 
@@ -390,7 +390,7 @@ async def test_stop_pump_with_an_amount_writes_the_total_and_no_side_amounts(
     assert payload["sides"] == 0
     last = state(hass, LAST_PUMP)
     assert last.attributes["amount"] == 4.5
-    assert "left_amount" not in last.attributes
+    assert last.attributes["left_amount"] is None
 
 
 async def test_stop_pump_saves_a_note(
@@ -893,8 +893,8 @@ async def test_a_zero_amount_pump_from_the_app_shows_no_volume_and_adds_to_no_to
     last = state(hass, LAST_PUMP)
     assert last.state != "unknown"
     assert last.attributes["left_duration_minutes"] == 9
-    assert "amount" not in last.attributes
-    assert "unit" not in last.attributes
+    assert last.attributes["amount"] is None
+    assert last.attributes["unit"] is None
     assert state(hass, "sensor.baby_one_bottle_volume_today").state == "0.0"
     assert state(hass, "sensor.baby_one_feeds_today").state == "0"
 
