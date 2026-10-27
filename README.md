@@ -197,6 +197,21 @@ sends no notifications; the blueprint does, from the timer sensors.
 - A sync failure mid-timer (running, then unavailable, then unknown) still ends the activity; going unavailable and back to the same running timer leaves it alone.
 - The blueprint runs queued, so a start, a switch, and an end are sent in order.
 
+## Removing a baby
+
+A baby that has left your account can be deleted from its device page (**Delete** in the device's
+menu). A baby still on the account can't be deleted, because the next sync would add it back, and
+neither can the account's own device.
+
+A baby removed from the account becomes deletable from its device page only after the
+integration reloads or Home Assistant restarts.
+
+## Diagnostics
+
+On the integration's page, choose **Download diagnostics** to attach to a bug report. It holds the
+settings, the sync state, and counts of records. The email, password, and device ID are redacted,
+and it holds no baby's name or ID and no notes.
+
 ## Removal
 
 1. Go to **Settings > Devices & services**, open **Baby Tracker (Nighp)**, and choose **Delete**.

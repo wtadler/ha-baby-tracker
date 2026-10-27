@@ -5,12 +5,10 @@ from dataclasses import dataclass
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
+from .entity import BabyTrackerBabyEntity
 from .writes import (
     async_log_configured_bottle,
     async_log_diaper,
@@ -80,7 +78,7 @@ async def async_setup_entry(
 
     @callback
     def _add_new_babies() -> None:
-        new = [baby_id for baby_id in coordinator.data if baby_id not in known]
+        new = [baby_id for baby_id in coordinator.data.babies if baby_id not in known]
         known.update(new)
         async_add_entities(
             BabyTrackerButton(coordinator, description, baby_id)
@@ -92,35 +90,10 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))
 
 
-class BabyTrackerButton(CoordinatorEntity[BabyTrackerCoordinator], ButtonEntity):
+class BabyTrackerButton(BabyTrackerBabyEntity, ButtonEntity):
     """Logs one thing, or moves a timer along, right now, for one baby."""
 
-    _attr_has_entity_name = True
     entity_description: BabyTrackerButtonDescription
-
-    def __init__(
-        self,
-        coordinator: BabyTrackerCoordinator,
-        description: BabyTrackerButtonDescription,
-        baby_id: str,
-    ) -> None:
-        """Set up a button that acts on one baby."""
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._baby_id = baby_id
-        self._attr_unique_id = f"{baby_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, baby_id)},
-            name=coordinator.data[baby_id].name or "Baby",
-            manufacturer="Nighp",
-            model="Baby Tracker",
-            entry_type=DeviceEntryType.SERVICE,
-        )
-
-    @property
-    def available(self) -> bool:
-        """Return whether the baby is still on the account."""
-        return super().available and self._baby_id in self.coordinator.data
 
     async def async_press(self) -> None:
         """Run the button's action for its baby."""

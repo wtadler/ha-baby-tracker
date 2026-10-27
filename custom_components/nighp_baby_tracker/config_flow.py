@@ -12,6 +12,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.selector import (
@@ -31,8 +32,8 @@ from .const import (
     CONF_BOTTLE_TYPE,
     CONF_BOTTLE_UNIT,
     CONF_DEVICE_UUID,
-    CONF_EMAIL,
-    CONF_PASSWORD,
+    CONFIG_ENTRY_MINOR_VERSION,
+    CONFIG_ENTRY_VERSION,
     DEVICE_NAME,
     DOMAIN,
 )
@@ -92,7 +93,8 @@ async def _check_login(
 class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up one Baby Tracker account."""
 
-    VERSION = 1
+    VERSION = CONFIG_ENTRY_VERSION
+    MINOR_VERSION = CONFIG_ENTRY_MINOR_VERSION
 
     def __init__(self) -> None:
         """Set up the flow with a fresh device ID."""

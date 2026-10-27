@@ -4,7 +4,7 @@
   "codeowners": ["@wtadler"],
   "config_flow": true,
   "documentation": "https://github.com/wtadler/ha-baby-tracker/blob/main/README.md",
-  "integration_type": "service",
+  "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/wtadler/ha-baby-tracker/issues",
   "requirements": [],

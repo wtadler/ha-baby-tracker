@@ -11,14 +11,10 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
-    CONF_DEVICE_UUID,
-    CONF_EMAIL,
-    CONF_PASSWORD,
-    DOMAIN,
-)
+from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import (
     AuthenticationError,
     Device,

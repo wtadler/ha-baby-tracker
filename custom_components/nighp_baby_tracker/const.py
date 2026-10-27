@@ -4,8 +4,10 @@ from datetime import timedelta
 
 DOMAIN = "nighp_baby_tracker"
 
-CONF_EMAIL = "email"
-CONF_PASSWORD = "password"
+# The config entry's version: the minor number goes up when setup needs a one-time change.
+CONFIG_ENTRY_VERSION = 1
+CONFIG_ENTRY_MINOR_VERSION = 2
+
 CONF_DEVICE_UUID = "device_uuid"
 
 # How often the account syncs. Fixed: Home Assistant's polling rules leave it to the user to
@@ -21,8 +23,8 @@ STORAGE_VERSION = 1
 # The account-level device, one per config entry: it holds what belongs to the account rather than
 # to a baby (the last pump). Its identifier can't clash with a baby's, which is a UUID.
 ACCOUNT_DEVICE_MODEL = "Account"
-# A fixed name, so the account's email never ends up in an entity ID. A second entry gets "_2".
-ACCOUNT_DEVICE_NAME = "Baby Tracker account"
+# The device's name is the "account" device string ("Baby Tracker account"): fixed, so the
+# account's email never ends up in an entity ID. A second entry gets "_2".
 ACCOUNT_SUFFIX = "_account"
 
 

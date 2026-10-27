@@ -52,6 +52,14 @@
       }
     }
   },
+  "device": {
+    "account": {
+      "name": "Baby Tracker account"
+    },
+    "baby": {
+      "name": "Baby"
+    }
+  },
   "entity": {
     "binary_sensor": {
       "asleep": {
@@ -445,6 +453,9 @@
     },
     "sync_failed": {
       "message": "Couldn't sync with the service before writing: {error}"
+    },
+    "sync_failed_update": {
+      "message": "Couldn't sync with the service: {error}"
     },
     "write_failed": {
       "message": "Couldn't save to Baby Tracker: {error}"

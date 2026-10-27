@@ -1,0 +1,100 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "asleep": {
+        "default": "mdi:sleep-off",
+        "state": {
+          "on": "mdi:sleep",
+          "off": "mdi:sleep-off"
+        }
+      }
+    },
+    "button": {
+      "wet_diaper": {
+        "default": "mdi:water"
+      },
+      "dirty_diaper": {
+        "default": "mdi:emoticon-poop"
+      },
+      "mixed_diaper": {
+        "default": "mdi:baby"
+      },
+      "bottle": {
+        "default": "mdi:baby-bottle"
+      },
+      "sleep": {
+        "default": "mdi:sleep"
+      },
+      "nurse_left": {
+        "default": "mdi:chevron-left-circle"
+      },
+      "nurse_right": {
+        "default": "mdi:chevron-right-circle"
+      }
+    },
+    "sensor": {
+      "diapers_today": {
+        "default": "mdi:baby"
+      },
+      "feeds_today": {
+        "default": "mdi:baby-bottle"
+      },
+      "bottle_volume_today": {
+        "default": "mdi:cup-water"
+      },
+      "last_diaper": {
+        "default": "mdi:baby"
+      },
+      "last_feed": {
+        "default": "mdi:baby-bottle"
+      },
+      "last_pump": {
+        "default": "mdi:water-pump"
+      },
+      "last_sleep": {
+        "default": "mdi:sleep"
+      },
+      "sleep_timer": {
+        "default": "mdi:sleep"
+      },
+      "nursing_timer": {
+        "default": "mdi:timer-sand"
+      }
+    }
+  },
+  "services": {
+    "log_diaper": {
+      "service": "mdi:baby"
+    },
+    "log_bottle": {
+      "service": "mdi:baby-bottle"
+    },
+    "log_nursing": {
+      "service": "mdi:mother-nurse"
+    },
+    "log_sleep": {
+      "service": "mdi:sleep"
+    },
+    "log_pump": {
+      "service": "mdi:water-pump"
+    },
+    "undo": {
+      "service": "mdi:undo"
+    },
+    "start_sleep": {
+      "service": "mdi:sleep"
+    },
+    "stop_sleep": {
+      "service": "mdi:sleep-off"
+    },
+    "start_nursing": {
+      "service": "mdi:timer-play"
+    },
+    "switch_nursing_side": {
+      "service": "mdi:swap-horizontal"
+    },
+    "stop_nursing": {
+      "service": "mdi:timer-stop"
+    }
+  }
+}

@@ -1,0 +1,368 @@
+# serializer version: 1
+# name: test_entity_ids_unique_ids_and_devices_are_unchanged
+  dict({
+    'binary_sensor.baby_one_asleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'asleep',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_asleep',
+    }),
+    'binary_sensor.baby_two_asleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'asleep',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_asleep',
+    }),
+    'button.baby_one_bottle': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'bottle',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_bottle',
+    }),
+    'button.baby_one_dirty_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'dirty_diaper',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_dirty_diaper',
+    }),
+    'button.baby_one_mixed_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'mixed_diaper',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_mixed_diaper',
+    }),
+    'button.baby_one_nurse_left': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'nurse_left',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nurse_left',
+    }),
+    'button.baby_one_nurse_right': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'nurse_right',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nurse_right',
+    }),
+    'button.baby_one_sleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'sleep',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_sleep',
+    }),
+    'button.baby_one_wet_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'wet_diaper',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_wet_diaper',
+    }),
+    'button.baby_two_bottle': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'bottle',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_bottle',
+    }),
+    'button.baby_two_dirty_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'dirty_diaper',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_dirty_diaper',
+    }),
+    'button.baby_two_mixed_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'mixed_diaper',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_mixed_diaper',
+    }),
+    'button.baby_two_nurse_left': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'nurse_left',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nurse_left',
+    }),
+    'button.baby_two_nurse_right': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'nurse_right',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nurse_right',
+    }),
+    'button.baby_two_sleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'sleep',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_sleep',
+    }),
+    'button.baby_two_wet_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'wet_diaper',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_wet_diaper',
+    }),
+    'sensor.baby_one_bottle_volume_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'bottle_volume_today',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_bottle_volume_today',
+    }),
+    'sensor.baby_one_diapers_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'diapers_today',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_diapers_today',
+    }),
+    'sensor.baby_one_feeds_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'feeds_today',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_feeds_today',
+    }),
+    'sensor.baby_one_last_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'last_diaper',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_diaper',
+    }),
+    'sensor.baby_one_last_feed': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'last_feed',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_feed',
+    }),
+    'sensor.baby_one_last_sleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'last_sleep',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_sleep',
+    }),
+    'sensor.baby_one_nursing_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'nursing_timer',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nursing_timer',
+    }),
+    'sensor.baby_one_sleep_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '11111111-AAAA-4AAA-8AAA-000000000001',
+        ),
+      ]),
+      'device_name': 'Baby One',
+      'translation_key': 'sleep_timer',
+      'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_sleep_timer',
+    }),
+    'sensor.baby_tracker_account_last_pump': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '<entry>_account',
+        ),
+      ]),
+      'device_name': 'Baby Tracker account',
+      'translation_key': 'last_pump',
+      'unique_id': '<entry>_last_pump',
+    }),
+    'sensor.baby_two_bottle_volume_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'bottle_volume_today',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_bottle_volume_today',
+    }),
+    'sensor.baby_two_diapers_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'diapers_today',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_diapers_today',
+    }),
+    'sensor.baby_two_feeds_today': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'feeds_today',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_feeds_today',
+    }),
+    'sensor.baby_two_last_diaper': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'last_diaper',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_diaper',
+    }),
+    'sensor.baby_two_last_feed': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'last_feed',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_feed',
+    }),
+    'sensor.baby_two_last_sleep': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'last_sleep',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_sleep',
+    }),
+    'sensor.baby_two_nursing_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'nursing_timer',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nursing_timer',
+    }),
+    'sensor.baby_two_sleep_timer': dict({
+      'device_identifiers': list([
+        tuple(
+          'nighp_baby_tracker',
+          '22222222-BBBB-4BBB-8BBB-000000000002',
+        ),
+      ]),
+      'device_name': 'Baby Two',
+      'translation_key': 'sleep_timer',
+      'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_sleep_timer',
+    }),
+  })
+# ---
