@@ -5,8 +5,8 @@ rules:
     status: done
     comment: Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep or nursing timer runs.
   brands:
-    status: exempt
-    comment: This is a custom integration. Brand images go to the brands repository only when it moves to core.
+    status: done
+    comment: brand/icon.png and icon@2x.png, the app's official App Store icon, used for identification only (as the brands repository's trademark notice describes). The icon doubles as the logo. Move to the brands repository at core submission.
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
