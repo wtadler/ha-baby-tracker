@@ -47,8 +47,7 @@ TIMER_INTERVAL = timedelta(minutes=1)
 class BabyData:
     """One baby's newest record of each kind the sensors show.
 
-    A pump belongs to the account, not a baby, so it isn't here (see the
-    coordinator's ``last_pump``).
+    A pump belongs to the account, not a baby, so it isn't here (see ``BabyTrackerData``).
     """
 
     baby_id: str
@@ -63,6 +62,16 @@ class BabyData:
     def running_sleep(self) -> Sleep | None:
         """The newest sleep, if it's still running. The asleep sensor follows the same rule."""
         return self.sleep if isinstance(self.sleep, Sleep) and self.sleep.is_running else None
+
+
+@dataclass(frozen=True, slots=True)
+class BabyTrackerData:
+    """Everything the entities show, compared by value so an unchanged refresh writes nothing."""
+
+    babies: dict[str, BabyData]
+    # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
+    # baby, so it isn't part of any BabyData.
+    last_pump: Record | None = None
 
 
 def storage_key(entry_id: str) -> str:
@@ -88,7 +97,7 @@ class SyncBeforeWriteError(BabyTrackerError):
     """The sync that precedes every write failed, so nothing was written."""
 
 
-class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
+class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     """Syncs with the service, saves the engine's state, and rebuilds each baby's latest records."""
 
     config_entry: BabyTrackerConfigEntry
@@ -107,6 +116,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             config_entry=entry,
             name=DOMAIN,
             update_interval=SCAN_INTERVAL,
+            always_update=False,
         )
         self.client = client
         self.session = session
@@ -118,9 +128,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             hass, STORAGE_VERSION, storage_key(entry.entry_id)
         )
         self._baby_names: dict[str, str | None] = {}
-        # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
-        # baby, so it isn't part of any BabyData.
-        self.last_pump: Record | None = None
         # Home Assistant's own nursing timers, by baby ID (see timers.py).
         self.nursing: dict[str, NursingTimer] = {}
         self._nursing_store: Store[dict[str, Any]] = Store(
@@ -156,20 +163,26 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 "The saved sync state couldn't be read (%r); loading all history again", err
             )
 
-    async def _async_update_data(self) -> dict[str, BabyData]:
+    async def _async_update_data(self) -> BabyTrackerData:
         async with self.lock:
             before = dict(self.engine.last_seen)
             try:
                 await self.engine.sync(self.client)
             except AuthenticationError as err:
-                raise ConfigEntryAuthFailed("The service rejected the email or password") from err
+                raise ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN, translation_key="auth_failed"
+                ) from err
             except BabyTrackerError as err:
-                raise UpdateFailed(f"Couldn't sync with the service: {err}") from err
+                raise UpdateFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="sync_failed_update",
+                    translation_placeholders={"error": str(err)},
+                ) from err
             finally:
                 # Keep progress even when a later device failed.
                 if dict(self.engine.last_seen) != before:
                     await self._async_save()
-            return self._snapshot()
+            return self._rebuild()
 
     async def _async_save(self) -> None:
         """Save the engine state. A failed save is logged, and never hides a sync error."""
@@ -211,15 +224,16 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             result = await operation(self.engine, self.client)
         finally:
             await self._async_save()
-        self.async_set_updated_data(self._snapshot())
+        self.async_set_updated_data(self._rebuild())
         return result
 
-    def wanted_interval(self, data: dict[str, BabyData] | None = None) -> timedelta:
+    def wanted_interval(self, data: BabyTrackerData | None = None) -> timedelta:
         """Return the sync interval: one minute while a timer runs, else five.
 
         A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running.
         """
-        babies = data if data is not None else self.data or {}
+        current = data if data is not None else self.data
+        babies = current.babies if current is not None else {}
         if any(baby_id in babies for baby_id in self.nursing) or any(
             baby.running_sleep is not None for baby in babies.values()
         ):
@@ -245,7 +259,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
             self.nursing.pop(baby_id, None)
         else:
             self.nursing[baby_id] = timer
-        self.async_set_updated_data(self._snapshot())
+        self.async_set_updated_data(self._rebuild())
         if not await self._async_save_nursing():
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="nursing_not_saved")
 
@@ -263,21 +277,22 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
     def _async_midnight(self, _now: datetime) -> None:
         """Start a new day of counts without syncing."""
         if self.data is not None:
-            self.data = self._snapshot()
+            self.data = self._rebuild()
             self.async_update_listeners()
 
-    def _snapshot(self) -> dict[str, BabyData]:
+    def _snapshot(self) -> BabyTrackerData:
+        """Build the data from the engine and the timers, changing nothing."""
         # The local calendar day, so a day with a clock change is 23 or 25 hours long.
         today = dt_util.now().date()
         start = dt_util.start_of_local_day(today)
         end = dt_util.start_of_local_day(today + timedelta(days=1))
+        names = dict(self._baby_names)
         for baby_id, baby in self.engine.babies().items():
-            self._baby_names[baby_id] = baby.name
-        self.last_pump = self.engine.latest_pump()
-        data: dict[str, BabyData] = {}
-        for baby_id, name in self._baby_names.items():
+            names[baby_id] = baby.name
+        babies: dict[str, BabyData] = {}
+        for baby_id, name in names.items():
             latest = self.engine.latest_records(baby_id)
-            data[baby_id] = BabyData(
+            babies[baby_id] = BabyData(
                 baby_id=baby_id,
                 name=name,
                 diaper=latest.get("Diaper"),
@@ -286,21 +301,24 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[dict[str, BabyData]]):
                 today=day_totals(self.engine.records.values(), baby_id, start, end),
                 nursing=self.nursing.get(baby_id),
             )
+        return BabyTrackerData(babies=babies, last_pump=self.engine.latest_pump())
+
+    def _rebuild(self) -> BabyTrackerData:
+        """Build the data, then do what a new snapshot calls for.
+
+        Every path that publishes data (a sync, a write, a timer change, midnight) comes through
+        here: it remembers the babies' names, drops the nursing timers of babies no longer in the
+        account (their saved copy is dropped in a task the config entry tracks), and sets the next
+        refresh's interval.
+        """
+        data = self._snapshot()
+        self._baby_names = {baby_id: baby.name for baby_id, baby in data.babies.items()}
         # A saved timer for a baby no longer in the account can't be stopped: drop it.
-        if orphaned := [baby_id for baby_id in self.nursing if baby_id not in data]:
+        if orphaned := [baby_id for baby_id in self.nursing if baby_id not in data.babies]:
             for baby_id in orphaned:
                 _LOGGER.warning("Dropping the nursing timer of baby %s, no longer known", baby_id)
                 del self.nursing[baby_id]
-            self.hass.async_create_task(self._async_save_nursing())
+            self.config_entry.async_create_task(self.hass, self._async_save_nursing())
         # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
         self.update_interval = self.wanted_interval(data)
         return data
-
-    async def async_close(self) -> None:
-        """Stop syncing and free the client.
-
-        Home Assistant detaches the session when the config entry unloads (it was created during
-        setup), and warns if an integration closes one itself, so this leaves the session alone.
-        """
-        await self.async_shutdown()
-        await self.client.close()

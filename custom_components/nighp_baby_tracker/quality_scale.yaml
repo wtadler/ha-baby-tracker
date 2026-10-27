@@ -35,3 +35,7 @@ rules:
   # Silver, built with this ticket
   config-entry-unloading: done
   reauthentication-flow: done
+  # Gold, built with the structure ticket
+  diagnostics: done
+  icon-translations: done
+  stale-devices: done

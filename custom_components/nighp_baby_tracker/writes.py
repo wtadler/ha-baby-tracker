@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from homeassistant.const import UnitOfVolume
+from homeassistant.const import CONF_EMAIL, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
@@ -24,7 +24,6 @@ from .const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
     CONF_BOTTLE_UNIT,
-    CONF_EMAIL,
     DOMAIN,
 )
 from .coordinator import BabyTrackerCoordinator, SyncBeforeWriteError
@@ -456,7 +455,7 @@ async def async_press_sleep(coordinator: BabyTrackerCoordinator, baby_id: str) -
     the parent meant to stop, and raises a validation error saying so (after the new state is
     shown).
     """
-    shown = coordinator.data.get(baby_id) if coordinator.data else None
+    shown = coordinator.data.babies.get(baby_id) if coordinator.data else None
     seen = shown.running_sleep if shown is not None else None
     moment, offset = _in_home_assistant_time(None)
     new_id = _new_id()
@@ -526,7 +525,7 @@ async def async_stop_sleep(
 
 
 def _check_baby(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
-    if not coordinator.data or baby_id not in coordinator.data:
+    if not coordinator.data or baby_id not in coordinator.data.babies:
         raise validation_error("baby_not_found")
 
 

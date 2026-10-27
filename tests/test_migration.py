@@ -1,12 +1,13 @@
 """The one-time registry cleanup runs as a config entry migration, exactly once."""
 
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import CONF_EMAIL, CONF_PASSWORD, DOMAIN
+from custom_components.nighp_baby_tracker.const import DOMAIN
 
 from .conftest import EMAIL, PASSWORD, FakeServer
 from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID
@@ -54,7 +55,9 @@ async def test_the_migration_is_idempotent_when_the_cleanup_already_ran(
     config_entry.add_to_hass(hass)
     await _setup(hass, config_entry)
     registry = er.async_get(hass)
-    before = {e.entity_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)}
+    before = {
+        e.entity_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
 
     # Put the entry back at the old minor version, as a live install that has run the cleanup is.
     await hass.config_entries.async_unload(config_entry.entry_id)
@@ -63,7 +66,9 @@ async def test_the_migration_is_idempotent_when_the_cleanup_already_ran(
 
     assert config_entry.state is ConfigEntryState.LOADED
     assert config_entry.minor_version == 2
-    after = {e.entity_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)}
+    after = {
+        e.entity_id for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
     assert after == before
 
 
@@ -103,7 +108,13 @@ async def test_the_migration_removes_every_old_entity_including_one_for_an_absen
 async def test_the_migration_leaves_other_entries_entities_alone(
     hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
-    other = MockConfigEntry(domain=DOMAIN, title="other", unique_id="other@example.com", data={})
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        title="other",
+        unique_id="other@example.com",
+        minor_version=2,
+        data=dict(config_entry.data),
+    )
     other.add_to_hass(hass)
     config_entry.add_to_hass(hass)
     theirs = add_old_pump_entity(hass, other, BABY_THREE_ID, "Baby Three")

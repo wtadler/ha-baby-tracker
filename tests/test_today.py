@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -16,12 +17,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.nighp_baby_tracker.const import (
-    CONF_DEVICE_UUID,
-    CONF_EMAIL,
-    CONF_PASSWORD,
-    DOMAIN,
-)
+from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
 
 from .conftest import BABY_ONE, BABY_TWO, EMAIL, PASSWORD, FakeServer

@@ -105,7 +105,8 @@ async def test_every_platform_has_its_states_after_the_refactor(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     domains = {
-        entry.domain for entry in er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
+        entry.domain
+        for entry in er.async_entries_for_config_entry(er.async_get(hass), setup_entry.entry_id)
     }
     assert domains == {"button", "sensor", "binary_sensor"}
     assert hass.states.get(DIAPER).state == at(0).isoformat()
@@ -126,7 +127,7 @@ async def test_the_account_device_name_comes_from_a_translation(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     info = _device_info(hass, LAST_PUMP)
-    assert info["translation_key"] == "account"
+    assert info.get("translation_key") == "account"
     assert "name" not in info
     [account] = dr.async_get(hass).async_get_devices(
         identifiers={(DOMAIN, f"{setup_entry.entry_id}_account")}
@@ -152,10 +153,11 @@ async def test_a_baby_with_no_name_gets_a_translated_fallback_name(
 
     [nameless] = dr.async_get(hass).async_get_devices(identifiers={(DOMAIN, nameless_id)})
     assert nameless.name == "Baby"
-    info = _device_info(hass, er.async_get(hass).async_get_entity_id(
-        "binary_sensor", DOMAIN, f"{nameless_id}_asleep"
-    ))
-    assert info["translation_key"] == "baby"
+    info = _device_info(
+        hass,
+        er.async_get(hass).async_get_entity_id("binary_sensor", DOMAIN, f"{nameless_id}_asleep"),
+    )
+    assert info.get("translation_key") == "baby"
     assert "name" not in info
 
 
@@ -234,7 +236,9 @@ async def test_a_pump_alone_reaches_the_account_sensor_on_a_refresh(
 ) -> None:
     """The last pump lives in the coordinator's data, so a pump-only change isn't dropped."""
     assert hass.states.get(LAST_PUMP).state == "unknown"
-    server.add_pump("BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45))
+    server.add_pump(
+        "BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45)
+    )
     await tick(hass)
     assert hass.states.get(LAST_PUMP).state == at(45).isoformat()
 
@@ -242,7 +246,9 @@ async def test_a_pump_alone_reaches_the_account_sensor_on_a_refresh(
 async def test_the_coordinator_data_is_one_frozen_object_holding_the_last_pump(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    server.add_pump("BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45))
+    server.add_pump(
+        "BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45)
+    )
     await tick(hass)
     data = setup_entry.runtime_data.data
     assert set(data.babies) == {BABY_ONE_ID, BABY_TWO_ID}
@@ -398,3 +404,9 @@ async def test_unloading_closes_the_client(
     await hass.config_entries.async_unload(setup_entry.entry_id)
     await hass.async_block_till_done()
     assert server.open_clients == []
+
+
+@pytest.mark.parametrize("rule", ["diagnostics", "icon-translations", "stale-devices"])
+def test_the_quality_scale_marks_the_gold_rules_built_in_this_ticket(rule: str) -> None:
+    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
+    assert scale[rule] == "done"

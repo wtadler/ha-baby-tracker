@@ -1,0 +1,47 @@
+# serializer version: 1
+# name: test_diagnostics_match_the_snapshot
+  dict({
+    'babies': list([
+      dict({
+        'has_diaper': True,
+        'has_feed': False,
+        'has_sleep': False,
+        'nursing_timer_running': False,
+        'sleep_running': False,
+      }),
+      dict({
+        'has_diaper': True,
+        'has_feed': False,
+        'has_sleep': False,
+        'nursing_timer_running': False,
+        'sleep_running': False,
+      }),
+    ]),
+    'coordinator': dict({
+      'babies': 2,
+      'has_last_pump': False,
+      'last_update_success': True,
+      'update_interval_seconds': 300.0,
+    }),
+    'engine': dict({
+      'devices_seen': 1,
+      'last_sync_ids': list([
+        2,
+      ]),
+      'records_by_type': dict({
+        'Diaper': 2,
+      }),
+    }),
+    'entry': dict({
+      'data': dict({
+        'device_uuid': '**REDACTED**',
+        'email': '**REDACTED**',
+        'password': '**REDACTED**',
+      }),
+      'minor_version': 2,
+      'options': dict({
+      }),
+      'version': 1,
+    }),
+  })
+# ---

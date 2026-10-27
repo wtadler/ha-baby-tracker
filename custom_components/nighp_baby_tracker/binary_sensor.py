@@ -8,8 +8,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import BabyTrackerConfigEntry
+from .entity import BabyTrackerBabyEntity
 from .pybabytracker import Sleep
-from .today_entity import BabyTrackerBabyEntity
 
 PARALLEL_UPDATES = 0
 
@@ -27,7 +27,7 @@ async def async_setup_entry(
 
     @callback
     def _add_new_babies() -> None:
-        new = [baby_id for baby_id in coordinator.data if baby_id not in known]
+        new = [baby_id for baby_id in coordinator.data.babies if baby_id not in known]
         known.update(new)
         async_add_entities(BabyTrackerAsleepSensor(coordinator, ASLEEP, baby_id) for baby_id in new)
 

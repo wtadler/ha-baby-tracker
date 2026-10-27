@@ -11,6 +11,7 @@ from unittest.mock import patch
 import probatio
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -19,12 +20,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
-    CONF_DEVICE_UUID,
-    CONF_EMAIL,
-    CONF_PASSWORD,
-    DOMAIN,
-)
+from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import (
     OP_ADD,
     OP_DELETE,
