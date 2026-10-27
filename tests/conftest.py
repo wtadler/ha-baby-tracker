@@ -1,179 +1,60 @@
 """Fixtures for Baby Tracker (Nighp) tests.
 
-The library's client is faked at its public interface (``sign_in``, ``get_devices``,
-``get_transactions``, ``close``). The real sync engine runs on top of the fake, so the tests
-exercise the real merging of logs.
+The library's client is faked at its public interface by ``FakeServer`` (see ``fake_server.py``).
+The real sync engine runs on top of the fake, so the tests exercise the real merging of logs.
 """
 
-from collections.abc import Iterator
-from datetime import datetime
+from collections.abc import Generator, Iterator
+from datetime import timedelta
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+)
 
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
-from custom_components.nighp_baby_tracker.pybabytracker import (
-    AuthenticationError,
-    Device,
-    RawTransaction,
-)
 
+from . import (
+    BABY_ONE,
+    BABY_THREE,
+    BABY_TWO,
+    EMAIL,
+    EMAIL_TWO,
+    ENTRY_ID,
+    OWN_DEVICE,
+    OWN_DEVICE_TWO,
+    PASSWORD,
+    setup_integration,
+)
 from .factories import (
-    BABY_ONE_ID,
-    BABY_TWO_ID,
     DEVICE_A,
-    OP_ADD,
+    DEVICE_B,
     at,
-    baby_payload,
-    record_payload,
-    wire,
+    volume,
 )
-
-EMAIL = "parent@example.com"
-PASSWORD = "test-password"
-NEW_PASSWORD = "test-new-password"
-PAGE_SIZE = 500
-
-BABY_ONE = baby_payload("Baby One", BABY_ONE_ID)
-BABY_TWO = baby_payload("Baby Two", BABY_TWO_ID)
-
-
-class FakeServer:
-    """The state behind every fake client: devices, their logs, and failure switches."""
-
-    def __init__(self) -> None:
-        self.password = PASSWORD
-        self.logs: dict[str, list[dict[str, Any]]] = {}
-        self.names: dict[str, str] = {}
-        self.sign_in_error: Exception | None = None
-        self.request_error: Exception | None = None
-        self.read_errors: dict[str, Exception] = {}
-        self.clients: list[FakeClient] = []
-        self.sign_ins: list[dict[str, str]] = []
-        self.device_list_calls = 0
-        self.transaction_reads: list[tuple[str, int]] = []
-
-    def add_record(
-        self,
-        device: str,
-        type_name: str,
-        object_id: str,
-        *,
-        when: datetime,
-        baby: dict[str, Any] | None = BABY_ONE,
-        op: int = OP_ADD,
-        changed: datetime | None = None,
-        note: str = "",
-        **fields: Any,
-    ) -> int:
-        payload = record_payload(
-            type_name, object_id, when=when, baby=baby, changed=changed, note=note, **fields
-        )
-        return self.add_payload(device, payload, op=op)
-
-    def add_pump(self, device: str, object_id: str, *, when: datetime, **fields: Any) -> int:
-        """A pump as the live service shapes it: no ``baby`` key."""
-        return self.add_record(device, "Pump", object_id, when=when, baby=None, **fields)
-
-    def add_payload(self, device: str, payload: Any, *, op: int = OP_ADD) -> int:
-        log = self.logs.setdefault(device, [])
-        sync_id = len(log) + 1
-        log.append(wire(sync_id, op, payload))
-        self.names.setdefault(device, f"Device {device[:1]}")
-        return sync_id
-
-    def add_raw(self, device: str, entry: dict[str, Any]) -> None:
-        self.logs.setdefault(device, []).append(entry)
-        self.names.setdefault(device, f"Device {device[:1]}")
-
-    @property
-    def open_clients(self) -> list[FakeClient]:
-        return [client for client in self.clients if not client.closed]
-
-    def reads_from_start(self) -> list[tuple[str, int]]:
-        return [read for read in self.transaction_reads if read[1] == 0]
-
-
-class FakeClient:
-    """Stands in for ``BabyTrackerClient``."""
-
-    def __init__(
-        self,
-        server: FakeServer,
-        email: str,
-        password: str,
-        device_uuid: str,
-        device_name: str,
-        **kwargs: Any,
-    ) -> None:
-        self.server = server
-        self.email = email
-        self.password = password
-        self.device_uuid = device_uuid
-        self.device_name = device_name
-        self.kwargs = kwargs
-        self.closed = False
-        self._signed_in = False
-        server.clients.append(self)
-
-    async def sign_in(self) -> int:
-        self.server.sign_ins.append(
-            {
-                "email": self.email,
-                "password": self.password,
-                "device_uuid": self.device_uuid,
-                "device_name": self.device_name,
-            }
-        )
-        if self.server.sign_in_error is not None:
-            raise self.server.sign_in_error
-        if self.password != self.server.password:
-            raise AuthenticationError("the service rejected the email or password")
-        self._signed_in = True
-        return 1
-
-    async def _ensure_session(self) -> None:
-        if self.server.request_error is not None:
-            raise self.server.request_error
-        if not self._signed_in or self.password != self.server.password:
-            await self.sign_in()
-
-    async def get_devices(self) -> list[Device]:
-        await self._ensure_session()
-        self.server.device_list_calls += 1
-        return [
-            Device(
-                device_uuid=uuid,
-                last_sync_id=len(log),
-                device_name=self.server.names[uuid],
-                device_os_info="test",
-            )
-            for uuid, log in self.server.logs.items()
-        ]
-
-    async def get_transactions(
-        self, device_uuid: str, since_sync_id: int = 0
-    ) -> list[RawTransaction]:
-        await self._ensure_session()
-        if device_uuid in self.server.read_errors:
-            raise self.server.read_errors[device_uuid]
-        self.server.transaction_reads.append((device_uuid, since_sync_id))
-        entries = [e for e in self.server.logs.get(device_uuid, []) if e["SyncID"] > since_sync_id]
-        return [
-            RawTransaction(e["SyncID"], e["OPCode"], e["Transaction"]) for e in entries[:PAGE_SIZE]
-        ]
-
-    async def close(self) -> None:
-        self.closed = True
+from .fake_server import FakeClient, FakeServer
+from .helpers import LOCAL_NOW
 
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterator[None]:
     """Load custom_components/ in every test."""
     yield
+
+
+@pytest.fixture
+def mock_setup_entry() -> Generator[AsyncMock]:
+    """Override async_setup_entry, so a config flow test doesn't set the integration up."""
+    with patch(
+        "custom_components.nighp_baby_tracker.async_setup_entry", return_value=True
+    ) as mock_setup_entry:
+        yield mock_setup_entry
 
 
 @pytest.fixture
@@ -199,12 +80,32 @@ def server() -> FakeServer:
     return server
 
 
-@pytest.fixture(autouse=True)
-def fake_client(server: FakeServer) -> Iterator[FakeServer]:
-    """Replace the library's client everywhere the integration builds one."""
+@pytest.fixture
+def second_server() -> FakeServer:
+    """A second account's service, with one phone that has logged for a third baby."""
+    server = FakeServer()
+    server.names[DEVICE_B] = "Other Phone"
+    server.add_record(
+        DEVICE_B,
+        "Diaper",
+        "D0000000-0000-4000-8000-0000000000B1",
+        when=at(3),
+        baby=BABY_THREE,
+        status=2,
+    )
+    return server
 
-    def factory(*args: Any, **kwargs: Any) -> FakeClient:
-        return FakeClient(server, *args, **kwargs)
+
+@pytest.fixture(autouse=True)
+def mock_baby_tracker_client(server: FakeServer, second_server: FakeServer) -> Iterator[FakeServer]:
+    """Replace the library's client everywhere the integration builds one.
+
+    The second account (``EMAIL_TWO``) signs in to ``second_server``, every other one to
+    ``server``. It is autouse so that no test can reach the real service by accident.
+    """
+
+    def factory(email: str, *args: Any, **kwargs: Any) -> FakeClient:
+        return FakeClient(second_server if email == EMAIL_TWO else server, email, *args, **kwargs)
 
     with (
         patch("custom_components.nighp_baby_tracker.BabyTrackerClient", factory),
@@ -214,8 +115,122 @@ def fake_client(server: FakeServer) -> Iterator[FakeServer]:
 
 
 @pytest.fixture
-def config_entry() -> MockConfigEntry:
+def mock_config_entry() -> MockConfigEntry:
+    """The default entry: one account, with its unique ID set."""
     return MockConfigEntry(
+        domain=DOMAIN,
+        title=EMAIL,
+        unique_id=EMAIL,
+        entry_id=ENTRY_ID,  # fixed, because the account sensor's unique ID is built from it
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: PASSWORD,
+            CONF_DEVICE_UUID: OWN_DEVICE,
+        },
+    )
+
+
+@pytest.fixture
+async def init_integration(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> MockConfigEntry:
+    """Set the default entry up. Tests check the resulting state."""
+    await setup_integration(hass, mock_config_entry)
+    return mock_config_entry
+
+
+@pytest.fixture
+async def second_entry(hass: HomeAssistant, init_integration: MockConfigEntry) -> MockConfigEntry:
+    """A second account, set up next to the default one."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=EMAIL_TWO,
+        unique_id=EMAIL_TWO,
+        data={CONF_EMAIL: EMAIL_TWO, CONF_PASSWORD: PASSWORD, CONF_DEVICE_UUID: OWN_DEVICE_TWO},
+    )
+    await setup_integration(hass, entry)
+    assert entry.state is ConfigEntryState.LOADED
+    return entry
+
+
+@pytest.fixture
+def populated_server(server: FakeServer) -> FakeServer:
+    """The default server plus every kind of record a baby's entities read.
+
+    Baby one has a feed of each kind, a sleep, and a pump (which belongs to the account). Baby two
+    has a sleep still running. All of it falls on the same local day as ``at(180)``.
+    """
+    server.add_record(
+        DEVICE_A, "Formula", "F0000000-0000-4000-8000-000000000001", when=at(20), amount=volume(4)
+    )
+    server.add_record(
+        DEVICE_A,
+        "Nursing",
+        "F0000000-0000-4000-8000-000000000002",
+        when=at(40),
+        leftDuration=7,
+        rightDuration=12,
+        bothDuration=0,
+        finishSide=1,
+        note="invented note",
+    )
+    server.add_record(
+        DEVICE_A,
+        "Pumped",
+        "F0000000-0000-4000-8000-000000000003",
+        when=at(60),
+        amount=volume(90, english=False),
+    )
+    server.add_record(
+        DEVICE_A,
+        "Sleep",
+        "F0000000-0000-4000-8000-000000000004",
+        when=at(90),
+        duration=45,
+        note="invented nap",
+    )
+    server.add_record(
+        DEVICE_A,
+        "Sleep",
+        "F0000000-0000-4000-8000-000000000005",
+        when=at(120),
+        baby=BABY_TWO,
+        duration=0,
+    )
+    server.add_pump(
+        DEVICE_A, "F0000000-0000-4000-8000-000000000006", when=at(150), amount=volume(5)
+    )
+    return server
+
+
+@pytest.fixture
+async def clock(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
+    """Eastern time, frozen at the default "now"."""
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to(LOCAL_NOW)
+    return freezer
+
+
+@pytest.fixture
+def empty(server: FakeServer) -> FakeServer:
+    """The fake service with no records: each test adds exactly what it needs."""
+    server.logs.clear()
+    server.names.clear()
+    server.names[DEVICE_A] = "Test Phone"
+    server.add_payload(DEVICE_A, BABY_ONE)
+    server.add_payload(DEVICE_A, BABY_TWO)
+    return server
+
+
+@pytest.fixture
+def entry(
+    hass: HomeAssistant, clock: FrozenDateTimeFactory, monkeypatch: pytest.MonkeyPatch
+) -> MockConfigEntry:
+    # A day-long interval, so a sync can never be what moves a count at midnight.
+    monkeypatch.setattr(
+        "custom_components.nighp_baby_tracker.coordinator.SCAN_INTERVAL", timedelta(days=1)
+    )
+    entry = MockConfigEntry(
         domain=DOMAIN,
         title=EMAIL,
         unique_id=EMAIL,
@@ -225,12 +240,5 @@ def config_entry() -> MockConfigEntry:
             CONF_DEVICE_UUID: "EEEEEEEE-0000-4000-8000-0000000000EE",
         },
     )
-
-
-@pytest.fixture
-async def setup_entry(hass, config_entry):
-    """Add the entry to hass and try to set it up. Tests check the resulting state."""
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
-    await hass.async_block_till_done()
-    return config_entry
+    entry.add_to_hass(hass)
+    return entry

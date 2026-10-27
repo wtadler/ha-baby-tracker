@@ -3,6 +3,16 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
+[tool.coverage.run]
+source = ["custom_components.nighp_baby_tracker"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# The floor for the whole package, vendored library included: the total when it was set.
+# config_flow.py is held to 100% separately, in CI.
+fail_under = 78
+
 [tool.ruff]
 target-version = "py314"
 line-length = 100
@@ -10,7 +20,7 @@ line-length = 100
 extend-exclude = ["custom_components/nighp_baby_tracker/pybabytracker"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D", "SLF"]
 # Home Assistant core's docstring ignores.
 ignore = ["D202", "D203", "D213", "D406", "D407", "D417"]
 

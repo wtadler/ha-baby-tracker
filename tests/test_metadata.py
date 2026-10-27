@@ -1,4 +1,4 @@
-"""Manifest, translations, quality scale, and the vendored library's packaging."""
+"""services.yaml, strings, icons, manifest, quality scale, and the vendored library's packaging."""
 
 import json
 import re
@@ -7,10 +7,37 @@ from typing import Any
 
 import pytest
 import yaml
+from homeassistant.core import is_callback
 
-ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
-VENDORED = INTEGRATION / "pybabytracker"
+from custom_components.nighp_baby_tracker import const as integration_const
+from custom_components.nighp_baby_tracker.const import (
+    CONF_BOTTLE_SIZE,
+    CONF_BOTTLE_TYPE,
+    CONF_BOTTLE_UNIT,
+    DOMAIN,
+)
+
+from .helpers import (
+    ACTION_IDS,
+    ALL_ACTIONS,
+    INTEGRATION,
+    ROOT,
+    VENDORED,
+    load_integration_json,
+)
+
+
+def _yaml() -> dict[str, Any]:
+    return yaml.safe_load((INTEGRATION / "services.yaml").read_text())
+
+
+def _strings() -> dict[str, Any]:
+    return json.loads((INTEGRATION / "strings.json").read_text())
+
+
+def _icons() -> dict[str, Any]:
+    return load_integration_json("icons.json")
+
 
 BRONZE_RULES = [
     "action-setup",
@@ -38,6 +65,298 @@ BRONZE_RULES = [
 
 def _load(path: Path) -> Any:
     return json.loads(path.read_text())
+
+
+# Failed writes
+
+
+async def test_the_unknown_outcome_message_asks_the_user_to_try_again_in_a_minute() -> None:
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    message = strings["exceptions"]["write_outcome_unknown"]["message"]
+    assert "still being confirmed" in message
+    assert "try again in a minute" in message.lower()
+
+
+def test_the_repair_text_has_numbered_steps_and_names_the_cost() -> None:
+    issue = json.loads((INTEGRATION / "strings.json").read_text())["issues"]["own_log_gap"]
+    text = issue["description"]
+    assert "more than an hour" in text
+    for step in ("1. ", "2. ", "3. "):
+        assert step in text
+    assert "history" in text
+    assert "new device" in text
+    assert "{account}" in text
+    assert "short delay" not in text  # it has already lasted an hour: don't say it may clear itself
+
+
+# Metadata
+
+
+def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() -> None:
+    import yaml
+
+    services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
+    assert set(services) == {
+        "log_diaper",
+        "undo",
+        "log_bottle",
+        "log_nursing",
+        "log_sleep",
+        "log_pump",
+        "start_sleep",
+        "stop_sleep",
+        "start_nursing",
+        "switch_nursing_side",
+        "stop_nursing",
+    }
+    assert set(services["log_diaper"]["fields"]) == {
+        "device_id",
+        "type",
+        "time",
+        "note",
+        "object_id",
+    }
+    assert set(services["undo"]["fields"]) == {"config_entry_id", "device_id", "object_id"}
+    baby = services["log_diaper"]["fields"]["device_id"]
+    assert baby["required"] is True
+    assert baby["selector"]["device"]["filter"] == [{"integration": DOMAIN}]
+    assert services["log_diaper"]["fields"]["type"]["selector"]["select"]["options"] == [
+        "wet",
+        "dirty",
+        "mixed",
+    ]
+
+
+def test_every_action_field_has_a_translated_name_and_description() -> None:
+    import yaml
+
+    services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
+    strings = json.loads((INTEGRATION / "strings.json").read_text())["services"]
+    assert set(strings) == set(services)
+    for action, spec in services.items():
+        assert strings[action]["name"] and strings[action]["description"]
+        assert set(strings[action]["fields"]) == set(spec["fields"])
+        for field in strings[action]["fields"].values():
+            assert field["name"] and field["description"]
+
+
+def test_every_error_and_issue_the_integration_raises_has_a_translation() -> None:
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    assert set(strings["exceptions"]) >= {
+        "baby_not_found",
+        "nothing_to_undo",
+        "record_not_for_baby",
+        "not_own_record",
+        "record_not_found",
+        "write_outcome_unknown",
+        "own_log_gap",
+        "auth_failed",
+        "sync_failed",
+        "write_failed",
+    }
+    assert all(item["message"] for item in strings["exceptions"].values())
+    assert strings["issues"]["own_log_gap"]["title"]
+    assert "{account}" in strings["issues"]["own_log_gap"]["description"]
+    assert {"wet_diaper", "dirty_diaper", "mixed_diaper"} <= set(strings["entity"]["button"])
+
+
+def test_the_action_setup_rule_is_done() -> None:
+    import yaml
+
+    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
+    assert scale["action-setup"] == "done"
+    assert scale["docs-actions"] == "done"
+
+
+# --- metadata ----------------------------------------------------------------------------------
+
+
+def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
+    import yaml
+
+    services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
+    assert set(services) == {
+        "log_diaper",
+        "undo",
+        "log_bottle",
+        "log_nursing",
+        "log_sleep",
+        "log_pump",
+        "start_sleep",
+        "stop_sleep",
+        "start_nursing",
+        "switch_nursing_side",
+        "stop_nursing",
+    }
+    fields = {name: set(spec["fields"]) for name, spec in services.items()}
+    assert fields["log_bottle"] == {
+        "device_id",
+        "kind",
+        "amount",
+        "unit",
+        "time",
+        "note",
+        "object_id",
+    }
+    assert fields["log_nursing"] == {
+        "device_id",
+        "left_minutes",
+        "right_minutes",
+        "finish_side",
+        "end_time",
+        "note",
+        "object_id",
+    }
+    assert fields["log_sleep"] == {"device_id", "start", "end", "note", "object_id"}
+    assert fields["log_pump"] == {
+        "config_entry_id",
+        "left_amount",
+        "right_amount",
+        "unit",
+        "left_minutes",
+        "right_minutes",
+        "finish_side",
+        "time",
+        "note",
+        "object_id",
+    }
+    bottle = services["log_bottle"]["fields"]
+    assert bottle["kind"]["required"] is True
+    assert bottle["amount"]["required"] is True
+    assert bottle["unit"]["selector"]["select"]["options"] == ["fl. oz.", "mL"]
+    for action in ("log_bottle", "log_nursing", "log_sleep"):
+        assert services[action]["fields"]["device_id"]["selector"]["device"]["filter"] == [
+            {"integration": DOMAIN}
+        ]
+
+
+def test_the_new_actions_errors_options_and_button_are_translated() -> None:
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    assert {
+        "minutes_too_long",
+        "sleep_too_long",
+        "amount_too_small",
+        "invalid_amount",
+        "end_before_start",
+        "no_duration",
+        "no_amount",
+        "metric_not_supported",
+    } <= set(strings["exceptions"])
+    assert "bottle" in strings["entity"]["button"]
+    options = strings["options"]["step"]["init"]
+    for key in (CONF_BOTTLE_SIZE, CONF_BOTTLE_UNIT, CONF_BOTTLE_TYPE):
+        assert options["data"][key] and options["data_description"][key]
+    assert "metric isn't supported yet" in options["data_description"][CONF_BOTTLE_UNIT].lower()
+    assert {"formula", "pumped"} <= set(strings["selector"]["bottle_type"]["options"])
+    assert strings == json.loads((INTEGRATION / "translations" / "en.json").read_text())
+
+
+# Setup
+
+
+def test_the_actions_are_set_up_by_a_callback_named_for_core() -> None:
+    from custom_components.nighp_baby_tracker import services
+
+    assert is_callback(services.async_setup_services)
+    assert not hasattr(services, "async_register_services")
+
+
+# services.yaml and strings
+
+
+@pytest.mark.parametrize("action", ACTION_IDS)
+def test_every_baby_action_has_a_required_device_id_field(action: str) -> None:
+    fields = _yaml()[action]["fields"]
+
+    assert "baby" not in fields
+    assert fields["device_id"]["required"] is True
+    assert fields["device_id"]["selector"] == {"device": {"filter": [{"integration": DOMAIN}]}}
+
+
+def test_log_pump_has_a_required_config_entry_id_and_no_device_field() -> None:
+    fields = _yaml()["log_pump"]["fields"]
+
+    assert {"device", "baby", "device_id"}.isdisjoint(fields)
+    assert fields["config_entry_id"]["required"] is True
+    assert fields["config_entry_id"]["selector"] == {"config_entry": {"integration": DOMAIN}}
+
+
+def test_undo_offers_a_device_for_a_baby_and_an_account_for_all() -> None:
+    fields = _yaml()["undo"]["fields"]
+
+    assert set(fields) == {"config_entry_id", "device_id", "object_id"}
+    assert fields["device_id"]["selector"] == {"device": {"filter": [{"integration": DOMAIN}]}}
+    assert fields["config_entry_id"]["selector"] == {"config_entry": {"integration": DOMAIN}}
+
+
+@pytest.mark.parametrize("action", ALL_ACTIONS)
+def test_every_yaml_field_has_a_name_and_description_and_no_alias_is_left(action: str) -> None:
+    strings = _strings()["services"][action]["fields"]
+
+    assert set(strings) == set(_yaml()[action]["fields"])
+    assert all(field["name"] and field["description"] for field in strings.values())
+
+
+def test_the_deprecation_repair_is_translated() -> None:
+    issue = _strings()["issues"]["deprecated_action_field"]
+
+    assert issue["title"]
+    for placeholder in ("{action}", "{field}", "{replacement}"):
+        assert placeholder in issue["description"]
+
+
+# Errors carry translation keys
+
+
+def test_the_new_exception_message_is_in_strings_and_the_english_translation() -> None:
+    for name in ("strings.json", "translations/en.json"):
+        assert (
+            "{error}" in load_integration_json(name)["exceptions"]["sync_failed_update"]["message"]
+        )
+
+
+# Icons
+
+
+def test_icons_json_covers_every_action() -> None:
+    actions = set(yaml.safe_load((INTEGRATION / "services.yaml").read_text()))
+    icons = _icons()["services"]
+    assert actions
+    assert set(icons) == actions
+    for name, icon in icons.items():
+        assert icon["service"].startswith("mdi:"), name
+
+
+def test_icons_json_covers_every_entity_with_a_translation_key() -> None:
+    entity_icons = _icons()["entity"]
+    keys = load_integration_json("strings.json")["entity"]
+    for platform, entities in keys.items():
+        for key in entities:
+            assert key in entity_icons[platform], f"{platform}.{key}"
+
+
+def test_the_asleep_sensor_has_an_icon_for_each_state() -> None:
+    asleep = _icons()["entity"]["binary_sensor"]["asleep"]
+    assert set(asleep["state"]) == {"on", "off"}
+    assert asleep["default"].startswith("mdi:")
+
+
+# Constants and registry cleanup helpers
+
+
+def test_email_and_password_constants_come_from_home_assistant() -> None:
+    assert "CONF_EMAIL" not in vars(integration_const)
+    assert "CONF_PASSWORD" not in vars(integration_const)
+
+
+def test_the_integration_is_a_hub() -> None:
+    assert load_integration_json("manifest.json")["integration_type"] == "hub"
+
+
+@pytest.mark.parametrize("rule", ["diagnostics", "icon-translations", "stale-devices"])
+def test_the_quality_scale_marks_the_gold_rules_built_in_this_ticket(rule: str) -> None:
+    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
+    assert scale[rule] == "done"
 
 
 def test_the_manifest_names_the_integration() -> None:
