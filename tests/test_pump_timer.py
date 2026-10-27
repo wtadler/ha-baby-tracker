@@ -35,6 +35,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
+from .factories import volume
 from .fake_server import FakeServer
 from .helpers import (
     LAST_PUMP,
@@ -176,11 +177,7 @@ async def test_turning_the_switch_on_then_off_posts_one_pump_with_equal_rounded_
     assert record.time == NOW  # the session's start
     assert "baby" not in payload
     # No volume was given at the stop: the app writes 0 for that, never a missing key.
-    assert payload["amount"] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "true",
-        "value": 0,
-    }
+    assert payload["amount"] == volume(0)
     assert "leftAmount" not in payload
     assert "rightAmount" not in payload
     assert payload["sides"] == 0

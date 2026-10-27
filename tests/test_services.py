@@ -2,9 +2,7 @@
 actions are registered. Several tests here run over every action, so the cut trims their
 parametrization to the actions the PR ships."""
 
-import json
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -13,7 +11,7 @@ import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, load_json_array_fixture
 
 from custom_components.nighp_baby_tracker.const import (
     DOMAIN,
@@ -57,7 +55,7 @@ def _start_at_now(freezer: Any) -> None:
     freezer.move_to(NOW)
 
 
-CAPTURE = json.loads((Path(__file__).parent / "fixtures" / "captured_payloads.json").read_text())
+CAPTURE = load_json_array_fixture("captured_payloads.json")
 
 
 IGNORED = ("objectID", "timestamp", "note", "baby")

@@ -26,6 +26,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 from .factories import (
     BABY_ONE_ID,
     BABY_TWO_ID,
+    volume,
 )
 from .fake_server import FakeServer
 from .helpers import (
@@ -186,11 +187,7 @@ async def test_a_bottle_press_with_milliliter_options_logs_a_metric_bottle(
     record = only_record(server)
     assert isinstance(record, Pumped)
     assert record.volume == Volume(90, "ml")
-    assert record.to_payload()["amount"] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "false",
-        "value": 90,
-    }
+    assert record.to_payload()["amount"] == volume(90, english=False)
 
 
 async def test_saved_ounce_options_stay_ounces_in_a_metric_home(

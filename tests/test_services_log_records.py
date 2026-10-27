@@ -18,6 +18,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
+from .factories import volume
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
@@ -80,11 +81,7 @@ async def test_a_milliliter_write_is_accepted_and_sent_as_metric(
 
     payload = only_record(server).to_payload()
     first = data.get("amount", data.get("left_amount"))
-    assert payload[key] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "false",
-        "value": first,
-    }
+    assert payload[key] == volume(first, english=False)
 
 
 async def test_log_bottle_in_milliliters_writes_the_value_as_given(
@@ -103,11 +100,7 @@ async def test_log_bottle_in_ounces_writes_english_measure_true(
 ) -> None:
     await call(hass, "log_bottle", kind="formula", amount=2.5, unit="fl. oz.")
 
-    assert only_record(server).to_payload()["amount"] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "true",
-        "value": 2.5,
-    }
+    assert only_record(server).to_payload()["amount"] == volume(2.5)
 
 
 @pytest.mark.parametrize(
