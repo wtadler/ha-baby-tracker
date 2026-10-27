@@ -289,7 +289,7 @@ async def test_an_unknown_diaper_status_has_no_type(
     await tick(hass)
     state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == at(40).isoformat()
-    assert "type" not in state.attributes
+    assert state.attributes["type"] is None
 
 
 async def test_the_diaper_note_is_an_attribute_when_there_is_one(
@@ -298,7 +298,7 @@ async def test_the_diaper_note_is_an_attribute_when_there_is_one(
     server.add_record(DEVICE_A, "Diaper", _object_id(4), when=at(40), status=0, note="rash cream")
     await tick(hass)
     assert _sensor_state(hass, "baby_one", "last_diaper").attributes["note"] == "rash cream"
-    assert "note" not in _sensor_state(hass, "baby_two", "last_diaper").attributes
+    assert _sensor_state(hass, "baby_two", "last_diaper").attributes["note"] is None
 
 
 async def test_an_older_record_arriving_later_does_not_replace_the_newest(
@@ -337,7 +337,7 @@ async def test_deleting_every_diaper_leaves_the_sensor_unknown(
     await tick(hass)
     state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == "unknown"
-    assert "type" not in state.attributes
+    assert state.attributes["type"] is None
 
 
 async def test_an_edit_from_another_device_updates_the_details(
@@ -430,7 +430,7 @@ async def test_a_nursing_feed_shows_sides_and_durations(
     assert state.attributes["right_duration_minutes"] == 12
     assert state.attributes["finish_side"] == "right"
     assert state.attributes["note"] == "sleepy"
-    assert "amount" not in state.attributes
+    assert state.attributes["amount"] is None
 
 
 async def test_a_feed_that_is_not_nursing_formula_or_pumped_is_ignored(
@@ -501,10 +501,10 @@ async def test_a_baby_with_only_a_diaper_has_unknown_other_sensors(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     assert _sensor_state(hass, "baby_one", "last_diaper").state != "unknown"
-    for key in ("last_feed", "last_sleep"):
+    for key, attribute in (("last_feed", "kind"), ("last_sleep", "duration_minutes")):
         state = _sensor_state(hass, "baby_one", key)
         assert state.state == "unknown"
-        assert "kind" not in state.attributes
+        assert state.attributes[attribute] is None
 
 
 async def test_a_record_type_the_integration_does_not_model_breaks_nothing(
@@ -555,7 +555,7 @@ async def test_a_feed_with_an_amount_in_an_unexpected_shape_still_shows(
     state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == at(5).isoformat()
     assert state.attributes["kind"] == "formula"
-    assert "amount" not in state.attributes
+    assert state.attributes["amount"] is None
 
 
 # Babies that appear later
@@ -618,7 +618,7 @@ async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
     assert init_integration.state is ConfigEntryState.LOADED
     state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == "unknown"  # a raw record carries no baby, so it isn't shown
-    assert "amount" not in state.attributes
+    assert state.attributes["amount"] is None
 
 
 # Entities
@@ -1154,7 +1154,7 @@ async def test_last_pump_is_unknown_when_nothing_was_pumped(
     state = state_of(hass, init_integration)
 
     assert state.state == "unknown"
-    assert "amount" not in state.attributes
+    assert state.attributes["amount"] is None
 
 
 async def test_last_pump_shows_the_newest_pump_whoever_logged_it(
@@ -1210,8 +1210,8 @@ async def test_a_total_only_pump_has_no_side_amounts(
 
     state = state_of(hass, init_integration)
     assert state.attributes["amount"] == 4
-    assert "left_amount" not in state.attributes
-    assert "right_amount" not in state.attributes
+    assert state.attributes["left_amount"] is None
+    assert state.attributes["right_amount"] is None
 
 
 async def test_a_pumped_bottle_is_not_a_pump_session(

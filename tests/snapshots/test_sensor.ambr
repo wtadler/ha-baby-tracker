@@ -199,6 +199,7 @@
     'attributes': ReadOnlyDict({
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last diaper',
+      'note': None,
       'type': 'wet',
     }),
     'context': <ANY>,
@@ -250,9 +251,14 @@
   StateSnapshot({
     'attributes': ReadOnlyDict({
       'amount': 90.0,
+      'both_duration_minutes': None,
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'finish_side': None,
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last feed',
       'kind': 'pumped',
+      'left_duration_minutes': None,
+      'note': None,
+      'right_duration_minutes': None,
       'unit': 'mL',
     }),
     'context': <ANY>,
@@ -571,6 +577,12 @@
       'amount': 5.0,
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Tracker account Last pump',
+      'left_amount': None,
+      'left_duration_minutes': None,
+      'note': None,
+      'right_amount': None,
+      'right_duration_minutes': None,
+      'sides': None,
       'unit': 'fl. oz.',
     }),
     'context': <ANY>,
@@ -832,6 +844,7 @@
     'attributes': ReadOnlyDict({
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last diaper',
+      'note': None,
       'type': 'dirty',
     }),
     'context': <ANY>,
@@ -882,8 +895,16 @@
 # name: test_sensors[sensor.baby_two_last_feed-state]
   StateSnapshot({
     'attributes': ReadOnlyDict({
+      'amount': None,
+      'both_duration_minutes': None,
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'finish_side': None,
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last feed',
+      'kind': None,
+      'left_duration_minutes': None,
+      'note': None,
+      'right_duration_minutes': None,
+      'unit': None,
     }),
     'context': <ANY>,
     'entity_id': 'sensor.baby_two_last_feed',
@@ -936,6 +957,7 @@
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       'duration_minutes': 0,
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last sleep',
+      'note': None,
     }),
     'context': <ANY>,
     'entity_id': 'sensor.baby_two_last_sleep',
