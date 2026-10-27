@@ -78,6 +78,8 @@ async def async_setup_entry(
 
     @callback
     def _add_new_babies() -> None:
+        # A baby that left (its device is removed with it) is new again if it's added back.
+        known.intersection_update(coordinator.data.babies)
         new = [baby_id for baby_id in coordinator.data.babies if baby_id not in known]
         known.update(new)
         async_add_entities(

@@ -72,24 +72,18 @@ async def test_a_baby_still_in_the_account_cannot_be_removed(
     assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is not None
 
 
-async def test_a_deleted_baby_can_be_removed_on_the_next_sync_without_a_reload(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    hass_ws_client: WebSocketGenerator,
+async def test_a_deleted_baby_is_removed_on_the_next_sync_without_a_reload(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     # The app deletes the baby but the baby's older diaper still embeds it.
     server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
     await tick(hass)
 
-    assert await remove_device(
-        hass, hass_ws_client, init_integration, baby_device(hass, BABY_TWO_ID)
-    )
     assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
     assert init_integration.state is ConfigEntryState.LOADED
 
 
-async def test_a_baby_record_that_was_added_and_then_deleted_can_be_removed(
+async def test_a_baby_record_that_was_added_and_then_deleted_is_removed(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -104,16 +98,11 @@ async def test_a_baby_record_that_was_added_and_then_deleted_can_be_removed(
     server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
     await tick(hass)
 
-    assert await remove_device(
-        hass, hass_ws_client, init_integration, baby_device(hass, BABY_TWO_ID)
-    )
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
 
 
-async def test_a_deleted_baby_is_removable_even_when_all_its_records_remain(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    hass_ws_client: WebSocketGenerator,
+async def test_a_deleted_baby_is_removed_even_when_all_its_records_remain(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_record(
         DEVICE_A, "Diaper", "D0000000-0000-4000-8000-000000000022", when=at(20), baby=BABY_TWO
@@ -121,9 +110,7 @@ async def test_a_deleted_baby_is_removable_even_when_all_its_records_remain(
     server.add_payload(DEVICE_A, BABY_TWO, op=OP_DELETE)
     await tick(hass)
 
-    assert await remove_device(
-        hass, hass_ws_client, init_integration, baby_device(hass, BABY_TWO_ID)
-    )
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
 
 
 async def test_deleting_one_baby_leaves_the_other_present_and_not_removable(
@@ -152,11 +139,8 @@ async def test_a_deleted_baby_stays_out_of_the_data_after_more_syncs(
     assert BABY_TWO_ID not in init_integration.runtime_data.data.babies
 
 
-async def test_a_deleted_baby_stays_removable_after_a_reload(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    hass_ws_client: WebSocketGenerator,
+async def test_a_deleted_baby_stays_gone_after_a_reload(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
     await tick(hass)
@@ -164,9 +148,7 @@ async def test_a_deleted_baby_stays_removable_after_a_reload(
     await hass.async_block_till_done()
 
     assert BABY_TWO_ID not in init_integration.runtime_data.data.babies
-    assert await remove_device(
-        hass, hass_ws_client, init_integration, baby_device(hass, BABY_TWO_ID)
-    )
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
 
 
 async def test_a_baby_added_again_after_its_delete_is_present_again(
@@ -226,9 +208,7 @@ async def test_nothing_can_be_removed_while_the_entry_is_not_loaded(
     server: FakeServer,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
-    await tick(hass)
-    device = baby_device(hass, BABY_TWO_ID)
+    device = baby_device(hass, BABY_ONE_ID)
     assert await hass.config_entries.async_unload(init_integration.entry_id)
 
     assert not await remove_device(hass, hass_ws_client, init_integration, device)
