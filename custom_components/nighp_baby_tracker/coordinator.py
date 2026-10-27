@@ -286,9 +286,14 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         today = dt_util.now().date()
         start = dt_util.start_of_local_day(today)
         end = dt_util.start_of_local_day(today + timedelta(days=1))
-        names = dict(self._baby_names)
+        names = {
+            baby_id: name
+            for baby_id, name in self._baby_names.items()
+            if not self.engine.is_deleted(baby_id)
+        }
         for baby_id, baby in self.engine.babies().items():
-            names[baby_id] = baby.name
+            if not self.engine.is_deleted(baby_id):
+                names[baby_id] = baby.name
         babies: dict[str, BabyData] = {}
         for baby_id, name in names.items():
             latest = self.engine.latest_records(baby_id)
