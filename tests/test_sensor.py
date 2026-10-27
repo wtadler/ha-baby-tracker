@@ -32,7 +32,7 @@ from .helpers import (
 KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
 
 
-# The counts and the asleep sensor are covered in test_today.py; each baby also has these four.
+# The counts and the asleep sensor are in test_sensor_today.py; each baby also has these four.
 TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
 
 
