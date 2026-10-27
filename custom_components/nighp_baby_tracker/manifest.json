@@ -7,6 +7,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/wtadler/ha-baby-tracker/issues",
+  "loggers": ["custom_components.nighp_baby_tracker.pybabytracker"],
   "requirements": [],
   "version": "0.1.0"
 }

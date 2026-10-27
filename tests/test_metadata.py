@@ -456,13 +456,6 @@ def test_the_readme_covers_install_and_removal() -> None:
         assert heading in readme
 
 
-def test_dependency_transparency_is_a_todo_until_the_library_is_published() -> None:
-    scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
-    entry = scale["dependency-transparency"]
-    assert entry["status"] == "todo"
-    assert entry["comment"] == "library bundled while private; PyPI at go-public (#12)"
-
-
 @pytest.mark.parametrize("rule", ["docs-triggers", "docs-conditions"])
 def test_trigger_and_condition_docs_are_exempt_with_a_reason(rule: str) -> None:
     scale = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]

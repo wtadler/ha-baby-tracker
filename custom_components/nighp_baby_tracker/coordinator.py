@@ -11,6 +11,7 @@ import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -21,6 +22,7 @@ from .const import (
     DOMAIN,
     SCAN_INTERVAL,
     STORAGE_VERSION,
+    is_account_identifier,
 )
 from .pybabytracker import (
     AuthenticationError,
@@ -312,11 +314,12 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         """Build the data, then do what a new snapshot calls for.
 
         Every path that publishes data (a sync, a write, a timer change, midnight) comes through
-        here: it remembers the babies' names, drops the nursing timers of babies no longer in the
-        account (their saved copy is dropped in a task the config entry tracks), and sets the next
-        refresh's interval.
+        here. It removes the devices of babies the sync shows as deleted, remembers the babies'
+        names, and drops the nursing timers of babies no longer in the account (their saved copy
+        is dropped in a task the config entry tracks). It also sets the next refresh's interval.
         """
         data = self._snapshot()
+        self._remove_deleted_devices(data)
         self._baby_names = {baby_id: baby.name for baby_id, baby in data.babies.items()}
         # A saved timer for a baby no longer in the account can't be stopped: drop it.
         if orphaned := [baby_id for baby_id in self.nursing if baby_id not in data.babies]:
@@ -327,3 +330,23 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
         self.update_interval = self.wanted_interval(data)
         return data
+
+    def _remove_deleted_devices(self, data: BabyTrackerData) -> None:
+        """Remove the device, and with it the entities, of every baby the sync shows as deleted.
+
+        Only a baby whose record carries a delete is judged gone. A baby merely missing from the
+        data is left alone, and so is the account's own device. A baby added again later gets a
+        new device with the same identifiers.
+        """
+        entry_id = self.config_entry.entry_id
+        registry = dr.async_get(self.hass)
+        for device in dr.async_entries_for_config_entry(registry, entry_id):
+            for domain, identifier in device.identifiers:
+                if (
+                    domain == DOMAIN
+                    and not is_account_identifier(identifier)
+                    and identifier not in data.babies
+                    and self.engine.is_deleted(identifier)
+                ):
+                    registry.async_remove_device(device.id)
+                    break

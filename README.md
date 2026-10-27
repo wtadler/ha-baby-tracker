@@ -200,12 +200,11 @@ sends no notifications; the blueprint does, from the timer sensors.
 
 ## Removing a baby
 
-A baby that has left your account can be deleted from its device page (**Delete** in the device's
-menu). A baby still on the account can't be deleted, because the next sync would add it back, and
-neither can the account's own device.
-
-A baby removed from the account becomes deletable from its device page only after the
-integration reloads or Home Assistant restarts.
+A baby you delete in the app is removed from Home Assistant, with its device and entities, at the
+next sync. A baby you add back later gets its device and entities again. If a baby's device is
+ever left behind, you can delete it from its device page (**Delete** in the device's menu).
+A baby still on the account can't be deleted, because the next sync would add it back, and neither
+can the account's own device.
 
 ## Diagnostics
 
@@ -218,6 +217,27 @@ and it holds no baby's name or ID and no notes.
 1. Go to **Settings > Devices & services**, open **Baby Tracker (Nighp)**, and choose **Delete**.
    This also deletes the saved sync state.
 2. Delete the `custom_components/nighp_baby_tracker` folder and restart Home Assistant.
+
+## Core submission
+
+This repository is a custom integration, so its manifest keeps a few keys that core handles
+differently. At core submission:
+
+- `documentation` points at the page on home-assistant.io.
+- `issue_tracker` and `version` are removed: core leaves them out.
+- `categories` is added as `["health_wellbeing"]`. The hassfest image CI runs doesn't accept the key
+  yet, so it waits.
+- `loggers` becomes `["pybabytracker"]`, the library's own logger, once the library is a PyPI
+  package (#12). The bundled copy logs under its path inside this integration, so the entry today
+  is redundant: Home Assistant's logger integration already covers the integration's own package.
+  It is kept to record the intent.
+- `requirements` pins that package, which is also what lets `dependency-transparency` be marked
+  done.
+- `quality_scale` is added with the highest tier that holds. It can't be declared today: Bronze
+  needs `dependency-transparency`.
+
+`quality_scale.yaml` lists all 54 rules. A test pins the rule list to Home Assistant's, and
+hassfest checks the file's shape for core integrations only.
 
 ## Development
 
