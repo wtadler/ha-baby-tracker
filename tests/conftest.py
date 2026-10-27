@@ -5,18 +5,23 @@ The real sync engine runs on top of the fake, so the tests exercise the real mer
 """
 
 from collections.abc import Generator, Iterator
+from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+)
 
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import (
+    BABY_ONE,
     BABY_THREE,
     BABY_TWO,
     EMAIL,
@@ -27,8 +32,14 @@ from . import (
     PASSWORD,
     setup_integration,
 )
-from .factories import DEVICE_A, DEVICE_B, at, volume
+from .factories import (
+    DEVICE_A,
+    DEVICE_B,
+    at,
+    volume,
+)
 from .fake_server import FakeClient, FakeServer
+from .helpers import LOCAL_NOW
 
 
 @pytest.fixture(autouse=True)
@@ -190,3 +201,44 @@ def populated_server(server: FakeServer) -> FakeServer:
         DEVICE_A, "F0000000-0000-4000-8000-000000000006", when=at(150), amount=volume(5)
     )
     return server
+
+
+@pytest.fixture
+async def clock(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
+    """Eastern time, frozen at the default "now"."""
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to(LOCAL_NOW)
+    return freezer
+
+
+@pytest.fixture
+def empty(server: FakeServer) -> FakeServer:
+    """The fake service with no records: each test adds exactly what it needs."""
+    server.logs.clear()
+    server.names.clear()
+    server.names[DEVICE_A] = "Test Phone"
+    server.add_payload(DEVICE_A, BABY_ONE)
+    server.add_payload(DEVICE_A, BABY_TWO)
+    return server
+
+
+@pytest.fixture
+def entry(
+    hass: HomeAssistant, clock: FrozenDateTimeFactory, monkeypatch: pytest.MonkeyPatch
+) -> MockConfigEntry:
+    # A day-long interval, so a sync can never be what moves a count at midnight.
+    monkeypatch.setattr(
+        "custom_components.nighp_baby_tracker.coordinator.SCAN_INTERVAL", timedelta(days=1)
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=EMAIL,
+        unique_id=EMAIL,
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: PASSWORD,
+            CONF_DEVICE_UUID: "EEEEEEEE-0000-4000-8000-0000000000EE",
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry

@@ -1,6 +1,8 @@
 """The setup screen, re-sign-in, and the options screen."""
 
 import uuid
+from datetime import timedelta
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -8,6 +10,7 @@ from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.const import (
@@ -25,6 +28,21 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 
 from . import EMAIL, NEW_PASSWORD, PASSWORD
 from .fake_server import FakeServer
+from .helpers import (
+    LEGACY_INTERVAL,
+    SLEEP_BUTTON,
+    entry_with_options,
+    press,
+    set_options,
+    sync_interval,
+)
+
+
+def schema_defaults(result: Any) -> dict[str, Any]:
+    return {str(key): key.default() for key in result["data_schema"].schema}
+
+
+BOTTLE_OPTIONS = {CONF_BOTTLE_SIZE, CONF_BOTTLE_UNIT, CONF_BOTTLE_TYPE}
 
 
 async def _start(hass: HomeAssistant):
@@ -39,6 +57,205 @@ async def _submit(hass: HomeAssistant, flow_id: str, email: str = EMAIL, passwor
 
 async def _submit_password(hass: HomeAssistant, flow_id: str, password: str = PASSWORD):
     return await hass.config_entries.flow.async_configure(flow_id, {CONF_PASSWORD: password})
+
+
+async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
+    entry.add_to_hass(hass)
+    return await entry.start_reauth_flow(hass)
+
+
+# --- the library's limits, checked here first with translated errors ------------------------
+
+
+async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    good = {
+        CONF_BOTTLE_SIZE: 32,
+        CONF_BOTTLE_UNIT: "fl. oz.",
+        CONF_BOTTLE_TYPE: "formula",
+    }
+    await set_options(hass, init_integration, **good)
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {**good, CONF_BOTTLE_SIZE: 33}
+        )
+
+
+# --- the options screen ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("units", "expected"),
+    [
+        (US_CUSTOMARY_SYSTEM, (4, "fl. oz.", "formula")),
+        (METRIC_SYSTEM, (4, "fl. oz.", "formula")),
+    ],
+    ids=["us-customary", "metric"],
+)
+async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
+    hass: HomeAssistant, init_integration: MockConfigEntry, units: Any, expected: tuple[Any, ...]
+) -> None:
+    hass.config.units = units
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    defaults = schema_defaults(result)
+    assert (
+        defaults[CONF_BOTTLE_SIZE],
+        defaults[CONF_BOTTLE_UNIT],
+        defaults[CONF_BOTTLE_TYPE],
+    ) == expected
+
+
+async def test_options_show_the_saved_bottle(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    hass.config_entries.async_update_entry(
+        init_integration,
+        options={CONF_BOTTLE_SIZE: 90, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "pumped"},
+    )
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    defaults = schema_defaults(result)
+    assert (defaults[CONF_BOTTLE_SIZE], defaults[CONF_BOTTLE_UNIT]) == (90, "mL")
+    assert defaults[CONF_BOTTLE_TYPE] == "pumped"
+
+
+async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_formula(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    defaults = schema_defaults(result)
+
+    await set_options(hass, init_integration, **defaults)
+
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 4
+    assert init_integration.options[CONF_BOTTLE_UNIT] == "fl. oz."
+    assert init_integration.options[CONF_BOTTLE_TYPE] == "formula"
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {CONF_BOTTLE_SIZE: 0},
+        {CONF_BOTTLE_SIZE: -4},
+        {CONF_BOTTLE_UNIT: "cups"},
+        {CONF_BOTTLE_TYPE: "milk"},
+    ],
+    ids=["zero-size", "negative-size", "unknown-unit", "unknown-type"],
+)
+async def test_options_reject_a_bad_bottle(
+    hass: HomeAssistant, init_integration: MockConfigEntry, bad: dict[str, Any]
+) -> None:
+    good = {
+        CONF_BOTTLE_SIZE: 4,
+        CONF_BOTTLE_UNIT: "fl. oz.",
+        CONF_BOTTLE_TYPE: "formula",
+    }
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(result["flow_id"], {**good, **bad})
+
+
+# The options flow
+
+
+async def test_the_options_flow_has_the_bottle_fields_and_no_interval(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert {str(key) for key in result["data_schema"].schema} == BOTTLE_OPTIONS
+
+
+async def test_the_options_flow_refuses_an_interval(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                LEGACY_INTERVAL: 10,
+                CONF_BOTTLE_SIZE: 4,
+                CONF_BOTTLE_UNIT: "fl. oz.",
+                CONF_BOTTLE_TYPE: "formula",
+            },
+        )
+
+
+async def test_saving_the_options_saves_only_the_bottle(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_BOTTLE_SIZE: 5.5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert init_integration.options == {
+        CONF_BOTTLE_SIZE: 5.5,
+        CONF_BOTTLE_UNIT: "fl. oz.",
+        CONF_BOTTLE_TYPE: "pumped",
+    }
+
+
+async def test_saving_the_options_drops_a_legacy_interval(
+    hass: HomeAssistant, server: FakeServer
+) -> None:
+    entry = await entry_with_options(hass, {LEGACY_INTERVAL: 15, CONF_BOTTLE_SIZE: 6})
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert {str(key) for key in result["data_schema"].schema} == BOTTLE_OPTIONS
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_BOTTLE_SIZE: 6, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
+    )
+    await hass.async_block_till_done()
+
+    assert LEGACY_INTERVAL not in entry.options
+    assert entry.state is ConfigEntryState.LOADED
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
+
+
+async def test_an_options_change_leaves_a_running_timer_at_one_minute(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    await press(hass, SLEEP_BUTTON)
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
+    )
+    await hass.async_block_till_done()
+
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
+
+
+async def test_saving_the_options_neither_reloads_nor_syncs(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    clients = len(server.clients)
+    calls = server.device_list_calls
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
+    )
+    await hass.async_block_till_done()
+
+    assert init_integration.state is ConfigEntryState.LOADED
+    assert len(server.clients) == clients  # not reloaded: no new client signed in
+    assert server.device_list_calls == calls
 
 
 async def test_shows_the_email_and_password_form(hass: HomeAssistant) -> None:
@@ -199,11 +416,6 @@ async def test_a_second_account_can_be_added(
 # Re-sign-in
 
 
-async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
-    entry.add_to_hass(hass)
-    return await entry.start_reauth_flow(hass)
-
-
 async def test_reauth_asks_for_the_password_only(hass: HomeAssistant, mock_config_entry) -> None:
     result = await _start_reauth(hass, mock_config_entry)
 
@@ -334,7 +546,6 @@ async def test_reauth_for_a_different_account_aborts_with_unique_id_mismatch(
 
 
 # Options (the interval is gone; test_polling.py covers that, and the bottle fields live in
-# test_feeds_sleeps_pumps.py)
 
 
 async def test_options_show_one_form(hass: HomeAssistant, init_integration) -> None:
