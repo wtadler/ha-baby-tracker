@@ -3,7 +3,8 @@
 The page lives at ``docs/home-assistant-io/nighp_baby_tracker.markdown`` and is copied into
 ``source/_integrations/`` of the docs repository when the core PR opens. These tests check the
 parts a docs reviewer or the docs build would reject, and that the page stays inside what the first
-core PR ships (the config flow, coordinator, per-baby sensors, and diagnostics).
+core PR ships: the user config flow, the coordinator, and the Last diaper, Last feed, and Last
+sleep sensors.
 """
 
 import json
@@ -45,8 +46,8 @@ REQUIRED_KEYS = (
 
 QUALITY_SCALES = {"bronze", "silver", "gold", "platinum", "internal", "legacy"}
 
-# The first core PR ships the sensor platform and diagnostics, and nothing else.
-FIRST_PR_PLATFORMS = {"sensor", "diagnostics"}
+# The first core PR ships the sensor platform and nothing else: diagnostics is PR 3.
+FIRST_PR_PLATFORMS = ["sensor"]
 
 
 def _page_text() -> str:
@@ -124,9 +125,7 @@ def test_the_platforms_are_only_the_first_prs() -> None:
     frontmatter, _ = _split()
     platforms = frontmatter.get("ha_platforms")
     assert isinstance(platforms, list)
-    assert "sensor" in platforms
-    assert set(platforms) <= FIRST_PR_PLATFORMS
-    assert len(platforms) == len(set(platforms))
+    assert platforms == FIRST_PR_PLATFORMS
 
 
 def test_the_categories_are_one_to_three() -> None:
@@ -253,6 +252,8 @@ def test_the_page_does_not_describe_later_pr_features() -> None:
         r"\basleep\b",
         r"\bundo\b",
         r"\blog_\w+",
+        r"diagnostics",
+        r"reauth",
         r"diapers today",
         r"feeds today",
         r"bottle volume today",
@@ -301,11 +302,10 @@ def test_the_data_updates_section_states_the_interval_in_the_code() -> None:
     assert f"{int(SCAN_INTERVAL.total_seconds() // 60)} minutes" in section
 
 
-def test_the_troubleshooting_section_covers_diagnostics_and_the_sign_in_errors() -> None:
+def test_the_troubleshooting_section_covers_the_sign_in_errors() -> None:
     _, body = _split()
     section = body.split("## Troubleshooting", 1)[-1].split("\n## ", 1)[0]
     errors = _strings()["config"]["error"]
-    assert "Download diagnostics" in section
     assert errors["invalid_auth"] in section
     assert errors["cannot_connect"] in section
 
@@ -314,3 +314,58 @@ def test_the_page_says_how_to_refresh_sooner_than_the_interval() -> None:
     _, body = _split()
     section = body.split("## Data updates", 1)[-1].split("\n## ", 1)[0]
     assert "homeassistant.update_entity" in section
+
+
+def test_the_page_does_not_document_diagnostics() -> None:
+    # Diagnostics is the third core PR.
+    _, body = _split()
+    live = _without_comments(body)
+    assert live.strip() != ""
+    assert "diagnostics" not in live.lower()
+
+
+def test_the_page_does_not_document_reauthentication() -> None:
+    # Reauthentication is the second core PR: the first promises no sign-in prompt.
+    _, body = _split()
+    live = _without_comments(body).lower()
+    assert live.strip() != ""
+    for phrase in ("reauth", "sign in again", "password changes", "re-authenticate"):
+        assert phrase not in live
+
+
+def test_the_page_does_not_document_sensor_attributes() -> None:
+    # The first core PR's sensors have a state and no attributes.
+    _, body = _split()
+    live = _without_comments(body)
+    assert live.strip() != ""
+    assert "attribute" not in live.lower()
+    for name in (
+        "type",
+        "note",
+        "kind",
+        "amount",
+        "unit",
+        "duration_minutes",
+        "left_duration_minutes",
+        "right_duration_minutes",
+        "both_duration_minutes",
+        "finish_side",
+    ):
+        assert f"`{name}`" not in live
+    assert "attributes." not in live
+
+
+def test_the_page_does_not_document_stale_device_handling() -> None:
+    # Removing a deleted baby's device is the sixth core PR.
+    _, body = _split()
+    live = _without_comments(body)
+    assert live.strip() != ""
+    assert "Removing a baby" not in live
+    assert "device page" not in live
+
+
+def test_the_source_comment_states_the_scope_and_the_polling_caveat() -> None:
+    _, body = _split()
+    top = body.lstrip().split("\n\n", 1)[0]
+    assert "user config flow, coordinator, Last diaper, Last feed, and Last sleep sensors" in top
+    assert "every minute while a timer runs" in top

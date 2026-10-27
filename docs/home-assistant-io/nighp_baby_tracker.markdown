@@ -10,19 +10,18 @@ ha_codeowners:
 ha_config_flow: true
 ha_domain: nighp_baby_tracker
 ha_platforms:
-  - diagnostics
   - sensor
 ha_integration_type: hub
 ha_quality_scale: bronze
 ---
 
-<!--- Source: the integration page template at source/_integrations/_integration_docs_template.markdown in home-assistant/home-assistant.io, last changed in commit 53439929be9cda80fbcb5d5c3bbb693dfc433769, with ohme.markdown (commit a3be2e6f89a8cf2b4229ca445cb670e1ddf560d7) as the recent cloud-polling example, read at docs repository commit 16bcbb9e127f12babd8e541a102746fb0b0147bb on October 27, 2026. To refresh, compare against the template's current commit and update this comment. Scope: the first core PR (config flow, coordinator, sensors, diagnostics). Before submitting, set ha_release to the release the PR targets and ha_quality_scale to the tier the integration reaches. -->
+<!--- Source: the integration page template at source/_integrations/_integration_docs_template.markdown in home-assistant/home-assistant.io, last changed in commit 53439929be9cda80fbcb5d5c3bbb693dfc433769, with ohme.markdown (commit a3be2e6f89a8cf2b4229ca445cb670e1ddf560d7) as the recent cloud-polling example, read at docs repository commit 16bcbb9e127f12babd8e541a102746fb0b0147bb on October 27, 2026. To refresh, compare against the template's current commit and update this comment. Scope: the first core PR (user config flow, coordinator, Last diaper, Last feed, and Last sleep sensors), so this page describes that PR's code and not the whole branch. The fixed 5-minute interval is PR 1 behavior; the full integration polls every minute while a timer runs. Re-verify against PR 1's code before copying this page into the docs repository, and add the later features (reauthentication, diagnostics, sensor attributes, stale devices, and the faster polling) with their own PRs. Before submitting, set ha_release to the release the PR targets and ha_quality_scale to the tier the integration reaches. -->
 
 The **Baby Tracker (Nighp)** {% term integration %} connects your account for the Baby Tracker app by Nighp to Home Assistant. It shows each baby's last diaper, feed, and sleep as sensors, so you can see them on a dashboard or use them in automations. For example, you can send yourself a message when a baby hasn't had a feed in four hours.
 
 ## Supported devices
 
-The integration doesn't use any hardware. It works with a Baby Tracker account, and every baby in the account becomes a {% term device %} in Home Assistant. Records logged on any phone signed in to the account show up in Home Assistant after the next update.
+The integration doesn't use any hardware. It works with a Baby Tracker account, and every baby in the account when you set up the integration becomes a {% term device %} in Home Assistant. Records logged on any phone signed in to the account show up in Home Assistant after the next update.
 
 ## Prerequisites
 
@@ -42,27 +41,20 @@ Home Assistant checks the email and password before it saves anything. The first
 
 Home Assistant signs in as its own device, named **Home Assistant**. It never borrows the identity of a phone.
 
-### If your password changes
-
-If Baby Tracker no longer accepts the saved password, Home Assistant asks you to sign in again. Enter your account's current password. The email address is the one you set up the integration with, and it isn't asked for again.
-
 ## Supported functionality
 
 The **Baby Tracker (Nighp)** integration creates one device for each baby in your account. The device has the baby's name, and **Baby** when the baby has no name in the app. Nighp is the manufacturer, and the model is **Baby Tracker**.
 
 ### Sensors
 
-Each baby has three sensors. Their state is the time the record happened, so a dashboard card can show "23 minutes ago" instead of a clock time. The state is unknown when the baby has no record of that kind. The attributes belong to the newest record, and an attribute is left out when the record has no value for it.
+Each baby has three sensors. Their state is the time of the baby's newest record of that kind, so a dashboard card can show "23 minutes ago" instead of a clock time. The state is unknown when the baby has no record of that kind.
 
 - **Last diaper**
   - **Description**: When the baby's newest diaper was logged.
-  - **Attributes**: `type` (`wet`, `dirty`, or `mixed`) and `note`.
 - **Last feed**
   - **Description**: When the baby's newest feed was logged. The newest of the nursing, formula, and pumped milk records counts as the last feed.
-  - **Attributes**: `kind` (`nursing`, `formula`, or `pumped`) and `note`. For a bottle (formula or pumped milk), `amount` and `unit` (`fl. oz.` or `mL`). For nursing, `left_duration_minutes`, `right_duration_minutes`, `both_duration_minutes`, and `finish_side` (`left` or `right`).
 - **Last sleep**
   - **Description**: When the baby's newest sleep was logged.
-  - **Attributes**: `duration_minutes`, which is `0` while the sleep is still running, and `note`.
 
 ## Baby Tracker (Nighp) automation examples
 
@@ -100,34 +92,37 @@ automation: |
 
 {% enddetails %}
 
-### Automation: Send a message when a dirty diaper is logged
+### Automation: Send a message when a new diaper is logged
 
-The **Last diaper** sensor has the diaper's `type` as an attribute. This example sends a message only when the newest diaper is a dirty one.
+The state of **Last diaper** changes each time a new diaper appears, whether it was logged on a phone or somewhere else. This example sends a message when that happens, and ignores the sensor becoming unknown or unavailable.
 
 - **Trigger**: State of an entity
   - **Entity**: Juniper Last diaper
-- **Condition**: Template
-  - **Template**: The new diaper's `type` is `dirty`
+  - **Not from**: Unknown, Unavailable
+  - **Not to**: Unknown, Unavailable
 - **Action**: Send a notification message
   - **Target**: My Device (`notify.my_device`)
 
-{% details "YAML example for sending a message about a dirty diaper" %}
+{% details "YAML example for sending a message about a new diaper" %}
 
 {% example %}
 automation: |
-  alias: "Juniper has a dirty diaper"
+  alias: "Juniper has a new diaper"
   triggers:
     - trigger: state
       entity_id: sensor.juniper_last_diaper
-  conditions:
-    - condition: template
-      value_template: "{{ trigger.to_state.attributes.type | default('') == 'dirty' }}"
+      not_from:
+        - "unknown"
+        - "unavailable"
+      not_to:
+        - "unknown"
+        - "unavailable"
   actions:
     - action: notify.send_message
       target:
         entity_id: notify.my_device
       data:
-        message: "A dirty diaper was logged for Juniper."
+        message: "A new diaper was logged for Juniper."
 {% endexample %}
 
 {% enddetails %}
@@ -145,6 +140,7 @@ To check for new records sooner, use the `homeassistant.update_entity` action on
 - The integration only reads your account. It can't log diapers, feeds, or sleep. Use the Baby Tracker app for that.
 - Records arrive on a schedule, not instantly. See [Data updates](#data-updates).
 - Nighp doesn't offer a public API. The integration uses the same sync service as the app, which Nighp can change without notice. A change may stop the integration until it's updated.
+- Babies added to the account after you set up the integration appear after you reload the integration or restart Home Assistant.
 - Each sensor shows only the newest record of its kind. The integration doesn't provide a history of every record.
 
 ## Troubleshooting
@@ -179,24 +175,6 @@ Home Assistant couldn't connect to the Baby Tracker service.
 
 {% enddetails %}
 
-{% details "Home Assistant asks you to sign in again" %}
-
-### Symptom: Home Assistant asks you to sign in again
-
-A message in **Settings** > **Devices & services** says the integration needs your attention.
-
-#### Description
-
-Baby Tracker rejected the saved password, usually because it changed.
-
-#### Resolution
-
-1. Go to **Settings** > **Devices & services**.
-2. Follow the prompt on the **Baby Tracker (Nighp)** card.
-3. Enter your account's current password.
-
-{% enddetails %}
-
 {% details "Sensors are unavailable or show old values" %}
 
 ### Symptom: Sensors are unavailable
@@ -211,7 +189,7 @@ Home Assistant couldn't update from the Baby Tracker service, so the sensors are
 
 1. Check that your Home Assistant instance is connected to the internet.
 2. Look in the Home Assistant log for the error. It names the reason the update failed.
-3. If the error continues, [download the diagnostics](#download-diagnostics) and report it.
+3. If the error continues, report it at [github.com/wtadler/ha-baby-tracker](https://github.com/wtadler/ha-baby-tracker/issues).
 
 ### Symptom: A sensor doesn't show a record you just logged
 
@@ -225,20 +203,8 @@ Use the `homeassistant.update_entity` action on any Baby Tracker sensor to updat
 
 {% enddetails %}
 
-### Download diagnostics
-
-To attach information to a bug report, go to **Settings** > **Devices & services**, select the **Baby Tracker (Nighp)** card, and select **Download diagnostics**. The file holds the integration's settings, the sync state, and counts of records. Your email address, password, and the device ID Home Assistant signs in with are redacted. It holds no baby's name or ID and no notes.
-
-Report problems at [github.com/wtadler/ha-baby-tracker](https://github.com/wtadler/ha-baby-tracker/issues).
-
 ## Removing the integration
 
 This integration follows standard integration removal. Deleting the integration also deletes the saved sync state.
 
 {% include integrations/remove_device_service.md %}
-
-### Removing a baby
-
-When you delete a baby in the Baby Tracker app, Home Assistant removes the baby's device and sensors at the next update. If you add the baby back later, Home Assistant creates the device and sensors again.
-
-If a baby's device is left behind, you can delete it from the device page. Select the three dots {% icon "mdi:dots-vertical" %} menu, and then select **Delete**. A baby that is still in your account can't be deleted, because the next update would add it back.
