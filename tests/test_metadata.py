@@ -351,6 +351,36 @@ def test_the_asleep_sensor_has_an_icon_for_each_state() -> None:
     assert asleep["default"].startswith("mdi:")
 
 
+@pytest.mark.parametrize("key", ["sleep", "nursing_left", "nursing_right"])
+def test_each_timer_switch_has_an_icon_for_on_and_off(key: str) -> None:
+    icons = _icons()["entity"]["switch"][key]
+    assert set(icons["state"]) == {"on", "off"}
+    assert icons["state"]["on"] != icons["state"]["off"]
+    assert all(icon.startswith("mdi:") for icon in (icons["default"], *icons["state"].values()))
+
+
+def test_the_timer_switches_and_discard_button_are_translated_and_the_old_buttons_are_gone() -> (
+    None
+):
+    entity = load_integration_json("strings.json")["entity"]
+    assert {key: value["name"] for key, value in entity["switch"].items()} == {
+        "sleep": "Sleep",
+        "nursing_left": "Nursing left",
+        "nursing_right": "Nursing right",
+    }
+    assert entity["button"]["discard_nursing"]["name"] == "Discard nursing"
+    for key in ("sleep", "nurse_left", "nurse_right"):
+        assert key not in entity["button"]
+        assert key not in _icons()["entity"]["button"]
+
+
+def test_the_repair_text_names_the_switches_and_the_discard_button_not_the_old_buttons() -> None:
+    text = load_integration_json("strings.json")["issues"]["nursing_timer_long"]["description"]
+    assert "Nurse button" not in text
+    assert "Nursing switch" in text
+    assert "Discard nursing button" in text
+
+
 # Constants and registry cleanup helpers
 
 
@@ -416,6 +446,8 @@ def test_every_sensor_has_a_translated_name() -> None:
         "last_sleep": "Last sleep",
         "sleep_timer": "Sleep timer",
         "nursing_timer": "Nursing timer",
+        "nursing_left_time": "Nursing left time",
+        "nursing_right_time": "Nursing right time",
     }
 
 

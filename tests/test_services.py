@@ -63,7 +63,7 @@ from .helpers import (
     NURSING_TIMER,
     OTHER_DEVICES_RECORD,
     PHONE_SLEEP,
-    SLEEP_BUTTON,
+    SLEEP_SWITCH,
     SLEEP_TIMER,
     account_device,
     button,
@@ -85,6 +85,8 @@ from .helpers import (
     state,
     state_of,
     sync,
+    toggle,
+    turn_on,
     undo,
 )
 
@@ -253,7 +255,7 @@ async def _prepare(hass: HomeAssistant, action: str, freezer: Any) -> None:
     freezer.move_to(NOW)
     prepare = BABY_ACTIONS[action][1]
     if prepare is not None:
-        await press(hass, prepare)
+        await turn_on(hass, prepare)
         freezer.tick(timedelta(minutes=2))
 
 
@@ -545,7 +547,7 @@ async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
@@ -770,7 +772,7 @@ async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
     gate = asyncio.Event()
     server.post_gate = gate
     freezer.move_to(minutes(6))
-    stop = hass.async_create_task(press(hass, NURSE_LEFT))
+    stop = hass.async_create_task(toggle(hass, NURSE_LEFT))
     for _ in range(20):
         await asyncio.sleep(0)
     assert "post" in server.calls  # the stop's post is waiting at the gate

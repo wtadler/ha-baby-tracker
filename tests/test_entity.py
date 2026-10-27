@@ -16,10 +16,12 @@ from custom_components.nighp_baby_tracker.button import BabyTrackerButton
 from custom_components.nighp_baby_tracker.const import DOMAIN
 from custom_components.nighp_baby_tracker.sensor import (
     BabyTrackerLastPumpSensor,
+    BabyTrackerNursingTimeSensor,
     BabyTrackerSensor,
     BabyTrackerTimerSensor,
     BabyTrackerTodaySensor,
 )
+from custom_components.nighp_baby_tracker.switch import BabyTrackerSwitch
 
 from .factories import BABY_ONE_ID, at, baby_payload
 from .fake_server import FakeServer
@@ -47,6 +49,8 @@ def _device_info(hass: HomeAssistant, entity_id: str) -> dict[str, Any]:
         BabyTrackerSensor,
         BabyTrackerTodaySensor,
         BabyTrackerTimerSensor,
+        BabyTrackerNursingTimeSensor,
+        BabyTrackerSwitch,
         BabyTrackerAsleepSensor,
         BabyTrackerLastPumpSensor,
     ],
@@ -100,7 +104,7 @@ async def test_every_platform_has_its_states_after_the_refactor(
             er.async_get(hass), init_integration.entry_id
         )
     }
-    assert domains == {"button", "sensor", "binary_sensor"}
+    assert domains == {"button", "sensor", "binary_sensor", "switch"}
     assert hass.states.get(DIAPER).state == at(0).isoformat()
     assert hass.states.get("binary_sensor.baby_one_asleep").state == "off"
     assert hass.states.get(LAST_PUMP).state == "unknown"

@@ -25,7 +25,6 @@ from custom_components.nighp_baby_tracker.const import (
 )
 from custom_components.nighp_baby_tracker.pybabytracker import (
     OP_ADD,
-    OP_UPDATE,
     AuthenticationError,
     BabyTrackerConnectionError,
     Diaper,
@@ -33,7 +32,6 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     NoResponseError,
     Nursing,
     Pumped,
-    Sleep,
     Volume,
 )
 
@@ -47,18 +45,14 @@ from .factories import (
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
+    DISCARD_NURSING,
     FEEDS_TODAY,
     LAST_DIAPER,
     LAST_FEED,
-    LAST_SLEEP,
     NOW,
     NURSE_LEFT,
     NURSING_TIMER,
-    PHONE_SLEEP,
-    SLEEP_BUTTON,
-    SLEEP_TIMER,
-    TWO_ASLEEP,
-    TWO_SLEEP_TIMER,
+    SLEEP_SWITCH,
     button,
     fail_to_write,
     gap_issue,
@@ -67,7 +61,6 @@ from .helpers import (
     nurse,
     nursing_posts,
     only_record,
-    phone_ends_sleep,
     phone_sleep,
     posted,
     press,
@@ -76,6 +69,7 @@ from .helpers import (
     set_options,
     state,
     sync,
+    toggle,
 )
 
 TWO_NURSING_TIMER = "sensor.baby_two_nursing_timer"
@@ -107,160 +101,6 @@ async def test_buttons(
         await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)
-
-
-# Sleep: the button
-
-
-async def test_a_sleep_press_with_no_running_sleep_starts_one_now(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    await hass.config.async_set_time_zone("America/New_York")
-    freezer.move_to(NOW)
-
-    await press(hass, SLEEP_BUTTON)
-
-    [(number, op, record)] = posted(server)
-    assert (number, op) == (1, OP_ADD)
-    assert isinstance(record, Sleep)
-    assert record.duration == 0
-    assert record.time == NOW
-    assert record.timezone == -18000
-    assert record.baby.object_id == BABY_ONE_ID
-    assert state(hass, ASLEEP).state == "on"
-    assert state(hass, SLEEP_TIMER).state == NOW.isoformat()
-
-
-async def test_a_sleep_press_while_a_phone_started_sleep_runs_ends_it_now(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    freezer.move_to(NOW)
-    phone_sleep(server, start=minutes(-40))
-    await sync(hass, init_integration)
-
-    await press(hass, SLEEP_BUTTON)
-
-    [(number, op, record)] = posted(server)
-    assert (number, op) == (1, OP_UPDATE)
-    assert record.object_id == PHONE_SLEEP
-    assert record.duration == 40
-    assert record.new_flag == "false"
-    assert record.timestamp == NOW
-    assert state(hass, ASLEEP).state == "off"
-    assert state(hass, SLEEP_TIMER).state == "unknown"
-    assert state(hass, LAST_SLEEP).attributes["duration_minutes"] == 40  # one sleep, now ended
-
-
-async def test_a_second_sleep_press_ends_the_sleep_home_assistant_started(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    freezer.move_to(NOW)
-    await press(hass, SLEEP_BUTTON)
-    freezer.move_to(minutes(25))
-
-    await press(hass, SLEEP_BUTTON)
-
-    [(_, op1, started), (_, op2, ended)] = posted(server)
-    assert (op1, op2) == (OP_ADD, OP_UPDATE)
-    assert ended.object_id == started.object_id
-    assert ended.duration == 25
-    assert state(hass, ASLEEP).state == "off"
-
-
-async def test_a_sleep_press_after_a_phone_already_ended_the_sleep_starts_nothing(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    """The press meant "stop": the sync before the write finds it stopped, so it's done."""
-    freezer.move_to(NOW)
-    phone_sleep(server, start=minutes(-40))
-    await sync(hass, init_integration)
-    phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=38, changed=minutes(-2))
-
-    with pytest.raises(ServiceValidationError) as err:
-        await press(hass, SLEEP_BUTTON)
-
-    assert err.value.translation_key == "sleep_already_ended"
-    assert posted(server) == []
-    assert state(hass, ASLEEP).state == "off"
-
-
-async def test_a_sleep_press_after_a_phone_already_started_a_sleep_starts_no_second_one(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    """The press meant "start": the sync before the write finds one running, so it's done."""
-    freezer.move_to(NOW)
-    phone_sleep(server, start=minutes(-1))  # not synced yet
-
-    with pytest.raises(ServiceValidationError) as err:
-        await press(hass, SLEEP_BUTTON)
-
-    assert err.value.translation_key == "sleep_already_started"
-    assert posted(server) == []
-    assert state(hass, ASLEEP).state == "on"
-    assert state(hass, SLEEP_TIMER).attributes["object_id"] == PHONE_SLEEP
-
-
-async def test_a_failed_end_keeps_the_sleep_running_and_the_next_press_lands_once(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    freezer.move_to(NOW)
-    phone_sleep(server, start=minutes(-40))
-    await sync(hass, init_integration)
-    server.post_errors.append((BabyTrackerConnectionError("down"), False))
-
-    with pytest.raises(HomeAssistantError):
-        await press(hass, SLEEP_BUTTON)
-    assert state(hass, ASLEEP).state == "on"
-    await press(hass, SLEEP_BUTTON)
-
-    assert [(n, op) for n, op, _ in posted(server)] == [(1, OP_UPDATE)]
-    assert state(hass, ASLEEP).state == "off"
-
-
-async def test_a_phone_and_home_assistant_ending_one_sleep_leave_one_finished_sleep(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    freezer.move_to(NOW)
-    phone_sleep(server, start=minutes(-40))
-    await sync(hass, init_integration)
-    # The phone's end lands after Home Assistant's pre-write sync, just before its post.
-    server.before_post.append(
-        lambda: phone_ends_sleep(
-            server, PHONE_SLEEP, start=minutes(-40), duration=39, changed=minutes(1)
-        )
-    )
-
-    await press(hass, SLEEP_BUTTON)
-    await sync(hass, init_integration)
-
-    assert state(hass, LAST_SLEEP).attributes["duration_minutes"] == 39  # the phone's end wins
-    assert [(n, op) for n, op, _ in posted(server)] == [(1, OP_UPDATE)]
-    assert state(hass, ASLEEP).state == "off"
-    assert state(hass, SLEEP_TIMER).state == "unknown"
-
-
-# Sleep: the actions
-
-
-async def test_two_babies_sleep_timers_run_independently(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    freezer.move_to(NOW)
-    await press(hass, SLEEP_BUTTON)
-    assert state(hass, TWO_ASLEEP).state == "off"
-    freezer.move_to(minutes(5))
-    await press(hass, "button.baby_two_sleep")
-    freezer.move_to(minutes(30))
-
-    await press(hass, SLEEP_BUTTON)
-
-    assert state(hass, ASLEEP).state == "off"
-    assert state(hass, TWO_ASLEEP).state == "on"
-    assert state(hass, TWO_SLEEP_TIMER).state == minutes(5).isoformat()
-    [(_, _, one), (_, _, two), (_, op, ended)] = posted(server)
-    assert ended.object_id == one.object_id
-    assert op == OP_UPDATE
-    assert two.baby.object_id == BABY_TWO_ID
 
 
 # Nursing: buttons
@@ -397,7 +237,7 @@ async def test_two_babies_nursing_timers_run_independently(
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     freezer.move_to(minutes(1))
-    await press(hass, "button.baby_two_nurse_right")
+    await toggle(hass, "switch.baby_two_nursing_right")
     await nurse(hass, freezer, (6, "left"))
 
     [record] = nursing_posts(server)
@@ -417,9 +257,9 @@ async def test_a_failed_nursing_write_keeps_the_timer_and_the_retry_lands_once(
 
     freezer.move_to(minutes(5))
     with pytest.raises(HomeAssistantError):
-        await press(hass, NURSE_LEFT)
+        await toggle(hass, NURSE_LEFT)
     assert state(hass, NURSING_TIMER).state == NOW.isoformat()
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     assert server.calls.count("post") == 2  # the failed post, then the retry
     [(number, _, record)] = posted(server)
@@ -438,9 +278,9 @@ async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice
 
     freezer.move_to(minutes(5))
     try:
-        await press(hass, NURSE_LEFT)
+        await toggle(hass, NURSE_LEFT)
     except HomeAssistantError:
-        await press(hass, NURSE_LEFT)
+        await toggle(hass, NURSE_LEFT)
 
     assert len(nursing_posts(server)) == 1
     assert state(hass, NURSING_TIMER).state == "unknown"
@@ -460,7 +300,7 @@ async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets
     for _ in range(20):
         await asyncio.sleep(0)
     assert "post" in server.calls
-    stop = hass.async_create_task(press(hass, NURSE_LEFT))
+    stop = hass.async_create_task(toggle(hass, NURSE_LEFT))
     for _ in range(5):
         await asyncio.sleep(0)
     freezer.move_to(minutes(8))
@@ -487,7 +327,7 @@ async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
         patch.object(Store, "async_save", save),
         pytest.raises(HomeAssistantError) as err,
     ):
-        await press(hass, NURSE_LEFT)
+        await toggle(hass, NURSE_LEFT)
 
     assert err.value.translation_key == "nursing_not_saved"
     assert state(hass, NURSING_TIMER).state == NOW.isoformat()
@@ -496,7 +336,7 @@ async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
 # Buttons
 
 
-async def test_each_baby_gets_wet_dirty_mixed_and_bottle_buttons(
+async def test_each_baby_gets_wet_dirty_mixed_bottle_and_discard_nursing_buttons(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     devices = dr.async_get(hass)
@@ -512,11 +352,9 @@ async def test_each_baby_gets_wet_dirty_mixed_and_bottle_buttons(
             "dirty_diaper",
             "mixed_diaper",
             "bottle",
-            "sleep",
-            "nurse_left",
-            "nurse_right",
+            "discard_nursing",
         }
-        assert len({b.unique_id for b in buttons}) == 7
+        assert len({b.unique_id for b in buttons}) == 5
     assert hass.states.get(button("baby_one", "wet")) is not None
     assert hass.states.get(button("baby_two", "mixed")) is not None
 
@@ -1065,6 +903,105 @@ async def test_a_started_timer_sends_the_standard_offset_in_summer(
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(datetime(2026, 7, 15, 16, 0, tzinfo=UTC))
 
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
 
     assert only_record(server).timezone == -18000
+
+
+# Discard nursing, and the buttons that are gone
+
+
+async def test_the_discard_button_drops_the_timer_and_posts_nothing(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"), (3, "right"))
+
+    await press(hass, DISCARD_NURSING)
+
+    assert posted(server) == []
+    assert state(hass, NURSING_TIMER).state == "unknown"
+    assert state(hass, NURSE_LEFT).state == "off"
+    assert state(hass, "switch.baby_one_nursing_right").state == "off"
+
+
+async def test_the_discard_button_with_no_timer_raises_the_translated_error(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    with pytest.raises(ServiceValidationError) as err:
+        await press(hass, DISCARD_NURSING)
+
+    assert err.value.translation_key == "no_nursing_timer"
+    assert err.value.translation_domain == DOMAIN
+    assert posted(server) == []
+
+
+async def test_the_discard_button_leaves_the_other_babys_timer_running(
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"))
+    await toggle(hass, "switch.baby_two_nursing_right")
+
+    await press(hass, DISCARD_NURSING)
+
+    assert state(hass, "switch.baby_two_nursing_right").state == "on"
+    assert state(hass, TWO_NURSING_TIMER).state == NOW.isoformat()
+
+
+async def test_a_discarded_session_can_start_again_and_logs_only_the_new_one(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"), (5, "left"))
+    await nurse(hass, freezer, (6, "right"))
+    await press(hass, DISCARD_NURSING)
+    await nurse(hass, freezer, (7, "right"), (9, "right"))
+
+    [record] = [r for r in nursing_posts(server) if r.right_duration]
+    assert (record.left_duration, record.right_duration) == (0, 2)
+
+
+async def test_discard_is_the_discard_nursing_action(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await nurse(hass, freezer, (0, "left"))
+    await press(hass, DISCARD_NURSING)
+
+    with pytest.raises(ServiceValidationError) as via_action:
+        await hass.services.async_call(
+            DOMAIN,
+            "discard_nursing",
+            {"device_id": get_baby_device(dr.async_get(hass), BABY_ONE_ID).id},  # type: ignore[union-attr]
+            blocking=True,
+        )
+    assert via_action.value.translation_key == "no_nursing_timer"
+
+
+@pytest.mark.parametrize("key", ["sleep", "nurse_left", "nurse_right"])
+async def test_the_old_timer_buttons_are_gone(
+    hass: HomeAssistant, init_integration: MockConfigEntry, key: str
+) -> None:
+    registry = er.async_get(hass)
+    for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
+        assert registry.async_get_entity_id("button", DOMAIN, f"{baby_id}_{key}") is None
+    assert hass.states.get(f"button.baby_one_{key}") is None
+
+
+async def test_the_one_shot_buttons_and_discard_are_the_only_buttons_per_baby(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
+        device = get_baby_device(devices, baby_id)
+        assert device is not None
+        keys = {
+            e.translation_key
+            for e in er.async_entries_for_device(entities, device.id)
+            if e.domain == "button"
+        }
+        assert keys == {
+            "wet_diaper",
+            "dirty_diaper",
+            "mixed_diaper",
+            "bottle",
+            "discard_nursing",
+        }

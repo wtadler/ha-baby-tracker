@@ -195,15 +195,18 @@ def test_dependency_transparency_stays_todo_while_the_library_is_bundled() -> No
     assert _status(_rules()["dependency-transparency"]) == "todo"
 
 
+def test_the_nursing_time_sensors_timer_makes_entity_event_setup_done_not_exempt() -> None:
+    assert _status(_rules()["entity-event-setup"]) == "done"
+
+
 def test_exempt_rules_are_ones_the_rule_text_allows() -> None:
     exempt = {rule for rule, entry in _rules().items() if _status(entry) == "exempt"}
     # Each of these has an exception in its rule text that this integration meets: no triggers or
-    # conditions, no entity subscribes to events, a cloud account with nothing to discover and no
+    # conditions, a cloud account with nothing to discover and no
     # physical device, only primary entities, and credentials-only configuration.
     assert exempt == {
         "docs-conditions",
         "docs-triggers",
-        "entity-event-setup",
         "discovery",
         "discovery-update-info",
         "docs-supported-devices",

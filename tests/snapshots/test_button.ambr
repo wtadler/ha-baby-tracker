@@ -99,6 +99,56 @@
     'state': 'unknown',
   })
 # ---
+# name: test_buttons[button.baby_one_discard_nursing-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'button',
+    'entity_category': None,
+    'entity_id': 'button.baby_one_discard_nursing',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Discard nursing',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Discard nursing',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'discard_nursing',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_discard_nursing',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_buttons[button.baby_one_discard_nursing-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Discard nursing',
+    }),
+    'context': <ANY>,
+    'entity_id': 'button.baby_one_discard_nursing',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
 # name: test_buttons[button.baby_one_mixed_diaper-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -143,156 +193,6 @@
     }),
     'context': <ANY>,
     'entity_id': 'button.baby_one_mixed_diaper',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_one_nurse_left-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_one_nurse_left',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Nurse left',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Nurse left',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'nurse_left',
-    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nurse_left',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_one_nurse_left-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Nurse left',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_one_nurse_left',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_one_nurse_right-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_one_nurse_right',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Nurse right',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Nurse right',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'nurse_right',
-    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nurse_right',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_one_nurse_right-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Nurse right',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_one_nurse_right',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_one_sleep-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_one_sleep',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Sleep',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Sleep',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'sleep',
-    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_sleep',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_one_sleep-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Sleep',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_one_sleep',
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
@@ -449,6 +349,56 @@
     'state': 'unknown',
   })
 # ---
+# name: test_buttons[button.baby_two_discard_nursing-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'button',
+    'entity_category': None,
+    'entity_id': 'button.baby_two_discard_nursing',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Discard nursing',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Discard nursing',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'discard_nursing',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_discard_nursing',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_buttons[button.baby_two_discard_nursing-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Discard nursing',
+    }),
+    'context': <ANY>,
+    'entity_id': 'button.baby_two_discard_nursing',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
 # name: test_buttons[button.baby_two_mixed_diaper-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -493,156 +443,6 @@
     }),
     'context': <ANY>,
     'entity_id': 'button.baby_two_mixed_diaper',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_two_nurse_left-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_two_nurse_left',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Nurse left',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Nurse left',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'nurse_left',
-    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nurse_left',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_two_nurse_left-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Nurse left',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_two_nurse_left',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_two_nurse_right-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_two_nurse_right',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Nurse right',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Nurse right',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'nurse_right',
-    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nurse_right',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_two_nurse_right-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Nurse right',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_two_nurse_right',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': 'unknown',
-  })
-# ---
-# name: test_buttons[button.baby_two_sleep-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'button',
-    'entity_category': None,
-    'entity_id': 'button.baby_two_sleep',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Sleep',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Sleep',
-    'platform': 'nighp_baby_tracker',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'sleep',
-    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_sleep',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_buttons[button.baby_two_sleep-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Sleep',
-    }),
-    'context': <ANY>,
-    'entity_id': 'button.baby_two_sleep',
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,

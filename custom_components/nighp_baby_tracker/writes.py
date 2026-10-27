@@ -449,38 +449,6 @@ def _new_id() -> str:
     return str(uuid.uuid4()).upper()
 
 
-async def async_press_sleep(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
-    """Handle the Sleep button: end the running sleep the button showed, else start one now.
-
-    What the press means is fixed by what Home Assistant showed when it was pressed. If a phone
-    changed things since (the sync before the write finds that sleep already ended, or a sleep
-    already started), the press writes nothing, so it never starts a second sleep or a new one
-    the parent meant to stop, and raises a validation error saying so (after the new state is
-    shown).
-    """
-    shown = coordinator.data.babies.get(baby_id) if coordinator.data else None
-    seen = shown.running_sleep if shown is not None else None
-    moment, offset = _in_home_assistant_time(None)
-    new_id = _new_id()
-
-    async def operation(engine: SyncEngine, client: BabyTrackerClient) -> str | None:
-        if seen is not None:
-            record = engine.records.get(seen.object_id)
-            if not (isinstance(record, Sleep) and record.is_running):
-                return "sleep_already_ended"
-            await engine.end_sleep(client, seen.object_id, end=moment)
-            return None
-        if running_sleep(engine, baby_id) is not None:
-            return "sleep_already_started"
-        await engine.start_sleep(
-            client, baby_id, start=moment, timezone_offset=offset, object_id=new_id
-        )
-        return None
-
-    if (stale := await _write(coordinator, operation)) is not None:
-        raise validation_error(stale)
-
-
 async def async_start_sleep(
     coordinator: BabyTrackerCoordinator,
     baby_id: str,
@@ -621,18 +589,18 @@ async def async_discard_nursing(coordinator: BabyTrackerCoordinator, baby_id: st
         await coordinator.async_set_nursing(baby_id, None)
 
 
-async def async_press_nurse(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
-    """Handle a Nurse button press.
+async def async_turn_off_nursing_side(
+    coordinator: BabyTrackerCoordinator, baby_id: str, side: str
+) -> None:
+    """Handle a nursing side's switch turned off: stop the session if it's running on ``side``.
 
-    Start ``side``, switch to it from the other side, or stop if it's the side already running.
-    Decided under the lock, against the timer as it is then.
+    A side that isn't the running one (or no session at all) does nothing. Decided under the
+    lock, against the timer as it is then, so a switch of sides in between isn't undone.
     """
     async with coordinator.exclusive():
         timer = coordinator.nursing.get(baby_id)
         if timer is not None and timer.side == side:
             await _stop_nursing_locked(coordinator, baby_id)
-        else:
-            await _start_nursing_locked(coordinator, baby_id, side)
 
 
 def _most_recent_own(engine: SyncEngine, baby_id: str | None) -> str | None:

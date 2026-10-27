@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -10,15 +10,18 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
-from homeassistant.const import UnitOfVolume
+from homeassistant.const import UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
 
 from .coordinator import BabyData, BabyTrackerConfigEntry
 from .entity import BabyTrackerAccountEntity, BabyTrackerBabyEntity
 from .helpers import volume_parts
 from .pybabytracker import Record
+from .timers import LEFT, RIGHT
 from .totals import DayTotals
 
 PARALLEL_UPDATES = 0
@@ -155,6 +158,11 @@ async def async_setup_entry(
             BabyTrackerTimerSensor(coordinator, description, baby_id)
             for baby_id in new
             for description in TIMER_SENSORS
+        )
+        async_add_entities(
+            BabyTrackerNursingTimeSensor(coordinator, description, baby_id)
+            for baby_id in new
+            for description in NURSING_TIME_SENSORS
         )
 
     _add_new_babies()
@@ -335,3 +343,59 @@ class BabyTrackerTimerSensor(BabyTrackerBabyEntity, SensorEntity):
         """Return the timer's attributes for the baby."""
         baby = self._baby
         return self.entity_description.timer_fn(baby)[1] if baby is not None else None
+
+
+# How often a running session's time is written, so a dashboard counts up without any sync.
+NURSING_TIME_INTERVAL = timedelta(seconds=30)
+
+
+@dataclass(frozen=True, kw_only=True)
+class BabyTrackerNursingTimeSensorDescription(SensorEntityDescription):
+    """The time on one side of Home Assistant's nursing session."""
+
+    side: str
+
+
+NURSING_TIME_SENSORS: tuple[BabyTrackerNursingTimeSensorDescription, ...] = tuple(
+    BabyTrackerNursingTimeSensorDescription(
+        key=f"nursing_{side}_time",
+        translation_key=f"nursing_{side}_time",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        suggested_display_precision=1,
+        side=side,
+    )
+    for side in (LEFT, RIGHT)
+)
+
+
+class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
+    """Minutes on one side this nursing session, the running side's time so far included.
+
+    Unknown while no session runs, as the timer sensors are. The value is worked out from the
+    clock, so a timer of its own refreshes it while a session runs (a sync isn't needed).
+    """
+
+    entity_description: BabyTrackerNursingTimeSensorDescription
+
+    async def async_added_to_hass(self) -> None:
+        """Count up while a session runs."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._async_tick, NURSING_TIME_INTERVAL)
+        )
+
+    @callback
+    def _async_tick(self, _now: datetime) -> None:
+        if self.native_value is not None:
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the minutes on this side, or None when no session runs."""
+        baby = self._baby
+        if baby is None or baby.nursing is None:
+            return None
+        left, right = baby.nursing.totals(dt_util.utcnow())
+        seconds = left if self.entity_description.side == LEFT else right
+        return round(seconds / 60, 1)

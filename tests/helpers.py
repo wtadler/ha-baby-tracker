@@ -82,6 +82,21 @@ async def press(hass: HomeAssistant, entity_id: str) -> None:
     await hass.services.async_call("button", "press", {"entity_id": entity_id}, blocking=True)
 
 
+async def turn_on(hass: HomeAssistant, entity_id: str) -> None:
+    await hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)
+
+
+async def turn_off(hass: HomeAssistant, entity_id: str) -> None:
+    await hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
+
+
+async def toggle(hass: HomeAssistant, entity_id: str) -> None:
+    """Tap a switch the way a dashboard does: off if it reads on, else on."""
+    found = hass.states.get(entity_id)
+    assert found is not None, f"{entity_id} doesn't exist"
+    await (turn_off if found.state == "on" else turn_on)(hass, entity_id)
+
+
 def device_id(hass: HomeAssistant, baby_id: str) -> str:
     device = get_baby_device(dr.async_get(hass), baby_id)
     assert device is not None
@@ -248,10 +263,10 @@ def nursing_posts(server: FakeServer) -> list[Nursing]:
 
 
 async def nurse(hass: HomeAssistant, freezer: Any, *steps: tuple[float, str]) -> None:
-    """Press nurse buttons at the given minutes after NOW: (minute, "left" | "right")."""
+    """Tap the nursing switches at the given minutes after NOW: (minute, "left" | "right")."""
     for minute, side in steps:
         freezer.move_to(minutes(minute))
-        await press(hass, f"button.baby_one_nurse_{side}")
+        await toggle(hass, f"switch.baby_one_nursing_{side}")
 
 
 LAST_DIAPER = "sensor.baby_one_last_diaper"
@@ -302,11 +317,11 @@ BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {
     "log_nursing": ({"left_minutes": 5}, None),
     "log_sleep": ({"start": "2026-10-26T13:00:00+00:00", "end": "2026-10-26T14:00:00+00:00"}, None),
     "start_sleep": ({}, None),
-    "stop_sleep": ({}, "button.baby_one_sleep"),
+    "stop_sleep": ({}, "switch.baby_one_sleep"),
     "start_nursing": ({"side": "left"}, None),
-    "switch_nursing_side": ({}, "button.baby_one_nurse_left"),
-    "stop_nursing": ({}, "button.baby_one_nurse_left"),
-    "discard_nursing": ({}, "button.baby_one_nurse_left"),
+    "switch_nursing_side": ({}, "switch.baby_one_nursing_left"),
+    "stop_nursing": ({}, "switch.baby_one_nursing_left"),
+    "discard_nursing": ({}, "switch.baby_one_nursing_left"),
 }
 
 ACTION_IDS = list(BABY_ACTIONS)
@@ -318,9 +333,23 @@ DIAPER = "sensor.baby_one_last_diaper"
 # The option an earlier version saved. It is no longer a setting, so these tests spell it out.
 LEGACY_INTERVAL = "scan_interval"
 
-SLEEP_BUTTON = "button.baby_one_sleep"
+SLEEP_SWITCH = "switch.baby_one_sleep"
 
-NURSE_LEFT = "button.baby_one_nurse_left"
+NURSE_RIGHT = "switch.baby_one_nursing_right"
+
+TWO_SLEEP_SWITCH = "switch.baby_two_sleep"
+
+TWO_NURSE_LEFT = "switch.baby_two_nursing_left"
+
+TWO_NURSE_RIGHT = "switch.baby_two_nursing_right"
+
+NURSING_LEFT_TIME = "sensor.baby_one_nursing_left_time"
+
+NURSING_RIGHT_TIME = "sensor.baby_one_nursing_right_time"
+
+DISCARD_NURSING = "button.baby_one_discard_nursing"
+
+NURSE_LEFT = "switch.baby_one_nursing_left"
 
 
 async def entry_with_options(hass: HomeAssistant, options: dict[str, Any]) -> MockConfigEntry:

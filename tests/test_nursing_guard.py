@@ -40,10 +40,10 @@ from .helpers import (
     nursing_posts,
     phone_sleep,
     posted,
-    press,
     state,
     sync_interval,
     tick,
+    toggle,
 )
 
 ISSUE = "nursing_timer_long_{}_{}"
@@ -109,7 +109,7 @@ async def test_no_repair_at_59_minutes_and_the_repair_exists_at_exactly_60(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 59)
     assert _issue(hass, init_integration) is None
@@ -125,7 +125,7 @@ async def test_the_repair_is_there_at_61_minutes_too(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 61)
 
@@ -136,7 +136,7 @@ async def test_the_repair_is_a_translated_warning_that_names_the_baby_and_is_not
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 61)
 
@@ -151,9 +151,9 @@ async def test_a_side_switch_does_not_restart_the_hour(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(50))
-    await press(hass, "button.baby_one_nurse_right")
+    await toggle(hass, "switch.baby_one_nursing_right")
 
     await _at(hass, freezer, 59)
     assert _issue(hass, init_integration) is None
@@ -166,7 +166,7 @@ async def test_the_repair_is_raised_by_the_polling_sync_too(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(61))
 
     # No scheduled callback is fired by hand: the next one-minute sync notices.
@@ -180,7 +180,7 @@ async def test_the_repair_is_raised_once_and_stays_one_issue(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     await _at(hass, freezer, 70)
     await _at(hass, freezer, 80)
@@ -192,7 +192,7 @@ async def test_a_dismissed_repair_stays_dismissed(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     ir.async_ignore_issue(hass, DOMAIN, _issue_id(init_integration), True)
 
@@ -205,9 +205,9 @@ async def test_each_baby_has_their_own_repair_and_clock(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(30))
-    await press(hass, "button.baby_two_nurse_left")
+    await toggle(hass, "switch.baby_two_nursing_left")
 
     await _at(hass, freezer, 61)
     assert _issue(hass, init_integration, BABY_ONE_ID) is not None
@@ -227,7 +227,7 @@ async def test_a_nursing_timer_well_under_an_hour_still_polls_every_minute(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 50)  # the probe's own ticks run up to seven minutes ahead
 
@@ -238,7 +238,7 @@ async def test_past_an_hour_polling_falls_back_to_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 61)
 
@@ -249,7 +249,7 @@ async def test_a_synced_running_sleep_keeps_one_minute_polling_past_the_nursing_
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     phone_sleep(server, start=NOW - timedelta(minutes=5))
     await _at(hass, freezer, 61)
     # The sync that finds the running sleep is on the five-minute schedule by now.
@@ -281,7 +281,7 @@ async def test_discarding_an_overdue_timer_leaves_polling_at_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
 
     await call(hass, "discard_nursing")
@@ -293,7 +293,7 @@ async def test_discarding_a_young_timer_returns_polling_to_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     await call(hass, "discard_nursing")
@@ -305,12 +305,12 @@ async def test_a_new_timer_after_an_overdue_one_polls_every_minute_again(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     await call(hass, "discard_nursing")
     assert _issue(hass, init_integration) is None
 
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     assert await sync_interval(hass, server) == timedelta(minutes=1)
     assert _issue(hass, init_integration) is None
@@ -320,11 +320,11 @@ async def test_a_timer_started_after_a_discard_gets_its_own_full_hour(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     await call(hass, "discard_nursing")
     freezer.move_to(minutes(62))
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await _at(hass, freezer, 62 + 59)
     assert _issue(hass, init_integration) is None
@@ -340,7 +340,7 @@ async def test_stopping_the_timer_clears_the_repair_and_still_writes_the_record(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     assert _issue(hass, init_integration) is not None
 
@@ -355,10 +355,10 @@ async def test_pressing_the_nurse_button_to_stop_clears_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
 
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     assert _issue(hass, init_integration) is None
 
@@ -367,7 +367,7 @@ async def test_discarding_the_timer_clears_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     assert _issue(hass, init_integration) is not None
 
@@ -381,8 +381,8 @@ async def test_discarding_one_babys_timer_leaves_the_other_babys_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
-    await press(hass, "button.baby_two_nurse_left")
+    await toggle(hass, NURSE_LEFT)
+    await toggle(hass, "switch.baby_two_nursing_left")
     await _at(hass, freezer, 61)
     assert _issue(hass, init_integration, BABY_ONE_ID) is not None
     assert _issue(hass, init_integration, BABY_TWO_ID) is not None
@@ -397,9 +397,9 @@ async def test_a_timer_that_ends_before_the_hour_never_raises_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(30))
-    await press(hass, NURSE_LEFT)  # stops it
+    await toggle(hass, NURSE_LEFT)  # stops it
 
     await _at(hass, freezer, 61)
     await _at(hass, freezer, 120)
@@ -411,7 +411,7 @@ async def test_a_timer_discarded_before_the_hour_never_raises_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(30))
     await call(hass, "discard_nursing")
 
@@ -424,7 +424,7 @@ async def test_unloading_the_entry_removes_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
 
     await hass.config_entries.async_unload(init_integration.entry_id)
@@ -437,7 +437,7 @@ async def test_removing_the_entry_removes_the_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
 
     await hass.config_entries.async_remove(init_integration.entry_id)
@@ -450,7 +450,7 @@ async def test_an_unloaded_entry_does_not_raise_the_repair_when_the_hour_passes(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
 
@@ -525,7 +525,7 @@ async def test_a_reload_with_an_overdue_timer_raises_the_repair_again(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await _at(hass, freezer, 61)
     await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
@@ -576,7 +576,7 @@ async def test_discard_drops_the_timer_and_writes_nothing_at_all(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(20))
     calls_before = list(server.calls)
 
@@ -596,7 +596,7 @@ async def test_a_discarded_timer_is_gone_after_a_restart(
     freezer: Any,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await call(hass, "discard_nursing")
 
     await hass.config_entries.async_reload(init_integration.entry_id)
@@ -611,8 +611,8 @@ async def test_discard_does_not_touch_the_sync_state_or_the_other_babys_timer(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
-    await press(hass, "button.baby_two_nurse_right")
+    await toggle(hass, NURSE_LEFT)
+    await toggle(hass, "switch.baby_two_nursing_right")
 
     await call(hass, "discard_nursing", BABY_ONE_ID)
 
@@ -641,7 +641,7 @@ async def test_discard_twice_fails_the_second_time(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     await call(hass, "discard_nursing")
 
     with pytest.raises(ServiceValidationError) as err:
@@ -655,7 +655,7 @@ async def test_discard_for_another_baby_than_the_one_with_the_timer_fails_and_ke
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)  # baby one's timer runs
+    await toggle(hass, NURSE_LEFT)  # baby one's timer runs
 
     with pytest.raises(ServiceValidationError) as err:
         await call(hass, "discard_nursing", BABY_TWO_ID)
@@ -669,7 +669,7 @@ async def test_discard_for_the_account_device_is_a_baby_not_found_error(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     account = account_device(hass, init_integration)
 
     with pytest.raises(ServiceValidationError) as err:
@@ -703,7 +703,7 @@ async def test_discard_accepts_the_deprecated_baby_field_and_raises_its_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
 
     await hass.services.async_call(
         DOMAIN, "discard_nursing", {"baby": device_id(hass, BABY_ONE_ID)}, blocking=True
@@ -717,11 +717,11 @@ async def test_a_discard_during_a_stops_write_waits_and_finds_no_timer(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     gate = asyncio.Event()
     server.post_gate = gate
     freezer.move_to(minutes(6))
-    stop = hass.async_create_task(press(hass, NURSE_LEFT))
+    stop = hass.async_create_task(toggle(hass, NURSE_LEFT))
     for _ in range(20):
         await asyncio.sleep(0)
     assert "post" in server.calls  # the stop's post is waiting at the gate
@@ -745,7 +745,7 @@ async def test_a_stop_during_a_discards_wait_finds_no_timer_and_writes_nothing(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     lock = init_integration.runtime_data.exclusive()
     await lock.acquire()  # something else (a sync or write) holds the lock
     discard = hass.async_create_task(call(hass, "discard_nursing"))
@@ -767,7 +767,7 @@ async def test_a_discard_that_cannot_be_saved_still_drops_the_timer_and_says_so(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     real_save = Store.async_save
 
     async def save(self: Store[Any], data: Any) -> None:
@@ -790,7 +790,7 @@ async def test_the_guard_firing_during_a_failing_sync_leaves_entities_unavailabl
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     server.request_error = BabyTrackerConnectionError("down")
     await tick(hass)
     assert state(hass, NURSING_TIMER).state == "unavailable"
@@ -808,11 +808,11 @@ async def test_a_stop_then_a_fresh_start_inside_the_old_window_raises_no_early_r
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(30))
-    await press(hass, NURSE_LEFT)  # stops it
+    await toggle(hass, NURSE_LEFT)  # stops it
     freezer.move_to(minutes(40))
-    await press(hass, NURSE_LEFT)  # a fresh timer
+    await toggle(hass, NURSE_LEFT)  # a fresh timer
 
     await _at(hass, freezer, 60)  # the first timer's hour
     assert _guard_issues(hass) == []
@@ -827,7 +827,7 @@ async def test_a_baby_deleted_while_flagged_clears_their_repair(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, "button.baby_two_nurse_left")
+    await toggle(hass, "switch.baby_two_nursing_left")
     await _at(hass, freezer, 61)
     assert _issue(hass, init_integration, BABY_TWO_ID) is not None
 

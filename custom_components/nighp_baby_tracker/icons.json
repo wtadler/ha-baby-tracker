@@ -22,14 +22,8 @@
       "bottle": {
         "default": "mdi:baby-bottle"
       },
-      "sleep": {
-        "default": "mdi:sleep"
-      },
-      "nurse_left": {
-        "default": "mdi:chevron-left-circle"
-      },
-      "nurse_right": {
-        "default": "mdi:chevron-right-circle"
+      "discard_nursing": {
+        "default": "mdi:timer-off"
       }
     },
     "sensor": {
@@ -59,6 +53,35 @@
       },
       "nursing_timer": {
         "default": "mdi:timer-sand"
+      },
+      "nursing_left_time": {
+        "default": "mdi:timer-sand"
+      },
+      "nursing_right_time": {
+        "default": "mdi:timer-sand"
+      }
+    },
+    "switch": {
+      "sleep": {
+        "default": "mdi:sleep-off",
+        "state": {
+          "on": "mdi:sleep",
+          "off": "mdi:sleep-off"
+        }
+      },
+      "nursing_left": {
+        "default": "mdi:chevron-left-circle-outline",
+        "state": {
+          "on": "mdi:chevron-left-circle",
+          "off": "mdi:chevron-left-circle-outline"
+        }
+      },
+      "nursing_right": {
+        "default": "mdi:chevron-right-circle-outline",
+        "state": {
+          "on": "mdi:chevron-right-circle",
+          "off": "mdi:chevron-right-circle-outline"
+        }
       }
     }
   },

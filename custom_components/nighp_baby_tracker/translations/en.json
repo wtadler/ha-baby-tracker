@@ -82,14 +82,8 @@
       "bottle": {
         "name": "Bottle"
       },
-      "sleep": {
-        "name": "Sleep"
-      },
-      "nurse_left": {
-        "name": "Nurse left"
-      },
-      "nurse_right": {
-        "name": "Nurse right"
+      "discard_nursing": {
+        "name": "Discard nursing"
       }
     },
     "sensor": {
@@ -142,6 +136,23 @@
             "name": "Right seconds"
           }
         }
+      },
+      "nursing_left_time": {
+        "name": "Nursing left time"
+      },
+      "nursing_right_time": {
+        "name": "Nursing right time"
+      }
+    },
+    "switch": {
+      "sleep": {
+        "name": "Sleep"
+      },
+      "nursing_left": {
+        "name": "Nursing left"
+      },
+      "nursing_right": {
+        "name": "Nursing right"
       }
     }
   },
@@ -541,7 +552,7 @@
     },
     "nursing_timer_long": {
       "title": "The nursing timer for {baby} has run for over an hour",
-      "description": "Home Assistant's nursing timer for {baby} has been running for more than an hour. The Baby Tracker app doesn't show a running nursing timer, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, either:\n\n1. Stop the timer (press the Nurse button for the side it is on, or call the Stop nursing action) to save one nursing record. A side is saved as at most 240 minutes.\n2. Discard the timer with the Discard nursing action to throw it away without saving anything.\n\nThis notice goes away when the timer stops or is discarded."
+      "description": "Home Assistant's nursing timer for {baby} has been running for more than an hour. The Baby Tracker app doesn't show a running nursing timer, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, either:\n\n1. Stop the timer (turn off the Nursing switch that is on, or call the Stop nursing action) to save one nursing record. A side is saved as at most 240 minutes.\n2. Discard the timer with the Discard nursing button or action to throw it away without saving anything.\n\nThis notice goes away when the timer stops or is discarded."
     },
     "deprecated_action_field": {
       "title": "An automation uses an old field of {action}",
