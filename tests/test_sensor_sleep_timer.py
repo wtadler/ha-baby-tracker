@@ -7,12 +7,11 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
 )
 
-from . import BABY_TWO
+from . import BABY_TWO, NOW, tick
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
     LAST_SLEEP,
-    NOW,
     PHONE_SLEEP,
     SLEEP_TIMER,
     TWO_ASLEEP,
@@ -22,7 +21,6 @@ from .helpers import (
     phone_sleep,
     state,
     sync,
-    tick,
 )
 
 PHONE_SLEEP_TWO = "5EE90000-0000-4000-8000-000000000002"

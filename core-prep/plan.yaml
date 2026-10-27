@@ -1,0 +1,303 @@
+# The core pull request sequence, as data for scripts/core_cut.py.
+#
+# Every value is the planned core PR that brings an item into core (1 to 22), or `hacs` for an
+# item that stays in this repository. A cut for PR N writes everything planned for PRs 1 to N.
+# Python code inside a file is cut by markers in the source: see scripts/core_cut.py.
+
+prs: 22
+
+# Files of custom_components/nighp_baby_tracker/. strings.json, icons.json, services.yaml,
+# manifest.json, and quality_scale.yaml are generated, so they aren't listed.
+integration_files:
+  __init__.py: 1
+  const.py: 1
+  coordinator.py: 1
+  entity.py: 1
+  sensor.py: 1
+  config_flow.py: 1
+  diagnostics.py: 3
+  helpers.py: 4
+  totals.py: 7
+  binary_sensor.py: 8
+  services.py: 9
+  writes.py: 9
+  button.py: 14
+  bottle.py: 15
+  switch.py: 17
+  timers.py: 18
+  timer_state.py: 18
+  guard.py: 18
+  brand: hacs
+  pybabytracker: hacs
+  translations: hacs
+
+# Files of tests/ whose module docstring doesn't name their PR. A test module's docstring starts
+# with "Core PR N" (or "Core PRs N, ...", which means the first of them) or "HACS only".
+test_files:
+  __init__.py: 1
+  conftest.py: 1
+  factories.py: 1
+  fake_server.py: 1
+  helpers.py: 2
+  components/nighp_baby_tracker/fixtures/baby.json: 1
+  components/nighp_baby_tracker/fixtures/record.json: 1
+  components/nighp_baby_tracker/fixtures/volume.json: 1
+  components/nighp_baby_tracker/fixtures/wire.json: 1
+  components/nighp_baby_tracker/fixtures/captured_payloads.json: 9
+  snapshots/test_sensor.ambr: 1
+  snapshots/test_diagnostics.ambr: 3
+  snapshots/test_binary_sensor.ambr: 8
+  snapshots/test_button.ambr: 14
+  snapshots/test_switch.ambr: 17
+  snapshots/test_entity.ambr: hacs
+
+# Keys of strings.json, icons.json, and services.yaml (as `services.<action>`). An entry covers
+# every key under it, and the longest entry that matches a key wins.
+keys:
+  config.step.user: 1
+  config.step.reauth_confirm: 2
+  config.error: 1
+  config.abort.already_configured: 1
+  config.abort.reauth_successful: 2
+  config.abort.unique_id_mismatch: 2
+  options: 15
+  device.baby: 1
+  device.account: 5
+  entity.sensor.last_diaper: 1
+  entity.sensor.last_feed: 1
+  entity.sensor.last_sleep: 1
+  entity.sensor.last_pump: 5
+  entity.sensor.diapers_today: 7
+  entity.sensor.feeds_today: 7
+  entity.sensor.bottle_volume_today: 7
+  entity.binary_sensor.asleep: 8
+  entity.sensor.sleep_timer: 8
+  entity.button.wet_diaper: 14
+  entity.button.dirty_diaper: 14
+  entity.button.mixed_diaper: 14
+  entity.button.bottle: 15
+  entity.switch.sleep: 17
+  entity.sensor.nursing_timer: 19
+  entity.sensor.nursing_left_time: 19
+  entity.sensor.nursing_right_time: 19
+  entity.switch.nursing_left: 20
+  entity.switch.nursing_right: 20
+  entity.button.discard_nursing: 20
+  entity.sensor.pump_timer: 21
+  entity.switch.pump: 21
+  services.log_diaper: 9
+  services.log_bottle: 10
+  services.log_nursing: 10
+  services.log_sleep: 10
+  services.log_pump: 12
+  services.undo: 13
+  services.start_sleep: 16
+  services.stop_sleep: 16
+  services.start_nursing: 18
+  services.switch_nursing_side: 18
+  services.stop_nursing: 18
+  services.discard_nursing: 18
+  services.start_pump: 21
+  services.stop_pump: 21
+  selector.diaper_type: 9
+  selector.bottle_kind: 10
+  selector.finish_side: 10
+  selector.bottle_type: 15
+  exceptions.auth_failed: 1
+  exceptions.sync_failed_update: 1
+  exceptions.baby_not_found: 9
+  exceptions.sync_failed: 9
+  exceptions.write_failed: 9
+  exceptions.write_outcome_unknown: 9
+  exceptions.object_id_in_use: 9
+  exceptions.invalid_amount: 10
+  exceptions.invalid_unit: 10
+  exceptions.invalid_bottle_kind: 10
+  exceptions.invalid_finish_side: 10
+  exceptions.end_before_start: 10
+  exceptions.no_duration: 10
+  exceptions.minutes_too_long: 10
+  exceptions.sleep_too_long: 10
+  exceptions.amount_too_small: 10
+  exceptions.own_log_gap: 11
+  exceptions.no_amount: 12
+  exceptions.amount_with_sides: 12
+  exceptions.minutes_with_sides: 12
+  exceptions.nothing_to_undo: 13
+  exceptions.not_own_record: 13
+  exceptions.record_not_found: 13
+  exceptions.record_not_for_baby: 13
+  exceptions.no_running_sleep: 16
+  exceptions.sleep_already_running: 16
+  exceptions.sleep_start_out_of_range: 16
+  exceptions.not_a_sleep: 16
+  exceptions.no_nursing_timer: 18
+  exceptions.nursing_not_saved: 18
+  exceptions.pump_already_running: 21
+  exceptions.no_pump_timer: 21
+  exceptions.pump_not_saved: 21
+  issues.own_log_gap: 11
+  issues.nursing_timer_long: 18
+  issues.pump_timer_long: 21
+  issues.deprecated_action_field: hacs
+
+# Strings that core takes from its common translations instead.
+references:
+  config.step.user.data.email: "[%key:common::config_flow::data::email%]"
+  config.step.user.data.password: "[%key:common::config_flow::data::password%]"
+  config.step.reauth_confirm.data.password: "[%key:common::config_flow::data::password%]"
+  config.error.invalid_auth: "[%key:common::config_flow::error::invalid_auth%]"
+  config.error.cannot_connect: "[%key:common::config_flow::error::cannot_connect%]"
+  config.error.unknown: "[%key:common::config_flow::error::unknown%]"
+  config.abort.already_configured: "[%key:common::config_flow::abort::already_configured_account%]"
+  config.abort.reauth_successful: "[%key:common::config_flow::abort::reauth_successful%]"
+
+# Strings worded differently until a later PR: `until` is the PR that brings the repository's
+# wording back.
+overrides:
+  exceptions.auth_failed.message:
+    until: 2
+    text: "The service rejected the email or password. Remove the entry and add the account again with its current password."
+
+manifest:
+  documentation: https://www.home-assistant.io/integrations/nighp_baby_tracker
+  loggers: [pybabytracker]
+  categories: [health_wellbeing]
+  # The tier each PR declares. PR 22 raises it, with a core team member's approval.
+  quality_scale:
+    1: bronze
+
+# The core quality_scale.yaml for each PR: a rule's status (and comment) from the PR given until
+# the next. Rules are in the order of core's scaffold template.
+quality_scale:
+  bronze:
+    action-setup:
+      1: {status: exempt, comment: "The integration has no actions yet."}
+      9: done
+    appropriate-polling:
+      1: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it)."}
+      8: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep runs."}
+      18: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep or nursing timer runs."}
+      21: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep, nursing, or pump timer runs."}
+    brands:
+      1: {status: done, comment: "The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker."}
+    common-modules:
+      1: done
+    config-flow-test-coverage:
+      1: done
+    config-flow:
+      1: done
+    dependency-transparency:
+      1: done
+    docs-actions:
+      1: {status: exempt, comment: "The integration has no actions yet."}
+      9: done
+    docs-conditions:
+      1: {status: exempt, comment: "The integration registers no device conditions."}
+    docs-high-level-description:
+      1: done
+    docs-installation-instructions:
+      1: done
+    docs-removal-instructions:
+      1: done
+    docs-triggers:
+      1: {status: exempt, comment: "The integration registers no device triggers."}
+    entity-event-setup:
+      1: {status: exempt, comment: "Entities only read the coordinator's data and subscribe to nothing."}
+      19: {status: done, comment: "Entities read the coordinator's data. The nursing time sensors also run a 30-second timer, subscribed in async_added_to_hass and cancelled with async_on_remove."}
+    entity-unique-id:
+      1: done
+    has-entity-name:
+      1: done
+    runtime-data:
+      1: done
+    test-before-configure:
+      1: done
+    test-before-setup:
+      1: done
+    unique-config-entry:
+      1: done
+  silver:
+    action-exceptions:
+      1: {status: exempt, comment: "The integration has no actions yet."}
+      9: done
+    config-entry-unloading:
+      1: done
+    docs-configuration-parameters:
+      1: {status: exempt, comment: "The integration has no options yet."}
+      15: done
+    docs-installation-parameters:
+      1: done
+    entity-unavailable:
+      1: done
+    integration-owner:
+      1: done
+    log-when-unavailable:
+      1: done
+    parallel-updates:
+      1: done
+    reauthentication-flow:
+      1: todo
+      2: done
+    test-coverage:
+      1: done
+  gold:
+    devices:
+      1: done
+    diagnostics:
+      1: todo
+      3: done
+    discovery-update-info:
+      1: {status: exempt, comment: "A cloud account has no devices to discover on a network, so there is no address to update."}
+    discovery:
+      1: {status: exempt, comment: "A cloud account has no devices to discover on a network."}
+    docs-data-update:
+      1: todo
+      22: done
+    docs-examples:
+      1: todo
+      22: done
+    docs-known-limitations:
+      1: todo
+      22: done
+    docs-supported-devices:
+      1: {status: exempt, comment: "The integration connects to an account in the app's cloud service. The babies it shows as devices are records in that account, not physical devices."}
+    docs-supported-functions:
+      1: todo
+      22: done
+    docs-troubleshooting:
+      1: todo
+      22: done
+    docs-use-cases:
+      1: todo
+      22: done
+    dynamic-devices:
+      1: todo
+      6: done
+    entity-category:
+      1: {status: exempt, comment: "Every entity is a primary entity, for which the default category is right."}
+    entity-device-class:
+      1: done
+    entity-disabled-by-default:
+      1: {status: done, comment: "No entity starts disabled. Each is one of the integration's main readings or controls."}
+    entity-translations:
+      1: done
+    exception-translations:
+      1: done
+    icon-translations:
+      1: done
+    reconfiguration-flow:
+      1: {status: exempt, comment: "The only settings in the config flow are the account's credentials. A different email is a different account, which gets its own entry."}
+    repair-issues:
+      1: {status: exempt, comment: "The integration raises no repair issues yet."}
+      11: done
+    stale-devices:
+      1: todo
+      6: done
+  platinum:
+    async-dependency:
+      1: done
+    inject-websession:
+      1: done
+    strict-typing:
+      1: done

@@ -1,0 +1,84 @@
+rules:
+  # Bronze
+  action-setup: done
+  appropriate-polling:
+    status: done
+    comment: Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep, nursing, or pump timer runs.
+  brands:
+    status: done
+    comment: The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker.
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-conditions:
+    status: exempt
+    comment: The integration registers no device conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: The integration registers no device triggers.
+  entity-event-setup:
+    status: done
+    comment: Entities read the coordinator's data. The nursing time sensors also run a 30-second timer, subscribed in async_added_to_hass and cancelled with async_on_remove.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow: done
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: A cloud account has no devices to discover on a network, so there is no address to update.
+  discovery:
+    status: exempt
+    comment: A cloud account has no devices to discover on a network.
+  docs-data-update: todo
+  docs-examples: todo
+  docs-known-limitations: todo
+  docs-supported-devices:
+    status: exempt
+    comment: The integration connects to an account in the app's cloud service. The babies it shows as devices are records in that account, not physical devices.
+  docs-supported-functions: todo
+  docs-troubleshooting: todo
+  docs-use-cases: todo
+  dynamic-devices: done
+  entity-category:
+    status: exempt
+    comment: Every entity is a primary entity, for which the default category is right.
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: done
+    comment: No entity starts disabled. Each is one of the integration's main readings or controls.
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow:
+    status: exempt
+    comment: The only settings in the config flow are the account's credentials. A different email is a different account, which gets its own entry.
+  repair-issues: done
+  stale-devices: done
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+  strict-typing: done

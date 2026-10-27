@@ -18,13 +18,13 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Nursing,
 )
 
+from . import NOW
 from .factories import (
     BABY_ONE_ID,
 )
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
-    NOW,
     NURSE_LEFT,
     NURSING_TIMER,
     device_id,

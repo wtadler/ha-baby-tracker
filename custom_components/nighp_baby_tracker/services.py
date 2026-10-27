@@ -240,6 +240,7 @@ UNDO_SCHEMA = probatio.All(
 )
 
 
+# HACS-only: the deprecated_action_field repair
 def _warn_deprecated(call: ServiceCall, field: str, replacement: str) -> None:
     """Raise a repair issue that says an automation should use ``replacement`` instead.
 

@@ -1,40 +1,42 @@
 """Config flow for Baby Tracker (Nighp)."""
 
 import logging
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping  # Core PR 2
+from typing import Any, override
 from uuid import uuid4
 
 import probatio
 from homeassistant.config_entries import (
-    ConfigEntry,
+    ConfigEntry,  # Core PR 15
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlow,  # Core PR 15
 )
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import (
+    HomeAssistant,
+    callback,  # Core PR 15
+)
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.selector import (
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
-    SelectSelector,
-    SelectSelectorConfig,
-    SelectSelectorMode,
+    NumberSelector,  # Core PR 15
+    NumberSelectorConfig,  # Core PR 15
+    NumberSelectorMode,  # Core PR 15
+    SelectSelector,  # Core PR 15
+    SelectSelectorConfig,  # Core PR 15
+    SelectSelectorMode,  # Core PR 15
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
-from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
+from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle  # Core PR 15
 from .const import (
-    CONF_BOTTLE_SIZE,
-    CONF_BOTTLE_TYPE,
-    CONF_BOTTLE_UNIT,
+    CONF_BOTTLE_SIZE,  # Core PR 15
+    CONF_BOTTLE_TYPE,  # Core PR 15
+    CONF_BOTTLE_UNIT,  # Core PR 15
     CONF_DEVICE_UUID,
-    CONFIG_ENTRY_MINOR_VERSION,
-    CONFIG_ENTRY_VERSION,
+    CONFIG_ENTRY_MINOR_VERSION,  # HACS-only: the config entry migration
     DEVICE_NAME,
     DOMAIN,
 )
@@ -46,8 +48,12 @@ from .pybabytracker import (
 
 _LOGGER = logging.getLogger(__name__)
 
-MAX_BOTTLE_SIZE = 1000  # the form's outer bound, in the larger number of the two units
-MAX_BOTTLE_SIZES = {OUNCES: 32, MILLILITERS: 1000}  # per unit: more than any bottle
+# Core PR 15
+# The form's outer bound, in the larger number of the two units.
+MAX_BOTTLE_SIZE = 1000
+# Core PR 15
+# Per unit: more than any bottle.
+MAX_BOTTLE_SIZES = {OUNCES: 32, MILLILITERS: 1000}
 
 CREDENTIALS_SCHEMA = probatio.Schema(
     {
@@ -60,6 +66,7 @@ CREDENTIALS_SCHEMA = probatio.Schema(
     }
 )
 
+# Core PR 2
 REAUTH_SCHEMA = probatio.Schema(
     {
         probatio.Required(CONF_PASSWORD): TextSelector(
@@ -94,20 +101,23 @@ async def _check_login(
 class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up one Baby Tracker account."""
 
-    VERSION = CONFIG_ENTRY_VERSION
-    MINOR_VERSION = CONFIG_ENTRY_MINOR_VERSION  # HACS-only: core has no minor version
+    VERSION = 1
+    MINOR_VERSION = CONFIG_ENTRY_MINOR_VERSION  # HACS-only: core starts at version 1.1
 
     def __init__(self) -> None:
         """Set up the flow with a fresh device ID."""
         # Generated once per flow, and kept in the entry: this is Home Assistant's device ID.
         self._device_uuid = str(uuid4()).upper()
 
+    # Core PR 15
     @staticmethod
     @callback
+    @override
     def async_get_options_flow(config_entry: ConfigEntry) -> BabyTrackerOptionsFlow:
         """Return the options flow."""
         return BabyTrackerOptionsFlow()
 
+    @override
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask for the account's email and password, then create the entry."""
         errors: dict[str, str] = {}
@@ -134,10 +144,12 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    # Core PR 2
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         """Start reauthentication when the saved password stops working."""
         return await self.async_step_reauth_confirm()
 
+    # Core PR 2
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -166,6 +178,7 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
+# Core PR 15
 class BabyTrackerOptionsFlow(OptionsFlow):
     """Choose what the Bottle button logs."""
 

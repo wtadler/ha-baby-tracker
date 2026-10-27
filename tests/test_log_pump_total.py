@@ -14,8 +14,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.pybabytracker import OP_ADD, Pump, Volume
 
+from . import NOW
 from .fake_server import FakeServer
-from .helpers import LAST_PUMP, NOW, log_pump, posted, state
+from .helpers import LAST_PUMP, log_pump, posted, state
 
 # The keys of a total-only pump: the live shape, with no per-side amounts and no baby.
 TOTAL_ONLY_KEYS = {

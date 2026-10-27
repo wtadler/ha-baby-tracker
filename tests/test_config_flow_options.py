@@ -21,15 +21,14 @@ from custom_components.nighp_baby_tracker.const import (
     CONF_BOTTLE_UNIT,
 )
 
+from . import NOW, sync_interval
 from .fake_server import FakeServer
 from .helpers import (
     INTEGRATION,
     LEGACY_INTERVAL,
-    NOW,
     SLEEP_SWITCH,
     entry_with_options,
     set_options,
-    sync_interval,
     toggle,
 )
 

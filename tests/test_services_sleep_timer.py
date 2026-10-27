@@ -12,13 +12,13 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     OP_UPDATE,
 )
 
+from . import NOW
 from .factories import (
     BABY_ONE_ID,
 )
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
-    NOW,
     PHONE_SLEEP,
     SLEEP_SWITCH,
     SLEEP_TIMER,

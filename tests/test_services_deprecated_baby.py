@@ -21,6 +21,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Pump,
 )
 
+from . import NOW
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -29,7 +30,6 @@ from .fake_server import FakeServer
 from .helpers import (
     ACTION_IDS,
     BABY_ACTIONS,
-    NOW,
     account_device,
     device_id,
     log_pump,

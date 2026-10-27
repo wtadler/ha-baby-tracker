@@ -21,7 +21,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 from custom_components.nighp_baby_tracker.const import account_identifier
 from custom_components.nighp_baby_tracker.pybabytracker import SyncEngine
 
-from . import BABY_TWO
+from . import BABY_TWO, get_baby_device, tick
 from .factories import (
     BABY_ONE_ID,
     BABY_TWO_ID,
@@ -32,7 +32,6 @@ from .factories import (
     at,
 )
 from .fake_server import FakeServer
-from .helpers import get_baby_device, tick
 
 BABY_TWO_DIAPER = "D0000000-0000-4000-8000-000000000002"  # from the server fixture
 

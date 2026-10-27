@@ -22,6 +22,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     BabyTrackerConnectionError,
 )
 
+from . import NOW
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -33,7 +34,6 @@ from .fake_server import FakeServer
 from .helpers import (
     LAST_DIAPER,
     LAST_FEED,
-    NOW,
     OTHER_DEVICES_RECORD,
     button,
     call,

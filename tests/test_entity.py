@@ -24,9 +24,10 @@ from custom_components.nighp_baby_tracker.sensor import (
 )
 from custom_components.nighp_baby_tracker.switch import BabyTrackerSwitch
 
+from . import DIAPER
 from .factories import BABY_ONE_ID, at, baby_payload
 from .fake_server import FakeServer
-from .helpers import DIAPER, INTEGRATION, LAST_PUMP, load_integration_json
+from .helpers import INTEGRATION, LAST_PUMP, load_integration_json
 
 
 def _defined_in_entity_module(cls: type) -> bool:

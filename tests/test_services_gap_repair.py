@@ -8,13 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from . import EMAIL, OWN_DEVICE
+from . import EMAIL, NOW, OWN_DEVICE
 from .fake_server import FakeServer
-from .helpers import (
-    NOW,
-    fail_to_write,
-    gap_issue,
-)
+from .helpers import fail_to_write, gap_issue
 
 
 @pytest.fixture(autouse=True)

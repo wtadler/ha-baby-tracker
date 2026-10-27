@@ -1,10 +1,16 @@
-"""Base entities: one for what belongs to a baby, one for what belongs to the account."""
+"""Base entities for Baby Tracker (Nighp)."""
+
+from typing import override
 
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ACCOUNT_DEVICE_MODEL, DOMAIN, account_identifier
+from .const import (
+    ACCOUNT_DEVICE_MODEL,  # Core PR 5
+    DOMAIN,
+    account_identifier,  # Core PR 5
+)
 from .coordinator import BabyData, BabyTrackerCoordinator
 
 MANUFACTURER = "Nighp"
@@ -59,11 +65,13 @@ class BabyTrackerBabyEntity(BabyTrackerEntity):
         return self.coordinator.data.babies.get(self._baby_id)
 
     @property
+    @override
     def available(self) -> bool:
         """Return whether the baby is on the account."""
         return super().available and self._baby is not None
 
 
+# Core PR 5
 class BabyTrackerAccountEntity(BabyTrackerEntity):
     """An entity on the account's own device, for what belongs to no one baby."""
 

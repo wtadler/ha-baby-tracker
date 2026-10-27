@@ -2,40 +2,46 @@
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable  # Core PR 9
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta  # Core PR 7
+from typing import TYPE_CHECKING, Any, override
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import (
+    HomeAssistant,
+    callback,  # Core PR 7
+)
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers import device_registry as dr  # Core PR 6
+from homeassistant.helpers.event import async_track_time_change  # Core PR 7
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util  # Core PR 7
 
 from .const import (
     CONF_DEVICE_UUID,
     DOMAIN,
     SCAN_INTERVAL,
     STORAGE_VERSION,
-    is_account_identifier,
+    is_account_identifier,  # Core PR 6
 )
-from .guard import TimerGuard
+from .guard import TimerGuard  # Core PR 18
 from .pybabytracker import (
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
     Record,
-    Sleep,
+    Sleep,  # Core PR 8
     SyncEngine,
 )
-from .timer_state import TimerState
-from .timers import NursingTimer, PumpTimer
-from .totals import DayTotals, day_totals
+from .timer_state import TimerState  # Core PR 18
+from .timers import (  # Core PR 18
+    NursingTimer,
+    PumpTimer,  # Core PR 21
+)
+from .totals import DayTotals, day_totals  # Core PR 7
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,25 +49,24 @@ type BabyTrackerConfigEntry = ConfigEntry[BabyTrackerCoordinator]
 
 FEED_TYPES = ("Nursing", "Formula", "Pumped")
 
+# Core PR 8
 # How often to sync while a sleep, nursing, or pump timer runs, so a phone's stop shows up quickly.
 TIMER_INTERVAL = timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
 class BabyData:
-    """One baby's newest record of each kind the sensors show.
-
-    A pump belongs to the account, not a baby, so it isn't here (see ``BabyTrackerData``).
-    """
+    """One baby's newest record of each kind the sensors show."""
 
     baby_id: str
     name: str | None
     diaper: Record | None = None
     feed: Record | None = None
     sleep: Record | None = None
-    today: DayTotals = DayTotals()
-    nursing: NursingTimer | None = None
+    today: DayTotals = DayTotals()  # Core PR 7
+    nursing: NursingTimer | None = None  # Core PR 18
 
+    # Core PR 8
     @property
     def running_sleep(self) -> Sleep | None:
         """The newest sleep, if it's still running. The asleep sensor follows the same rule."""
@@ -73,9 +78,11 @@ class BabyTrackerData:
     """Everything the entities show, compared by value so an unchanged refresh writes nothing."""
 
     babies: dict[str, BabyData]
+    # Core PR 5
     # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
     # baby, so it isn't part of any BabyData.
     last_pump: Record | None = None
+    # Core PR 21
     # Home Assistant's own pump timer, while it runs. It belongs to the account too.
     pump: PumpTimer | None = None
 
@@ -87,13 +94,16 @@ def storage_key(entry_id: str) -> str:
 
 def _newest(records: list[Record]) -> Record | None:
     def key(record: Record) -> tuple[float, float]:
-        assert record.time is not None  # latest_records only returns records with a time
+        if TYPE_CHECKING:
+            # latest_records only returns records with a time.
+            assert record.time is not None
         stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
         return (record.time.timestamp(), stamp)
 
     return max(records, key=key, default=None)
 
 
+# Core PR 9
 class SyncBeforeWriteError(BabyTrackerError):
     """The sync that precedes every write failed, so nothing was written."""
 
@@ -128,17 +138,15 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         )
         self._baby_names: dict[str, str | None] = {}
         self.lock = asyncio.Lock()
-        self.timers = TimerState(hass, entry, self._publish)
-        self.guard = TimerGuard(hass, entry, self.timers, self._async_republish)
+        self.timers = TimerState(hass, entry, self._publish)  # Core PR 18
+        self.guard = TimerGuard(hass, entry, self.timers, self._async_republish)  # Core PR 18
 
+    @override
     async def _async_setup(self) -> None:
-        """Load the saved sync state and any running nursing and pump timers.
-
-        A restart then fetches only what's newer.
-        """
-        self.guard.async_setup()
-        self._async_track_midnight()
-        await self.timers.async_load()
+        """Load what was saved, so a restart fetches only what's newer."""
+        self.guard.async_setup()  # Core PR 18
+        self._async_track_midnight()  # Core PR 7
+        await self.timers.async_load()  # Core PR 18
         await self._async_load_engine()
 
     async def _async_load_engine(self) -> None:
@@ -156,6 +164,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 "The saved sync state couldn't be read (%r); loading all history again", err
             )
 
+    @override
     async def _async_update_data(self) -> BabyTrackerData:
         async with self.lock:
             return await self._async_sync()
@@ -188,7 +197,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             _LOGGER.exception("Couldn't save the sync state; it will be saved after the next sync")
 
     def _snapshot(self) -> BabyTrackerData:
-        """Build the data from the engine and the timers, changing nothing."""
+        """Build the data, changing nothing."""
         names = {
             baby_id: name
             for baby_id, name in self._baby_names.items()
@@ -206,36 +215,39 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 diaper=latest.get("Diaper"),
                 feed=_newest([latest[kind] for kind in FEED_TYPES if kind in latest]),
                 sleep=latest.get("Sleep"),
-                today=self._today(baby_id),
-                nursing=self.timers.nursing.get(baby_id),
+                today=self._today(baby_id),  # Core PR 7
+                nursing=self.timers.nursing.get(baby_id),  # Core PR 18
             )
         return BabyTrackerData(
             babies=babies,
-            last_pump=self.engine.latest_pump(),
-            pump=self.timers.pump,
+            last_pump=self.engine.latest_pump(),  # Core PR 5
+            pump=self.timers.pump,  # Core PR 21
         )
 
     def _rebuild(self) -> BabyTrackerData:
         """Build the data, then do what a new snapshot calls for.
 
-        Every path that publishes data (a sync, a write, a timer change, midnight) comes through
-        here. It removes the devices of babies the sync shows as deleted, remembers the babies'
-        names, and drops the nursing timers of babies no longer in the account (their saved copy
-        is dropped in a task the config entry tracks). It also sets the next refresh's interval.
+        Every path that publishes data comes through here. It remembers the babies' names for the
+        next snapshot.
         """
         data = self._snapshot()
-        self._remove_deleted_devices(data)
+        self._remove_deleted_devices(data)  # Core PR 6
         self._baby_names = {baby_id: baby.name for baby_id, baby in data.babies.items()}
+        # Core PR 18
+        # The saved copy of an orphaned nursing timer is dropped in a task the entry tracks.
         self.timers.drop_orphaned_nursing(data.babies)
-        self.guard.check(self._baby_names)
+        self.guard.check(self._baby_names)  # Core PR 18
+        # Core PR 8
         # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
         self.update_interval = self.wanted_interval(data)
         return data
 
+    # Core PR 9
     def _publish(self) -> None:
         """Rebuild the data and hand it to the entities at once, without waiting for a poll."""
         self.async_set_updated_data(self._rebuild())
 
+    # Core PR 7
     @callback
     def _async_republish(self) -> None:
         """Publish fresh data, leaving ``last_update_success`` alone.
@@ -245,6 +257,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self.data = self._rebuild()
         self.async_update_listeners()
 
+    # Core PR 8
     def wanted_interval(self, data: BabyTrackerData | None = None) -> timedelta:
         """Return the sync interval: one minute while a timer runs, else five.
 
@@ -264,12 +277,12 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             return TIMER_INTERVAL
         return SCAN_INTERVAL
 
+    # Core PR 8
     @staticmethod
     def _sleep_running(babies: dict[str, BabyData]) -> bool:
         return any(baby.running_sleep is not None for baby in babies.values())
 
-    # Totals: today's counts, which also change at local midnight.
-
+    # Core PR 7
     def _today(self, baby_id: str) -> DayTotals:
         """Return one baby's counts for today.
 
@@ -280,20 +293,21 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         end = dt_util.start_of_local_day(today + timedelta(days=1))
         return day_totals(self.engine.records.values(), baby_id, start, end)
 
+    # Core PR 7
     def _async_track_midnight(self) -> None:
         """Start a new day of counts at local midnight even when nothing syncs."""
         self.config_entry.async_on_unload(
             async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
         )
 
+    # Core PR 7
     @callback
     def _async_midnight(self, _now: datetime) -> None:
         """Start a new day of counts without syncing."""
         if self.data is not None:
             self._async_republish()
 
-    # Device removal: the devices of babies the sync shows as deleted.
-
+    # Core PR 6
     def _remove_deleted_devices(self, data: BabyTrackerData) -> None:
         """Remove the device, and with it the entities, of every baby the sync shows as deleted.
 
@@ -314,8 +328,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                     registry.async_remove_device(device.id)
                     break
 
-    # Writes: the lock that syncs and writes share, and the write path.
-
+    # Core PR 9
     def exclusive(self) -> asyncio.Lock:
         """Return the lock that syncs and writes take.
 
@@ -324,6 +337,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         """
         return self.lock
 
+    # Core PR 9
     async def async_write[T](
         self,
         operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]],
@@ -345,6 +359,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         async with self.lock:
             return await self._async_write_locked(operation)
 
+    # Core PR 9
     async def _async_write_locked[T](
         self, operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]]
     ) -> T:

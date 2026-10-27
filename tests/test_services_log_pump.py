@@ -23,6 +23,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
+from . import NOW
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -32,7 +33,6 @@ from .fake_server import FakeServer
 from .helpers import (
     BOTTLE_TODAY,
     FEEDS_TODAY,
-    NOW,
     account_device,
     call,
     device_id,

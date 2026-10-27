@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import override
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.core import HomeAssistant, callback
@@ -82,6 +83,7 @@ class BabyTrackerButton(BabyTrackerBabyEntity, ButtonEntity):
 
     entity_description: BabyTrackerButtonDescription
 
+    @override
     async def async_press(self) -> None:
         """Run the button's action for its baby."""
         await self.entity_description.press_fn(self.coordinator, self._baby_id)

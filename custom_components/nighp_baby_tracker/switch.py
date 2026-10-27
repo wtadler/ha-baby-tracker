@@ -18,7 +18,7 @@ the stop has no amount (the ``stop_pump`` action takes one).
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.core import HomeAssistant, callback
@@ -167,15 +167,18 @@ class BabyTrackerSwitch(BabyTrackerBabyEntity, SwitchEntity):
     entity_description: BabyTrackerSwitchDescription
 
     @property
+    @override
     def is_on(self) -> bool | None:
         """Return whether the timer runs."""
         baby = self._baby
         return self.entity_description.is_on_fn(baby) if baby is not None else None
 
+    @override
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Start the timer (a nursing side switches to it from the other side)."""
         await self.entity_description.turn_on_fn(self.coordinator, self._baby_id)
 
+    @override
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop the timer: a sleep ends, a nursing session is logged."""
         await self.entity_description.turn_off_fn(self.coordinator, self._baby_id)
@@ -187,14 +190,17 @@ class BabyTrackerAccountSwitch(BabyTrackerAccountEntity, SwitchEntity):
     entity_description: BabyTrackerAccountSwitchDescription
 
     @property
+    @override
     def is_on(self) -> bool:
         """Return whether the timer runs."""
         return self.entity_description.is_on_fn(self.coordinator.data)
 
+    @override
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Start the timer."""
         await self.entity_description.turn_on_fn(self.coordinator)
 
+    @override
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop the timer and log the session, with no amount."""
         await self.entity_description.turn_off_fn(self.coordinator)

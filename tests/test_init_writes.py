@@ -22,6 +22,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 )
 
 from . import (
+    NOW,
     OWN_DEVICE,
 )
 from .factories import (
@@ -33,7 +34,6 @@ from .helpers import (
     FEEDS_TODAY,
     LAST_FEED,
     LAST_PUMP,
-    NOW,
     button,
     call,
     device_id,

@@ -14,10 +14,9 @@ from syrupy.assertion import SnapshotAssertion
 
 from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID
 
-from . import BABY_ONE, BABY_TWO, EMAIL, NEW_PASSWORD, PASSWORD
+from . import BABY_ONE, BABY_TWO, EMAIL, NEW_PASSWORD, PASSWORD, tick
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, at
 from .fake_server import FakeServer
-from .helpers import tick
 
 
 async def _diagnostics(
