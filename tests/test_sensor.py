@@ -211,8 +211,8 @@ async def test_entities_have_unique_ids(
 ) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
     unique_ids = [entry.unique_id for entry in entries if entry.domain in READINGS]
-    assert len(unique_ids) == 2 * PER_BABY + 1  # and the account's last pump
-    assert len(set(unique_ids)) == 2 * PER_BABY + 1
+    assert len(unique_ids) == 2 * PER_BABY + 2  # and the account's last pump and pump timer
+    assert len(set(unique_ids)) == 2 * PER_BABY + 2
     assert all(unique_id for unique_id in unique_ids)
 
 
@@ -221,12 +221,15 @@ async def test_unique_ids_are_built_from_the_baby_id(
 ) -> None:
     entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
     entries = [e for e in entries if e.domain in READINGS]
-    assert len(entries) == 2 * PER_BABY + 1
+    assert len(entries) == 2 * PER_BABY + 2
     assert {e.unique_id for e in entries} == {
         f"{baby}_{key}"
         for baby in (BABY_ONE_ID, BABY_TWO_ID)
         for key in KEYS + TODAY_KEYS + TIMER_KEYS
-    } | {f"{init_integration.entry_id}_last_pump"}
+    } | {
+        f"{init_integration.entry_id}_last_pump",
+        f"{init_integration.entry_id}_pump_timer",
+    }
 
 
 async def test_the_sensors_are_timestamps(
@@ -583,7 +586,7 @@ async def test_syncing_again_does_not_duplicate_a_baby(
     await tick(hass)
     await tick(hass)
     entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
-    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 1
+    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 2
 
 
 async def test_babies_are_restored_from_saved_state_after_a_restart(
@@ -1108,15 +1111,19 @@ async def test_the_account_email_is_nowhere_in_the_entity_id_or_the_device(
     assert EMAIL not in str(device.name) + str(device.model) + str(device.configuration_url)
 
 
-async def test_the_account_device_holds_only_the_last_pump_sensor(
+async def test_the_account_device_holds_only_the_last_pump_and_pump_timer_sensors(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     device = account_device(hass, init_integration)
 
     entries = er.async_entries_for_device(er.async_get(hass), device.id)
 
-    assert [e.unique_id for e in entries] == [f"{init_integration.entry_id}_last_pump"]
-    assert entries[0].translation_key == "last_pump"
+    sensors = [e for e in entries if e.domain == "sensor"]
+    assert sorted(e.unique_id for e in sensors) == [
+        f"{init_integration.entry_id}_last_pump",
+        f"{init_integration.entry_id}_pump_timer",
+    ]
+    assert {e.translation_key for e in sensors} == {"last_pump", "pump_timer"}
 
 
 async def test_no_baby_has_a_last_pump_entity(

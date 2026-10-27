@@ -22,10 +22,12 @@ from .const import (
     CONF_DEVICE_UUID,
     DOMAIN,
     NURSING_TIMER_GUARD_AFTER,
+    PUMP_TIMER_GUARD_AFTER,
     SCAN_INTERVAL,
     STORAGE_VERSION,
     is_account_identifier,
     nursing_guard_issue_id,
+    pump_guard_issue_id,
 )
 from .pybabytracker import (
     AuthenticationError,
@@ -35,7 +37,7 @@ from .pybabytracker import (
     Sleep,
     SyncEngine,
 )
-from .timers import NursingTimer, load_timers
+from .timers import NursingTimer, PumpTimer, load_pump_timer, load_timers
 from .totals import DayTotals, day_totals
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,7 +46,7 @@ type BabyTrackerConfigEntry = ConfigEntry[BabyTrackerCoordinator]
 
 FEED_TYPES = ("Nursing", "Formula", "Pumped")
 
-# How often to sync while a sleep or nursing timer runs, so a phone's stop shows up quickly.
+# How often to sync while a sleep, nursing, or pump timer runs, so a phone's stop shows up quickly.
 TIMER_INTERVAL = timedelta(minutes=1)
 
 
@@ -77,6 +79,8 @@ class BabyTrackerData:
     # The newest pump on the account, whoever logged it. A pump belongs to the account, not a
     # baby, so it isn't part of any BabyData.
     last_pump: Record | None = None
+    # Home Assistant's own pump timer, while it runs. It belongs to the account too.
+    pump: PumpTimer | None = None
 
 
 def storage_key(entry_id: str) -> str:
@@ -87,6 +91,15 @@ def storage_key(entry_id: str) -> str:
 def nursing_storage_key(entry_id: str) -> str:
     """Return the storage key for an entry's nursing timers."""
     return f"{DOMAIN}.{entry_id}.nursing"
+
+
+def pump_storage_key(entry_id: str) -> str:
+    """Return the storage key for an entry's pump timer."""
+    return f"{DOMAIN}.{entry_id}.pump"
+
+
+# The guard's key for the account's pump timer; a baby's is the baby's ID (a UUID, so no clash).
+PUMP_GUARD_KEY = "pump"
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -138,13 +151,19 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self._nursing_store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)
         )
-        # The guard on a forgotten nursing timer (see ``_guard_nursing_timers``): the babies whose
-        # repair is raised, and the callback waiting for each other timer's hour to end.
-        self._guard_raised: set[str] = set()
+        # Home Assistant's own pump timer, which belongs to the account (see timers.py).
+        self.pump: PumpTimer | None = None
+        self._pump_store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, pump_storage_key(entry.entry_id)
+        )
+        # The guard on a forgotten timer (see ``_guard_timers``): the timers whose repair is raised
+        # (by guard key, with the repair's ID), and the callback waiting for each other timer's
+        # hour to end. A key is a baby's ID for a nursing timer, or ``PUMP_GUARD_KEY``.
+        self._guard_raised: dict[str, str] = {}
         self._guard_waiting: dict[str, tuple[datetime, CALLBACK_TYPE]] = {}
 
     async def _async_setup(self) -> None:
-        """Load the saved sync state and any running nursing timers.
+        """Load the saved sync state and any running nursing and pump timers.
 
         A restart then fetches only what's newer.
         """
@@ -159,6 +178,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             _LOGGER.warning(
                 "The saved nursing timers couldn't be read (%s); starting with none", err
             )
+        try:
+            self.pump = load_pump_timer(await self._pump_store.async_load())
+        except HomeAssistantError as err:
+            _LOGGER.warning("The saved pump timer couldn't be read (%s); starting with none", err)
         try:
             saved = await self._store.async_load()
         except HomeAssistantError as err:
@@ -247,9 +270,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     def wanted_interval(self, data: BabyTrackerData | None = None) -> timedelta:
         """Return the sync interval: one minute while a timer runs, else five.
 
-        A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running. A nursing
-        timer that has run past ``NURSING_TIMER_GUARD_AFTER`` is probably forgotten, so it no
-        longer counts. A synced sleep always does: every phone shows it, and any can end it.
+        A sleep timer (synced), a nursing timer, or the pump timer (both Home Assistant's) counts
+        as running. A nursing or pump timer that has run past its guard hour is probably
+        forgotten, so it no longer counts. A synced sleep always does: every phone shows it, and
+        any can end it.
         """
         current = data if data is not None else self.data
         babies = current.babies if current is not None else {}
@@ -258,6 +282,8 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             baby_id in babies and not timer.is_overdue(now, NURSING_TIMER_GUARD_AFTER)
             for baby_id, timer in self.nursing.items()
         ) or any(baby.running_sleep is not None for baby in babies.values()):
+            return TIMER_INTERVAL
+        if self.pump is not None and not self.pump.is_overdue(now, PUMP_TIMER_GUARD_AFTER):
             return TIMER_INTERVAL
         return SCAN_INTERVAL
 
@@ -294,6 +320,23 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             return False
         return True
 
+    async def async_set_pump(self, timer: PumpTimer | None) -> None:
+        """Start or (with ``None``) clear the pump timer, publish it, and save it.
+
+        Hold ``exclusive()``. The change applies in memory and on the entities even if the save
+        fails; the failure then raises ``HomeAssistantError`` (``pump_not_saved``), because the
+        timer won't survive a restart.
+        """
+        self.pump = timer
+        self.async_set_updated_data(self._rebuild())
+        try:
+            await self._pump_store.async_save(timer.to_dict() if timer is not None else {})
+        except Exception as err:
+            _LOGGER.exception("Couldn't save the pump timer")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="pump_not_saved"
+            ) from err
+
     @callback
     def _async_midnight(self, _now: datetime) -> None:
         """Start a new day of counts without syncing."""
@@ -327,7 +370,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 today=day_totals(self.engine.records.values(), baby_id, start, end),
                 nursing=self.nursing.get(baby_id),
             )
-        return BabyTrackerData(babies=babies, last_pump=self.engine.latest_pump())
+        return BabyTrackerData(babies=babies, last_pump=self.engine.latest_pump(), pump=self.pump)
 
     def _rebuild(self) -> BabyTrackerData:
         """Build the data, then do what a new snapshot calls for.
@@ -346,66 +389,91 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 _LOGGER.warning("Dropping the nursing timer of baby %s, no longer known", baby_id)
                 del self.nursing[baby_id]
             self.config_entry.async_create_task(self.hass, self._async_save_nursing())
-        self._guard_nursing_timers(data)
+        self._guard_timers(data)
         # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
         self.update_interval = self.wanted_interval(data)
         return data
 
-    def _guard_nursing_timers(self, data: BabyTrackerData) -> None:
-        """Raise a repair for each nursing timer past its hour, and clear the ones that are done.
+    def _guarded_timers(
+        self, data: BabyTrackerData
+    ) -> dict[str, tuple[datetime, timedelta, str, str, dict[str, str]]]:
+        """Return each running guarded timer: start, guard time, repair ID, text, and placeholders.
 
-        A nursing timer lives only in Home Assistant, so a forgotten one can't be seen or ended
+        Keyed by the guard key: a baby's ID for a nursing timer, ``PUMP_GUARD_KEY`` for the pump.
+        """
+        entry_id = self.config_entry.entry_id
+        timers: dict[str, tuple[datetime, timedelta, str, str, dict[str, str]]] = {
+            baby_id: (
+                timer.started,
+                NURSING_TIMER_GUARD_AFTER,
+                nursing_guard_issue_id(entry_id, baby_id),
+                "nursing_timer_long",
+                {"baby": data.babies[baby_id].name or "a baby"},
+            )
+            for baby_id, timer in self.nursing.items()
+        }
+        if self.pump is not None:
+            timers[PUMP_GUARD_KEY] = (
+                self.pump.started,
+                PUMP_TIMER_GUARD_AFTER,
+                pump_guard_issue_id(entry_id),
+                "pump_timer_long",
+                {},
+            )
+        return timers
+
+    def _guard_timers(self, data: BabyTrackerData) -> None:
+        """Raise a repair for each nursing or pump timer past its hour, and clear finished ones.
+
+        These timers live only in Home Assistant, so a forgotten one can't be seen or ended
         anywhere else. A timer not yet an hour old gets a callback for the moment it turns one, so
         the repair doesn't wait for a sync. Nothing here touches the network.
         """
         now = dt_util.utcnow()
-        for baby_id, timer in self.nursing.items():
-            due = timer.started + NURSING_TIMER_GUARD_AFTER
+        timers = self._guarded_timers(data)
+        for key, (started, after, issue_id, translation_key, placeholders) in timers.items():
+            due = started + after
             if now >= due:
-                self._cancel_guard_wait(baby_id)
-                if baby_id not in self._guard_raised:
-                    self._guard_raised.add(baby_id)
-                    name = data.babies[baby_id].name or "a baby"
+                self._cancel_guard_wait(key)
+                if key not in self._guard_raised:
+                    self._guard_raised[key] = issue_id
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        nursing_guard_issue_id(self.config_entry.entry_id, baby_id),
+                        issue_id,
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
-                        translation_key="nursing_timer_long",
-                        translation_placeholders={"baby": name},
+                        translation_key=translation_key,
+                        translation_placeholders=placeholders,
                     )
             else:
-                self._clear_guard_issue(baby_id)
-                waiting = self._guard_waiting.get(baby_id)
+                self._clear_guard_issue(key)
+                waiting = self._guard_waiting.get(key)
                 if waiting is None or waiting[0] != due:
-                    self._cancel_guard_wait(baby_id)
-                    self._guard_waiting[baby_id] = (
+                    self._cancel_guard_wait(key)
+                    self._guard_waiting[key] = (
                         due,
                         async_track_point_in_utc_time(self.hass, self._async_guard_due, due),
                     )
-        for baby_id in [*self._guard_raised, *self._guard_waiting]:
-            if baby_id not in self.nursing:
-                self._clear_guard_issue(baby_id)
-                self._cancel_guard_wait(baby_id)
+        for key in [*self._guard_raised, *self._guard_waiting]:
+            if key not in timers:
+                self._clear_guard_issue(key)
+                self._cancel_guard_wait(key)
 
-    def _clear_guard_issue(self, baby_id: str) -> None:
-        if baby_id in self._guard_raised:
-            self._guard_raised.discard(baby_id)
-            ir.async_delete_issue(
-                self.hass, DOMAIN, nursing_guard_issue_id(self.config_entry.entry_id, baby_id)
-            )
+    def _clear_guard_issue(self, key: str) -> None:
+        if (issue_id := self._guard_raised.pop(key, None)) is not None:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
-    def _cancel_guard_wait(self, baby_id: str) -> None:
-        if (waiting := self._guard_waiting.pop(baby_id, None)) is not None:
+    def _cancel_guard_wait(self, key: str) -> None:
+        if (waiting := self._guard_waiting.pop(key, None)) is not None:
             waiting[1]()
 
     @callback
     def _async_guard_due(self, now: datetime) -> None:
-        """Publish when a nursing timer reaches its hour: raise its repair and ease polling."""
-        for baby_id, (due, _) in list(self._guard_waiting.items()):
+        """Publish when a timer reaches its hour: raise its repair and ease polling."""
+        for key, (due, _) in list(self._guard_waiting.items()):
             if due <= now:
-                del self._guard_waiting[baby_id]
+                del self._guard_waiting[key]
         # Like midnight: publish without touching ``last_update_success``, so entities that are
         # unavailable because a sync is failing stay unavailable.
         self.data = self._rebuild()
@@ -414,9 +482,9 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     @callback
     def _async_stop_guarding(self) -> None:
         """On unload or removal, drop the repairs and callbacks, which only a loaded entry owns."""
-        for baby_id in [*self._guard_raised, *self._guard_waiting]:
-            self._clear_guard_issue(baby_id)
-            self._cancel_guard_wait(baby_id)
+        for key in [*self._guard_raised, *self._guard_waiting]:
+            self._clear_guard_issue(key)
+            self._cancel_guard_wait(key)
 
     def _remove_deleted_devices(self, data: BabyTrackerData) -> None:
         """Remove the device, and with it the entities, of every baby the sync shows as deleted.

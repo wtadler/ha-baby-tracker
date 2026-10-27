@@ -49,6 +49,7 @@ Captured on the test account on 2026-10-26, with the sync screen opened while ea
 
 - **Sleep timers sync while running.** Starting a sleep posts an **add** right away with `duration` 0 and `time` set to the start. Stopping it posts an **update** to the same `objectID` with the final `duration`. Each later edit, such as adding a note, posts another update. A sleep with `duration` 0 is therefore a sleep in progress.
 - **Nursing timers don't sync while running.** Nothing was posted when the timer started, when it switched from left to right, or while the sync screen was open. When the timer stopped, one **add** arrived with `leftDuration`, `rightDuration`, `finishSide` (the side last nursed, 1 = right), `isDetailed` "true", and `state` 5. That fits the absence of a "last synced" update during nursing. HA can't see a nursing timer running on a phone. It can only keep its own timer and write the finished entry at the stop.
+- **Pump timers (assumed, not captured).** The app's pump timer wasn't captured. Real timed pumps carry equal `leftDuration` and `rightDuration` with `sides` 0, so Home Assistant keeps its own pump timer like the nursing one and writes the finished pump at the stop. A stop with no amount writes the durations and no `amount` key. That shape hasn't been checked against the app's own screens, and is the first thing to try on the test iPad.
 - Durations are whole minutes. About 30 seconds per side was stored as 1.
 
 ## Payloads by type

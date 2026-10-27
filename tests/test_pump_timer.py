@@ -140,7 +140,9 @@ async def test_no_pump_entity_is_added_to_a_baby_device(
     assert babies
     for device in babies:
         assert not [
-            e for e in er.async_entries_for_device(registry, device.id) if "pump_timer" in e.unique_id
+            e
+            for e in er.async_entries_for_device(registry, device.id)
+            if "pump_timer" in e.unique_id
         ]
 
 
@@ -504,9 +506,7 @@ async def test_a_timer_that_cannot_be_saved_still_turns_the_switch_on_and_says_s
     from unittest.mock import patch
 
     with patch.object(Store, "async_save", save):
-        await expect_error(
-            hass, "switch", "turn_on", {"entity_id": PUMP_SWITCH}, "pump_not_saved"
-        )
+        await expect_error(hass, "switch", "turn_on", {"entity_id": PUMP_SWITCH}, "pump_not_saved")
 
     assert state(hass, PUMP_SWITCH).state == "on"
 
@@ -556,14 +556,17 @@ async def test_a_running_timer_survives_a_reload_and_keeps_one_minute_polling(
     assert record.time == NOW
 
 
-async def test_a_reload_keeps_the_record_id_so_a_retried_stop_cannot_write_twice(
+async def test_a_reload_after_a_failed_stop_keeps_the_record_id_the_retry_writes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
+    hass_storage: dict[str, Any],
     freezer: Any,
 ) -> None:
+    key = f"{DOMAIN}.{init_integration.entry_id}.pump"
     await turn_on(hass, PUMP_SWITCH)
-    server.post_errors.append((BabyTrackerConnectionError("down"), True))  # lands, then errors
+    chosen = hass_storage[key]["data"]["object_id"]
+    server.post_errors.append((BabyTrackerConnectionError("down"), False))
     freezer.move_to(minutes(5))
     with pytest.raises(HomeAssistantError):
         await turn_off(hass, PUMP_SWITCH)
@@ -572,9 +575,9 @@ async def test_a_reload_keeps_the_record_id_so_a_retried_stop_cannot_write_twice
 
     await turn_off(hass, PUMP_SWITCH)
 
-    records = pump_posts(server)
-    assert len(records) == 1
-    assert records[0].left_duration == 5
+    record = only_pump(server)
+    assert record.object_id == chosen  # fixed at the start, so a retry can't write a second pump
+    assert record.left_duration == 5
 
 
 async def test_an_idle_timer_stays_idle_after_a_reload(
@@ -595,6 +598,7 @@ async def test_an_idle_timer_stays_idle_after_a_reload(
         {"object_id": "AB000000-0000-4000-8000-0000000000A1", "started": "garbage"},
         {"object_id": "AB000000-0000-4000-8000-0000000000A1", "started": "2026-10-26T15:00:00"},
         {"started": "2026-10-26T14:50:00+00:00"},  # no record ID
+        {"object_id": "", "started": "2026-10-26T14:50:00+00:00"},  # an empty record ID
         [1, 2],
     ],
 )
@@ -830,3 +834,27 @@ async def test_the_account_helper_reaches_start_and_stop(
     record = only_pump(server)
     assert record.volume == Volume(1, "ml")
     assert record.left_duration == 3
+
+
+async def test_a_saved_timer_that_cannot_be_loaded_at_all_starts_with_none_and_says_so(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    real_load = Store.async_load
+
+    async def load(self: Store[Any]) -> Any:
+        if self.key.endswith(".pump"):
+            raise HomeAssistantError("corrupt file")
+        return await real_load(self)
+
+    from unittest.mock import patch
+
+    mock_config_entry.add_to_hass(hass)
+    with patch.object(Store, "async_load", load), caplog.at_level(logging.WARNING):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    assert state(hass, PUMP_SWITCH).state == "off"
+    assert "saved pump timer couldn't be read" in caplog.text

@@ -48,7 +48,7 @@ def only_pump(server: FakeServer) -> Pump:
     return record
 
 
-# --- amount ----------------------------------------------------------------------------------------
+# --- amount -----------------------------------------------------------------------------------
 
 
 async def test_amount_and_unit_alone_post_one_total_only_pump(
@@ -107,16 +107,14 @@ async def test_a_total_shows_on_the_last_pump_sensor_without_side_amounts(
     assert "right_amount" not in last.attributes
 
 
-# --- minutes ---------------------------------------------------------------------------------------
+# --- minutes ----------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("unit", ["fl. oz.", "mL"])
 async def test_amount_and_minutes_post_equal_durations(
     unit: str, hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await log_pump(
-        hass, config_entry_id=init_integration.entry_id, amount=4, unit=unit, minutes=17
-    )
+    await log_pump(hass, config_entry_id=init_integration.entry_id, amount=4, unit=unit, minutes=17)
 
     payload = only_pump(server).to_payload()
     assert (payload["leftDuration"], payload["rightDuration"]) == (17, 17)
@@ -192,7 +190,7 @@ async def test_minutes_alone_still_need_an_amount(
     assert server.posted == []
 
 
-# --- conflicts -------------------------------------------------------------------------------------
+# --- conflicts --------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("side", ["left_amount", "right_amount"])
@@ -209,7 +207,11 @@ async def test_amount_with_a_side_amount_is_a_validation_error_and_posts_nothing
 @pytest.mark.parametrize("side", ["left_minutes", "right_minutes"])
 @pytest.mark.parametrize("value", [0, 5])
 async def test_minutes_with_a_side_minutes_is_a_validation_error_even_at_zero(
-    side: str, value: int, hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+    side: str,
+    value: int,
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await log_pump(
@@ -257,7 +259,7 @@ async def test_amount_with_side_amounts_and_minutes_with_side_minutes_gives_the_
     assert server.posted == []
 
 
-# --- bad values ------------------------------------------------------------------------------------
+# --- bad values -------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -303,7 +305,7 @@ async def test_an_unknown_unit_is_refused_with_a_total(
     assert server.posted == []
 
 
-# --- the per-side fields work as they did ------------------------------------------------------------
+# --- the per-side fields work as they did --------------------------------------------------
 
 
 async def test_per_side_amounts_and_minutes_still_write_per_side_keys(

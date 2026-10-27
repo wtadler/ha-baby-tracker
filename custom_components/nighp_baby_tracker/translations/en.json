@@ -142,6 +142,9 @@
       },
       "nursing_right_time": {
         "name": "Nursing right time"
+      },
+      "pump_timer": {
+        "name": "Pump timer"
       }
     },
     "switch": {
@@ -153,6 +156,9 @@
       },
       "nursing_right": {
         "name": "Nursing right"
+      },
+      "pump": {
+        "name": "Pump timer"
       }
     }
   },
@@ -297,19 +303,27 @@
     },
     "log_pump": {
       "name": "Log pump",
-      "description": "Adds a pumping session to a Baby Tracker account. A pump belongs to the account, not a baby. Give the amount for one side or both; the total is their sum.",
+      "description": "Adds a pumping session to a Baby Tracker account. A pump belongs to the account, not a baby. Give the total amount, or the amount for one side or both (then the total is their sum).",
       "fields": {
         "config_entry_id": {
           "name": "Account",
           "description": "The Baby Tracker account to log the pump to."
         },
+        "amount": {
+          "name": "Amount",
+          "description": "The total pumped, for a pump that wasn't split by side. Use this or the side amounts, not both."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "How long the session lasted, with both sides together. Use this or the minutes for each side, not both."
+        },
         "left_amount": {
           "name": "Left amount",
-          "description": "How much came from the left side."
+          "description": "How much came from the left side. Use this and the right side instead of the total."
         },
         "right_amount": {
           "name": "Right amount",
-          "description": "How much came from the right side."
+          "description": "How much came from the right side. Use this and the left side instead of the total."
         },
         "unit": {
           "name": "Unit",
@@ -422,6 +436,38 @@
         "device_id": {
           "name": "Baby",
           "description": "The baby's device."
+        }
+      }
+    },
+    "start_pump": {
+      "name": "Start pump",
+      "description": "Starts Home Assistant's pump timer for a Baby Tracker account. Nothing is saved until the timer stops. Starting while it runs is an error.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "The Baby Tracker account whose pump timer to start."
+        }
+      }
+    },
+    "stop_pump": {
+      "name": "Stop pump",
+      "description": "Stops Home Assistant's pump timer and saves one pumping session. The minutes are the time since the start, rounded to whole minutes. Give the amount to save the total with it; without one, the session has no amount.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "The Baby Tracker account whose pump timer to stop."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "The total pumped. Leave it out to save the session with no amount."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "The unit of the amount. Defaults to fl. oz."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the pump."
         }
       }
     }
@@ -537,6 +583,21 @@
     },
     "nursing_not_saved": {
       "message": "The nursing timer changed, but it couldn't be saved, so it won't survive a restart. Check the logs."
+    },
+    "pump_already_running": {
+      "message": "The pump timer is already running. Stop it first."
+    },
+    "no_pump_timer": {
+      "message": "The pump timer isn't running."
+    },
+    "pump_not_saved": {
+      "message": "The pump timer changed, but it couldn't be saved, so it won't survive a restart. Check the logs."
+    },
+    "amount_with_sides": {
+      "message": "Give the total amount or the amount for each side, not both."
+    },
+    "minutes_with_sides": {
+      "message": "Give the minutes or the minutes for each side, not both."
     }
   },
   "issues": {
@@ -551,6 +612,10 @@
     "deprecated_action_field": {
       "title": "An automation uses an old field of {action}",
       "description": "Something called the Baby Tracker action {action} with the field {field}, which is deprecated and will stop working in a later release. To fix it:\n\n1. Find the automation, script, or dashboard button that calls {action}.\n2. Replace {field} with {replacement}, and pick the same baby or account.\n3. Save it, then run it again.\n\nThis notice goes away on its own after the next restart, unless something still uses the old field."
+    },
+    "pump_timer_long": {
+      "title": "The pump timer has run for over an hour",
+      "description": "Home Assistant's pump timer has been running for more than an hour. The Baby Tracker app doesn't show a running pump, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, turn off the Pump timer switch, or call the Stop pump action, to save the session. A session is saved as at most 240 minutes. If the session wasn't real, use the Undo action to delete the record Home Assistant just saved.\n\nThis notice goes away when the timer stops."
     }
   }
 }

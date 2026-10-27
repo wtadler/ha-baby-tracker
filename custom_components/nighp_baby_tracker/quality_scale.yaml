@@ -3,7 +3,7 @@ rules:
   action-setup: done
   appropriate-polling:
     status: done
-    comment: Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep or nursing timer runs.
+    comment: Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep, nursing, or pump timer runs.
   brands:
     status: done
     comment: brand/icon.png and icon@2x.png, the app's official App Store icon, used for identification only (as the brands repository's trademark notice describes). The icon doubles as the logo. Move to the brands repository at core submission.
@@ -74,7 +74,7 @@ rules:
   dynamic-devices: done
   entity-category:
     status: exempt
-    comment: Every entity (the buttons, the timer switches, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
+    comment: Every entity (the buttons, the timer switches including the account's pump timer, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
   entity-device-class: done
   entity-disabled-by-default:
     status: done

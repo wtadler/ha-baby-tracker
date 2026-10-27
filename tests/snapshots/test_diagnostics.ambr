@@ -21,6 +21,7 @@
       'babies': 2,
       'has_last_pump': False,
       'last_update_success': True,
+      'pump_timer_running': False,
       'update_interval_seconds': 300.0,
     }),
     'engine': dict({

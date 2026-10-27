@@ -1,4 +1,4 @@
-"""Last-activity, today, and timer sensors, one set per baby, and the account's last pump."""
+"""Last-activity, today, and timer sensors per baby, and the account's last pump and pump timer."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -130,12 +130,17 @@ async def async_setup_entry(
     entry: BabyTrackerConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the account's last-pump sensor and every baby's sensors.
+    """Add the account's last-pump and pump timer sensors, and every baby's sensors.
 
     Babies that appear in later syncs get theirs when they appear.
     """
     coordinator = entry.runtime_data
-    async_add_entities([BabyTrackerLastPumpSensor(coordinator, LAST_PUMP)])
+    async_add_entities(
+        [
+            BabyTrackerLastPumpSensor(coordinator, LAST_PUMP),
+            BabyTrackerPumpTimerSensor(coordinator, PUMP_TIMER),
+        ]
+    )
     known: set[str] = set()
 
     @callback
@@ -210,6 +215,27 @@ class BabyTrackerLastPumpSensor(BabyTrackerAccountEntity, SensorEntity):
         """Return the attributes of the last pump."""
         pump = self.coordinator.data.last_pump
         return _pump_attributes(pump) if pump is not None else None
+
+
+PUMP_TIMER = SensorEntityDescription(
+    key="pump_timer",
+    translation_key="pump_timer",
+    device_class=SensorDeviceClass.TIMESTAMP,
+)
+
+
+class BabyTrackerPumpTimerSensor(BabyTrackerAccountEntity, SensorEntity):
+    """When Home Assistant's pump timer started, or unknown when none runs.
+
+    Like the nursing timer sensor: the app doesn't sync a running pump, so this follows Home
+    Assistant's own timer only.
+    """
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the timer's start."""
+        timer = self.coordinator.data.pump
+        return timer.started if timer is not None else None
 
 
 @dataclass(frozen=True, kw_only=True)

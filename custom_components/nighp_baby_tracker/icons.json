@@ -59,6 +59,9 @@
       },
       "nursing_right_time": {
         "default": "mdi:timer-sand"
+      },
+      "pump_timer": {
+        "default": "mdi:timer-sand"
       }
     },
     "switch": {
@@ -81,6 +84,13 @@
         "state": {
           "on": "mdi:chevron-right-circle",
           "off": "mdi:chevron-right-circle-outline"
+        }
+      },
+      "pump": {
+        "default": "mdi:water-pump-off",
+        "state": {
+          "on": "mdi:water-pump",
+          "off": "mdi:water-pump-off"
         }
       }
     }
@@ -121,6 +131,12 @@
     },
     "discard_nursing": {
       "service": "mdi:timer-off"
+    },
+    "start_pump": {
+      "service": "mdi:timer-play"
+    },
+    "stop_pump": {
+      "service": "mdi:timer-stop"
     }
   }
 }
