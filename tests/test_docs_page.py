@@ -1,4 +1,5 @@
-"""The home-assistant.io page draft: frontmatter, sections, and the scope of the first core PR.
+"""HACS only: the home-assistant.io page draft, its frontmatter, sections, and the scope of the
+first core PR. The page itself goes to the docs repository, not to core.
 
 The page lives at ``docs/home-assistant-io/nighp_baby_tracker.markdown`` and is copied into
 ``source/_integrations/`` of the docs repository when the core PR opens. These tests check the

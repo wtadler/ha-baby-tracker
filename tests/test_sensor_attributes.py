@@ -1,4 +1,5 @@
-"""The last-activity sensors keep the same attribute keys whether or not a value is set."""
+"""Core PRs 4 and 5: the last-activity sensors keep the same attribute keys whether or not a
+value is set. The pump cases belong to PR 5."""
 
 from typing import Any
 

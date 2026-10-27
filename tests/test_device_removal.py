@@ -1,4 +1,4 @@
-"""Removing a baby's device: only once a sync shows the baby has left the account.
+"""Core PR 6: removing a baby's device, only once a sync shows the baby has left the account.
 
 A deleted baby shows up in the sync data as a ``Baby`` record deleted (opcode 2), usually with
 the baby's older records still in the logs and still embedding it. These tests drive that

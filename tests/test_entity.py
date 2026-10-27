@@ -1,4 +1,5 @@
-"""The shared entity base and the device names."""
+"""HACS only: the shared entity base and the device names, checked across every platform at
+once. Core covers each entity with its own platform snapshot."""
 
 from typing import Any
 

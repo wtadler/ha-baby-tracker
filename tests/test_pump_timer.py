@@ -1,4 +1,5 @@
-"""The pump timer: a switch and a timestamp sensor on the account, and start_pump and stop_pump.
+"""Core PR 21: the pump timer. A switch and a timestamp sensor on the account, and start_pump
+and stop_pump.
 
 A pump belongs to the account, not a baby. Like the nursing timer, this one lives only in Home
 Assistant until it stops (the app doesn't sync a running pump), is saved with a ``Store``, and

@@ -1,4 +1,4 @@
-"""The asleep binary sensor."""
+"""Core PR 8: the asleep binary sensor."""
 
 from collections.abc import Iterator
 from datetime import datetime

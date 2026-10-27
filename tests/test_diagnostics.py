@@ -1,4 +1,5 @@
-"""The diagnostics download: useful for a bug report, with nothing that identifies the account."""
+"""Core PR 3: the diagnostics download, useful for a bug report, with nothing that identifies
+the account."""
 
 import json
 from typing import Any

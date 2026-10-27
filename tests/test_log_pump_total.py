@@ -1,4 +1,5 @@
-"""log_pump with a total: ``amount`` (with ``unit``) and ``minutes``, the way most pumps are logged.
+"""Core PR 12: log_pump with a total, ``amount`` (with ``unit``) and ``minutes``, the way most
+pumps are logged.
 
 The app writes most pumps with only a total ``amount`` and no per-side keys, and a timed one with
 equal ``leftDuration`` and ``rightDuration``. Everything here is invented fixture data.

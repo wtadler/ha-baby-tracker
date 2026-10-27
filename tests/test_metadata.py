@@ -1,4 +1,5 @@
-"""services.yaml, strings, icons, manifest, quality scale, and the vendored library's packaging."""
+"""HACS only: services.yaml, strings, icons, manifest, quality scale, and the vendored library's
+packaging. Core checks these with hassfest, so this file does not go to core."""
 
 import json
 import re

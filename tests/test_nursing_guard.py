@@ -1,4 +1,4 @@
-"""The guard on Home Assistant's own nursing timer, and the discard_nursing action.
+"""Core PR 18: the guard on Home Assistant's own nursing timer, and the discard_nursing action.
 
 A running sleep is synced, so every phone shows it and no cap applies. A nursing timer lives only
 in Home Assistant until it stops, so one left running is flagged after an hour with a repair, and

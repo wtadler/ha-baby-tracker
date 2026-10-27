@@ -1,4 +1,5 @@
-"""The vendoring script copies the library and records where it came from."""
+"""HACS only: the vendoring script copies the library and records where it came from. Core
+depends on the library from PyPI, so the script does not go to core."""
 
 import subprocess
 from pathlib import Path
