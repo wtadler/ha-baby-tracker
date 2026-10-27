@@ -11,6 +11,7 @@ from unittest.mock import patch
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
@@ -243,3 +244,126 @@ async def test_a_sync_and_refresh_do_not_encode_the_engine_to_find_deleted_babie
         await init_integration.runtime_data.async_refresh()
 
     assert BABY_TWO_ID not in init_integration.runtime_data.data.babies
+
+
+# --- removed automatically, as soon as a sync shows the baby is deleted ---------------------------
+
+
+def entity_ids_on(hass: HomeAssistant, device: dr.DeviceEntry) -> set[str]:
+    return {
+        entry.entity_id
+        for entry in er.async_entries_for_device(
+            er.async_get(hass), device.id, include_disabled_entities=True
+        )
+    }
+
+
+async def test_a_deleted_babys_device_and_entities_are_gone_after_the_next_refresh(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    device = baby_device(hass, BABY_TWO_ID)
+    entity_ids = entity_ids_on(hass, device)
+    assert entity_ids
+
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
+    registry = er.async_get(hass)
+    assert all(registry.async_get(entity_id) is None for entity_id in entity_ids)
+    assert all(hass.states.get(entity_id) is None for entity_id in entity_ids)
+    assert init_integration.state is ConfigEntryState.LOADED
+
+
+async def test_a_present_baby_keeps_its_device_and_entities(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    device = baby_device(hass, BABY_ONE_ID)
+    entity_ids = entity_ids_on(hass, device)
+
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+
+    assert baby_device(hass, BABY_ONE_ID).id == device.id
+    assert entity_ids_on(hass, device) == entity_ids
+    assert all(hass.states.get(entity_id) is not None for entity_id in entity_ids)
+
+
+async def test_a_refresh_with_no_deletion_removes_nothing(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    before = {
+        device.id
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), init_integration.entry_id
+        )
+    }
+    server.add_record(DEVICE_A, "Diaper", "D0000000-0000-4000-8000-000000000024", when=at(40))
+    await tick(hass)
+
+    after = {
+        device.id
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), init_integration.entry_id
+        )
+    }
+    assert after == before
+
+
+async def test_the_account_device_survives_a_baby_deletion(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    registry = dr.async_get(hass)
+    identifier = (init_integration.domain, account_identifier(init_integration.entry_id))
+    assert registry.async_get_devices(identifiers={identifier})
+
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+
+    accounts = registry.async_get_devices(identifiers={identifier})
+    assert len(accounts) == 1
+    assert entity_ids_on(hass, accounts[0])
+
+
+async def test_a_baby_added_again_gets_its_device_and_entities_back(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    before = entity_ids_on(hass, baby_device(hass, BABY_TWO_ID))
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
+
+    revived = {**BABY_TWO, "timestamp": "2026-10-26 12:00:00 +0000"}
+    server.add_payload(DEVICE_B, revived, op=OP_ADD)
+    await tick(hass)
+    await hass.async_block_till_done()
+
+    device = baby_device(hass, BABY_TWO_ID)
+    assert device.identifiers == {(init_integration.domain, BABY_TWO_ID)}
+    assert entity_ids_on(hass, device) == before
+    assert all(hass.states.get(entity_id) is not None for entity_id in before)
+
+
+async def test_a_deleted_baby_is_removed_on_a_write_sync_too(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": entity_ids_on_wet_button(hass)},
+        blocking=True,
+    )
+
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
+
+
+def entity_ids_on_wet_button(hass: HomeAssistant) -> str:
+    registry = er.async_get(hass)
+    ids = [
+        entry.entity_id
+        for entry in er.async_entries_for_device(registry, baby_device(hass, BABY_ONE_ID).id)
+        if entry.entity_id.startswith("button.") and "wet" in entry.entity_id
+    ]
+    assert len(ids) == 1
+    return ids[0]
