@@ -1,14 +1,14 @@
 """Core PR 15: the Bottle button and the options it reads."""
 
 from datetime import UTC, datetime
-from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM, UnitSystem
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.const import (
@@ -42,7 +42,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -77,7 +77,7 @@ async def test_a_bottle_press_with_a_4_oz_formula_option_logs_a_4_oz_formula_bot
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     hass.config_entries.async_update_entry(
@@ -105,7 +105,7 @@ async def test_a_bottle_press_with_no_options_logs_4_oz_in_us_customary_and_120_
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    units: Any,
+    units: UnitSystem,
     volume: Volume,
 ) -> None:
     hass.config.units = units
@@ -141,7 +141,10 @@ async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
 
 
 async def test_a_bottle_press_is_for_its_own_baby_and_counts_in_todays_totals(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     hass.config.units = METRIC_SYSTEM
@@ -268,7 +271,7 @@ async def test_a_press_sends_the_zones_standard_offset_year_round(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
     zone: str,
     moment: datetime,
     expected: int,

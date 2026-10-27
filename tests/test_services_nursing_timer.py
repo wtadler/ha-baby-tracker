@@ -1,9 +1,9 @@
 """Core PR 18: the nursing timer actions."""
 
 import asyncio
-from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -24,7 +24,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -34,7 +34,10 @@ def _start_at_now(freezer: Any) -> None:
 
 
 async def test_start_switch_and_stop_nursing_actions(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_nursing", side="right")
@@ -52,7 +55,10 @@ async def test_start_switch_and_stop_nursing_actions(
 
 
 async def test_start_nursing_on_the_running_side_changes_nothing_and_on_the_other_switches(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_nursing", side="left")
@@ -92,7 +98,10 @@ async def test_start_nursing_needs_a_side(
 
 
 async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     gate = asyncio.Event()

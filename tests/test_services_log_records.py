@@ -5,9 +5,10 @@ from typing import Any
 
 import probatio
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM, UnitSystem
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.pybabytracker import (
@@ -33,7 +34,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -115,7 +116,7 @@ async def test_log_bottle_without_a_unit_uses_fluid_ounces_in_any_unit_system(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    units: Any,
+    units: UnitSystem,
     unit: str,
     expected: Volume,
 ) -> None:
@@ -127,7 +128,10 @@ async def test_log_bottle_without_a_unit_uses_fluid_ounces_in_any_unit_system(
 
 
 async def test_log_bottle_time_defaults_to_now_and_reads_a_naive_time_in_the_ha_zone(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -155,7 +159,10 @@ async def test_log_nursing_with_only_one_side_writes_zero_for_the_other(
 
 
 async def test_log_nursing_without_an_end_time_ends_now(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -308,7 +315,7 @@ async def test_log_nursing_with_no_minutes_is_a_validation_error(
 
 @pytest.mark.parametrize("minutes", [-1, 2.5, "ten"])
 async def test_log_nursing_rejects_negative_or_fractional_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, minutes: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, minutes: float | str
 ) -> None:
     with pytest.raises(probatio.Invalid):
         await call(hass, "log_nursing", left_minutes=minutes)
@@ -338,7 +345,10 @@ async def test_a_sleep_updates_the_last_sleep_sensor_and_leaves_the_baby_awake(
 
 
 async def test_nursing_counts_as_a_feed_today_and_adds_no_bottle_volume(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)

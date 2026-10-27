@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -29,7 +30,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -49,7 +50,10 @@ _GOOD_TIMER = {
 
 
 async def test_a_nursing_timer_survives_a_restart(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (4, "right"))
 
@@ -129,7 +133,7 @@ async def test_a_saved_nursing_timer_store_that_is_not_a_mapping_is_ignored(
 async def test_removing_the_entry_deletes_the_saved_nursing_timers(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
     hass_storage: dict[str, Any],
 ) -> None:
     await nurse(hass, freezer, (0, "left"))

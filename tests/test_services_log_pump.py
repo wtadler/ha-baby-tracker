@@ -6,6 +6,7 @@ from typing import Any
 import probatio
 import pytest
 import voluptuous as vol
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -69,7 +70,7 @@ def only_pump(server: FakeServer) -> Pump:
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -326,7 +327,10 @@ async def test_log_pump_with_a_negative_side_is_a_validation_error(
 
 
 async def test_a_pump_and_a_sleep_are_not_feeds_today(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -341,7 +345,7 @@ async def test_a_pump_and_a_sleep_are_not_feeds_today(
 
 
 async def test_log_pump_takes_an_account_with_config_entry_id(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await _call(hass, "log_pump", {"config_entry_id": init_integration.entry_id, "left_amount": 3})
 
@@ -354,7 +358,10 @@ async def test_log_pump_takes_an_account_with_config_entry_id(
     [("config_entry_id", "device"), ("config_entry_id", "baby"), ("device", "baby")],
 )
 async def test_log_pump_with_two_targets_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, fields: tuple[str, str]
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    fields: tuple[str, str],
 ) -> None:
     values = {
         "config_entry_id": init_integration.entry_id,
@@ -369,7 +376,7 @@ async def test_log_pump_with_two_targets_is_refused(
 
 
 async def test_log_pump_with_no_target_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, "log_pump", {"left_amount": 3})

@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -55,13 +56,17 @@ def _reset_counter() -> Iterator[None]:
     yield
 
 
-def _diaper(server: FakeServer, when: datetime, status: int = 0, baby=BABY_ONE, **kw) -> str:
+def _diaper(
+    server: FakeServer, when: datetime, status: int = 0, baby: dict[str, Any] = BABY_ONE, **kw: Any
+) -> str:
     object_id = _id()
     server.add_record(DEVICE_A, "Diaper", object_id, when=when, status=status, baby=baby, **kw)
     return object_id
 
 
-def _sleep(server: FakeServer, when: datetime, duration: int, baby=BABY_ONE, **kw) -> str:
+def _sleep(
+    server: FakeServer, when: datetime, duration: int, baby: dict[str, Any] = BABY_ONE, **kw: Any
+) -> str:
     object_id = _id()
     server.add_record(DEVICE_A, "Sleep", object_id, when=when, duration=duration, baby=baby, **kw)
     return object_id

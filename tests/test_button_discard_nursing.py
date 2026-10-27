@@ -1,8 +1,7 @@
 """Core PR 20: the Discard button for a nursing timer."""
 
-from typing import Any
-
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -34,7 +33,7 @@ TWO_NURSING_TIMER = "sensor.baby_two_nursing_timer"
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -44,7 +43,10 @@ def _start_at_now(freezer: Any) -> None:
 
 
 async def test_the_discard_button_drops_the_timer_and_posts_nothing(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (3, "right"))
 
@@ -68,7 +70,7 @@ async def test_the_discard_button_with_no_timer_raises_the_translated_error(
 
 
 async def test_the_discard_button_leaves_the_other_babys_timer_running(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     await toggle(hass, "switch.baby_two_nursing_right")
@@ -80,7 +82,10 @@ async def test_the_discard_button_leaves_the_other_babys_timer_running(
 
 
 async def test_a_discarded_session_can_start_again_and_logs_only_the_new_one(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "left"))
     await nurse(hass, freezer, (6, "right"))
@@ -92,7 +97,10 @@ async def test_a_discarded_session_can_start_again_and_logs_only_the_new_one(
 
 
 async def test_discard_is_the_discard_nursing_action(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     await press(hass, DISCARD_NURSING)

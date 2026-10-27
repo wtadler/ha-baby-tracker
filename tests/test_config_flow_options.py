@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from homeassistant.config_entries import ConfigEntryState
+from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryState, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
-from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM, UnitSystem
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker import config_flow
@@ -33,7 +34,7 @@ from .helpers import (
 )
 
 
-def schema_defaults(result: Any) -> dict[str, Any]:
+def schema_defaults(result: ConfigFlowResult) -> dict[str, Any]:
     return {str(key): key.default() for key in result["data_schema"].schema}
 
 
@@ -41,7 +42,7 @@ BOTTLE_OPTIONS = {CONF_BOTTLE_SIZE, CONF_BOTTLE_UNIT, CONF_BOTTLE_TYPE}
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -120,7 +121,10 @@ async def test_the_form_after_an_error_keeps_what_was_typed(
     ids=["us-customary", "metric"],
 )
 async def test_options_default_the_bottle_to_4_oz_in_us_customary_and_120_ml_in_metric(
-    hass: HomeAssistant, init_integration: MockConfigEntry, units: Any, expected: tuple[Any, ...]
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    units: UnitSystem,
+    expected: tuple[Any, ...],
 ) -> None:
     hass.config.units = units
 
@@ -295,7 +299,9 @@ async def test_saving_the_options_neither_reloads_nor_syncs(
     assert server.device_list_calls == calls
 
 
-async def test_options_show_one_form(hass: HomeAssistant, init_integration) -> None:
+async def test_options_show_one_form(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"

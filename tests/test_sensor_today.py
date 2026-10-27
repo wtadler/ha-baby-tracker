@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
@@ -67,19 +67,21 @@ def _reset_counter() -> Iterator[None]:
     yield
 
 
-def _diaper(server: FakeServer, when: datetime, status: int = 0, baby=BABY_ONE, **kw) -> str:
+def _diaper(
+    server: FakeServer, when: datetime, status: int = 0, baby: dict[str, Any] = BABY_ONE, **kw: Any
+) -> str:
     object_id = _id()
     server.add_record(DEVICE_A, "Diaper", object_id, when=when, status=status, baby=baby, **kw)
     return object_id
 
 
-def _breakdown(state) -> tuple[int, int, int]:
+def _breakdown(state: State) -> tuple[int, int, int]:
     attributes = state.attributes
     return attributes["wet"], attributes["dirty"], attributes["mixed"]
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and

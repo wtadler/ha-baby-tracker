@@ -1,8 +1,7 @@
 """Core PR 8: the sleep timer sensor, reading a phone's running sleep."""
 
-from typing import Any
-
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -30,7 +29,7 @@ PHONE_SLEEP_TWO = "5EE90000-0000-4000-8000-000000000002"
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -40,7 +39,10 @@ def _start_at_now(freezer: Any) -> None:
 
 
 async def test_a_running_sleep_synced_from_a_phone_turns_asleep_on_and_shows_its_start(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -54,7 +56,10 @@ async def test_a_running_sleep_synced_from_a_phone_turns_asleep_on_and_shows_its
 
 
 async def test_a_sleep_a_phone_ends_while_home_assistant_shows_it_running_clears_next_sync(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -70,7 +75,10 @@ async def test_a_sleep_a_phone_ends_while_home_assistant_shows_it_running_clears
 
 
 async def test_a_running_sleep_for_one_baby_leaves_the_other_awake(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, PHONE_SLEEP_TWO, start=minutes(-15), baby=BABY_TWO)

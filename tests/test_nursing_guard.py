@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -65,7 +66,7 @@ def _guard_issues(hass: HomeAssistant) -> list[ir.IssueEntry]:
     ]
 
 
-async def _at(hass: HomeAssistant, freezer: Any, minute: float) -> None:
+async def _at(hass: HomeAssistant, freezer: FrozenDateTimeFactory, minute: float) -> None:
     """Move the clock to ``minute`` after NOW and let what was scheduled for then run."""
     freezer.move_to(minutes(minute))
     async_fire_time_changed(hass, minutes(minute))
@@ -106,7 +107,7 @@ async def _setup_with_saved(
 
 
 async def test_no_repair_at_59_minutes_and_the_repair_exists_at_exactly_60(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -122,7 +123,7 @@ async def test_no_repair_at_59_minutes_and_the_repair_exists_at_exactly_60(
 
 
 async def test_the_repair_is_there_at_61_minutes_too(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -133,7 +134,7 @@ async def test_the_repair_is_there_at_61_minutes_too(
 
 
 async def test_the_repair_is_a_translated_warning_that_names_the_baby_and_is_not_fixable(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -148,7 +149,7 @@ async def test_the_repair_is_a_translated_warning_that_names_the_baby_and_is_not
 
 
 async def test_a_side_switch_does_not_restart_the_hour(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -163,7 +164,7 @@ async def test_a_side_switch_does_not_restart_the_hour(
 
 
 async def test_the_repair_is_raised_by_the_polling_sync_too(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -177,7 +178,7 @@ async def test_the_repair_is_raised_by_the_polling_sync_too(
 
 
 async def test_the_repair_is_raised_once_and_stays_one_issue(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -189,7 +190,7 @@ async def test_the_repair_is_raised_once_and_stays_one_issue(
 
 
 async def test_a_dismissed_repair_stays_dismissed(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -202,7 +203,7 @@ async def test_a_dismissed_repair_stays_dismissed(
 
 
 async def test_each_baby_has_their_own_repair_and_clock(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -224,7 +225,10 @@ async def test_each_baby_has_their_own_repair_and_clock(
 
 
 async def test_a_nursing_timer_well_under_an_hour_still_polls_every_minute(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -235,7 +239,10 @@ async def test_a_nursing_timer_well_under_an_hour_still_polls_every_minute(
 
 
 async def test_past_an_hour_polling_falls_back_to_five_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -246,7 +253,10 @@ async def test_past_an_hour_polling_falls_back_to_five_minutes(
 
 
 async def test_a_synced_running_sleep_keeps_one_minute_polling_past_the_nursing_cap(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -263,7 +273,10 @@ async def test_a_synced_running_sleep_keeps_one_minute_polling_past_the_nursing_
 
 
 async def test_a_running_sleep_alone_is_never_flagged_however_long_it_runs(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=NOW - timedelta(hours=3))
@@ -278,7 +291,10 @@ async def test_a_running_sleep_alone_is_never_flagged_however_long_it_runs(
 
 
 async def test_discarding_an_overdue_timer_leaves_polling_at_five_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -290,7 +306,10 @@ async def test_discarding_an_overdue_timer_leaves_polling_at_five_minutes(
 
 
 async def test_discarding_a_young_timer_returns_polling_to_five_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -302,7 +321,10 @@ async def test_discarding_a_young_timer_returns_polling_to_five_minutes(
 
 
 async def test_a_new_timer_after_an_overdue_one_polls_every_minute_again(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -317,7 +339,7 @@ async def test_a_new_timer_after_an_overdue_one_polls_every_minute_again(
 
 
 async def test_a_timer_started_after_a_discard_gets_its_own_full_hour(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -337,7 +359,10 @@ async def test_a_timer_started_after_a_discard_gets_its_own_full_hour(
 
 
 async def test_stopping_the_timer_clears_the_repair_and_still_writes_the_record(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -352,7 +377,7 @@ async def test_stopping_the_timer_clears_the_repair_and_still_writes_the_record(
 
 
 async def test_pressing_the_nurse_button_to_stop_clears_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -364,7 +389,7 @@ async def test_pressing_the_nurse_button_to_stop_clears_the_repair(
 
 
 async def test_discarding_the_timer_clears_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -378,7 +403,7 @@ async def test_discarding_the_timer_clears_the_repair(
 
 
 async def test_discarding_one_babys_timer_leaves_the_other_babys_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -394,7 +419,7 @@ async def test_discarding_one_babys_timer_leaves_the_other_babys_repair(
 
 
 async def test_a_timer_that_ends_before_the_hour_never_raises_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -408,7 +433,7 @@ async def test_a_timer_that_ends_before_the_hour_never_raises_the_repair(
 
 
 async def test_a_timer_discarded_before_the_hour_never_raises_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -421,7 +446,7 @@ async def test_a_timer_discarded_before_the_hour_never_raises_the_repair(
 
 
 async def test_unloading_the_entry_removes_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -434,7 +459,7 @@ async def test_unloading_the_entry_removes_the_repair(
 
 
 async def test_removing_the_entry_removes_the_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -447,7 +472,7 @@ async def test_removing_the_entry_removes_the_repair(
 
 
 async def test_an_unloaded_entry_does_not_raise_the_repair_when_the_hour_passes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -467,7 +492,7 @@ async def test_a_saved_timer_older_than_an_hour_raises_the_repair_on_setup(
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -481,7 +506,7 @@ async def test_a_saved_timer_exactly_an_hour_old_raises_the_repair_on_setup(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -494,7 +519,7 @@ async def test_a_saved_timer_under_an_hour_old_raises_no_repair_until_the_hour(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -512,7 +537,7 @@ async def test_a_saved_timer_well_under_an_hour_old_polls_every_minute_after_a_r
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -522,7 +547,7 @@ async def test_a_saved_timer_well_under_an_hour_old_polls_every_minute_after_a_r
 
 
 async def test_a_reload_with_an_overdue_timer_raises_the_repair_again(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -541,7 +566,7 @@ async def test_an_overdue_saved_timer_for_a_baby_no_longer_in_the_account_raises
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     gone = "99999999-0000-4000-8000-000000000099"
@@ -556,7 +581,7 @@ async def test_a_saved_overdue_timer_can_be_stopped_and_writes_the_capped_record
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await _setup_with_saved(hass, mock_config_entry, hass_storage, {BABY_ONE_ID: _saved_timer(300)})
@@ -573,7 +598,10 @@ async def test_a_saved_overdue_timer_can_be_stopped_and_writes_the_capped_record
 
 
 async def test_discard_drops_the_timer_and_writes_nothing_at_all(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -593,7 +621,7 @@ async def test_a_discarded_timer_is_gone_after_a_restart(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -608,7 +636,10 @@ async def test_a_discarded_timer_is_gone_after_a_restart(
 
 
 async def test_discard_does_not_touch_the_sync_state_or_the_other_babys_timer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -638,7 +669,10 @@ async def test_discard_with_no_running_timer_is_a_clear_validation_error_and_pos
 
 
 async def test_discard_twice_fails_the_second_time(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -652,7 +686,10 @@ async def test_discard_twice_fails_the_second_time(
 
 
 async def test_discard_for_another_baby_than_the_one_with_the_timer_fails_and_keeps_the_timer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)  # baby one's timer runs
@@ -666,7 +703,7 @@ async def test_discard_for_another_baby_than_the_one_with_the_timer_fails_and_ke
 
 
 async def test_discard_for_the_account_device_is_a_baby_not_found_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -700,7 +737,7 @@ async def test_discard_needs_a_device(
 
 
 async def test_discard_accepts_the_deprecated_baby_field_and_raises_its_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -714,7 +751,10 @@ async def test_discard_accepts_the_deprecated_baby_field_and_raises_its_repair(
 
 
 async def test_a_discard_during_a_stops_write_waits_and_finds_no_timer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -742,7 +782,10 @@ async def test_a_discard_during_a_stops_write_waits_and_finds_no_timer(
 
 
 async def test_a_stop_during_a_discards_wait_finds_no_timer_and_writes_nothing(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -764,13 +807,16 @@ async def test_a_stop_during_a_discards_wait_finds_no_timer_and_writes_nothing(
 
 
 async def test_a_discard_that_cannot_be_saved_still_drops_the_timer_and_says_so(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
     real_save = Store.async_save
 
-    async def save(self: Store[Any], data: Any) -> None:
+    async def save(self: Store[dict[str, Any]], data: dict[str, Any]) -> None:
         if self.key.endswith(".nursing"):
             raise OSError("disk full")
         await real_save(self, data)
@@ -787,7 +833,10 @@ async def test_a_discard_that_cannot_be_saved_still_drops_the_timer_and_says_so(
 
 
 async def test_the_guard_firing_during_a_failing_sync_leaves_entities_unavailable(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -805,7 +854,7 @@ async def test_the_guard_firing_during_a_failing_sync_leaves_entities_unavailabl
 
 
 async def test_a_stop_then_a_fresh_start_inside_the_old_window_raises_no_early_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
@@ -824,7 +873,10 @@ async def test_a_stop_then_a_fresh_start_inside_the_old_window_raises_no_early_r
 
 
 async def test_a_baby_deleted_while_flagged_clears_their_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, "switch.baby_two_nursing_left")

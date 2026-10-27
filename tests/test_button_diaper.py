@@ -6,6 +6,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
@@ -43,7 +44,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -59,7 +60,7 @@ async def test_a_button_press_adds_that_kind_of_diaper_for_that_baby_now(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
     kind: str,
     status: int,
 ) -> None:
@@ -80,7 +81,10 @@ async def test_a_button_press_adds_that_kind_of_diaper_for_that_baby_now(
 
 
 async def test_two_presses_make_two_records_with_different_ids(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "wet"))
@@ -150,7 +154,10 @@ async def test_a_press_that_got_no_answer_but_landed_succeeds(
 
 
 async def test_a_write_right_after_an_unanswered_one_says_it_is_still_being_confirmed(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.post_errors.append((NoResponseError("timed out"), False))
@@ -168,7 +175,10 @@ async def test_a_write_right_after_an_unanswered_one_says_it_is_still_being_conf
 
 
 async def test_the_unknown_outcome_clears_once_the_grace_window_passes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.post_errors.append((NoResponseError("timed out"), False))
@@ -186,7 +196,7 @@ async def test_a_failed_write_still_saves_the_engine_state(
     init_integration: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.post_errors.append((NoResponseError("timed out"), False))
@@ -214,7 +224,10 @@ async def test_a_successful_write_saves_the_new_record(
 
 
 async def test_a_gap_that_clears_before_the_hour_starts_the_clock_over(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -233,7 +246,10 @@ async def test_a_gap_that_clears_before_the_hour_starts_the_clock_over(
 
 
 async def test_a_second_gap_after_a_clean_stretch_can_still_become_a_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -255,7 +271,7 @@ async def test_each_account_times_its_own_gap(
     init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -271,7 +287,10 @@ async def test_each_account_times_its_own_gap(
 
 
 async def test_the_repair_issue_goes_away_after_a_write_succeeds(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5

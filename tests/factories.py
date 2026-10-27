@@ -73,7 +73,7 @@ def record_payload(
     return payload
 
 
-def wire(sync_id: int, op_code: int, payload: Any) -> dict[str, Any]:
+def wire(sync_id: int, op_code: int, payload: dict[str, Any]) -> dict[str, Any]:
     """One entry as the service returns it from a device's log."""
     text = json.dumps(payload).encode("utf-8")
     entry = dict(load_json_object_fixture("wire.json"))

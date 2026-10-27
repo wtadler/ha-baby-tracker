@@ -6,6 +6,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -44,7 +45,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -312,7 +313,7 @@ async def test_corrupt_storage_falls_back_to_a_fresh_backfill_with_a_warning(
     server: FakeServer,
     hass_storage: dict[str, Any],
     caplog: pytest.LogCaptureFixture,
-    corrupt: Any,
+    corrupt: object,
 ) -> None:
     key = _storage_key(mock_config_entry)
     hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": corrupt}

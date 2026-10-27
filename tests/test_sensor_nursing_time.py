@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -39,7 +40,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -48,7 +49,9 @@ def _start_at_now(freezer: Any) -> None:
     freezer.move_to(NOW)
 
 
-async def _tick_seconds(hass: HomeAssistant, freezer: Any, seconds: float) -> None:
+async def _tick_seconds(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, seconds: float
+) -> None:
     """Move the clock and fire the timers due, without any sync being asked for."""
     freezer.tick(timedelta(seconds=seconds))
     async_fire_time_changed(hass, dt_util.utcnow())
@@ -89,7 +92,7 @@ async def test_the_running_sides_time_counts_up_with_no_sync(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     assert state(hass, NURSING_LEFT_TIME).state == "0.0"
@@ -111,7 +114,7 @@ async def test_the_sensors_update_at_least_every_minute_without_a_sync(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     changes: list[str] = []
@@ -121,7 +124,7 @@ async def test_the_sensors_update_at_least_every_minute_without_a_sync(
         changes.append(event.data["new_state"].state)
 
     @callback
-    def only_left(data: Any) -> bool:
+    def only_left(data: dict[str, Any]) -> bool:
         return bool(data["entity_id"] == NURSING_LEFT_TIME)
 
     hass.bus.async_listen("state_changed", record, event_filter=only_left)
@@ -133,7 +136,7 @@ async def test_the_sensors_update_at_least_every_minute_without_a_sync(
 
 
 async def test_the_time_on_each_side_across_a_side_switch(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(minutes(5))
@@ -156,7 +159,7 @@ async def test_the_time_on_each_side_across_a_side_switch(
 
 
 async def test_the_duration_sensors_are_unknown_again_after_a_stop(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(minutes(4))
@@ -172,7 +175,7 @@ async def test_the_duration_sensors_are_unknown_again_after_a_stop(
 
 
 async def test_the_duration_sensors_are_unknown_after_a_discard(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(minutes(4))
@@ -184,7 +187,7 @@ async def test_the_duration_sensors_are_unknown_after_a_discard(
 
 
 async def test_a_new_session_after_a_stop_starts_from_zero(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(9))
@@ -198,7 +201,7 @@ async def test_a_new_session_after_a_stop_starts_from_zero(
 
 
 async def test_two_babies_duration_sensors_run_independently(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(minutes(2))
@@ -211,7 +214,7 @@ async def test_two_babies_duration_sensors_run_independently(
 
 
 async def test_the_duration_sensors_hold_their_value_when_the_clock_goes_backwards(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(NOW - timedelta(minutes=5))
@@ -222,7 +225,7 @@ async def test_the_duration_sensors_hold_their_value_when_the_clock_goes_backwar
 
 
 async def test_a_session_saved_before_a_restart_shows_its_time_after_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, NURSE_LEFT)
     freezer.move_to(minutes(3))

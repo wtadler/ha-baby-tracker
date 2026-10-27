@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import probatio
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -46,7 +47,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -162,7 +163,7 @@ LIMITS = {
 }
 
 
-def _schema_fields(schema: Any) -> set[str]:
+def _schema_fields(schema: probatio.All | probatio.Schema) -> set[str]:
     """Return the field names of an action's schema, which may be wrapped in ``All``."""
     if isinstance(schema, probatio.All):
         return _schema_fields(schema.validators[0])
@@ -211,7 +212,10 @@ async def test_log_diaper_reads_a_time_without_an_offset_in_the_home_assistant_t
 
 
 async def test_log_diaper_without_a_time_uses_now_in_the_home_assistant_time_zone(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("Asia/Kolkata")
     freezer.move_to(NOW)
@@ -656,7 +660,10 @@ async def test_a_write_sends_the_standard_offset_of_the_records_own_moment(
 
 
 async def test_a_backdated_write_uses_the_standard_offset_not_the_offset_now(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(datetime(2026, 1, 20, 12, 0, tzinfo=UTC))

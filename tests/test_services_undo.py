@@ -6,6 +6,7 @@ from typing import Any
 import probatio
 import pytest
 import voluptuous as vol
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
@@ -49,7 +50,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -123,7 +124,9 @@ async def _call(hass: HomeAssistant, action: str, data: dict[str, Any]) -> None:
     await hass.services.async_call(DOMAIN, action, data, blocking=True)
 
 
-async def _two_diapers(hass: HomeAssistant, freezer: Any, server: Any) -> tuple[str, str]:
+async def _two_diapers(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, server: FakeServer
+) -> tuple[str, str]:
     """Write baby one's diaper, then baby two's. Returns their record IDs, oldest first."""
     freezer.move_to(NOW)
     await press(hass, "button.baby_one_wet_diaper")
@@ -133,7 +136,7 @@ async def _two_diapers(hass: HomeAssistant, freezer: Any, server: Any) -> tuple[
     return first, second
 
 
-def _deleted(server: Any) -> list[str]:
+def _deleted(server: FakeServer) -> list[str]:
     from custom_components.nighp_baby_tracker.pybabytracker import OP_DELETE
 
     return [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
@@ -166,7 +169,10 @@ async def test_undo_for_a_baby_never_picks_a_pump(
 
 
 async def test_undo_deletes_the_record_a_button_press_created(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "dirty"))
@@ -194,7 +200,10 @@ async def test_undo_by_config_entry_id(
 
 
 async def test_undo_without_an_object_id_removes_the_most_recent_record_ha_created(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "wet"))
@@ -208,7 +217,10 @@ async def test_undo_without_an_object_id_removes_the_most_recent_record_ha_creat
 
 
 async def test_undo_with_a_baby_only_considers_that_babys_records(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "wet"))
@@ -224,7 +236,10 @@ async def test_undo_with_a_baby_only_considers_that_babys_records(
 
 
 async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)  # the clock never moves: every record has the same timestamp
     for _ in range(6):
@@ -243,7 +258,7 @@ async def test_undo_deletes_the_newest_ha_write_even_after_a_phone_edited_it(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
     scope: str,
 ) -> None:
     freezer.move_to(NOW)
@@ -275,7 +290,10 @@ async def test_undo_deletes_the_newest_ha_write_even_after_a_phone_edited_it(
 
 
 async def test_undo_follows_write_order_not_the_time_of_the_diaper(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "wet"))
@@ -314,7 +332,10 @@ async def test_undo_with_a_baby_and_another_babys_record_id_is_a_validation_erro
 
 
 async def test_undo_with_an_object_id_removes_that_record(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, button("baby_one", "wet"))
@@ -473,7 +494,10 @@ async def test_undo_by_record_id_removes_a_bottle_among_other_writes(
 
 
 async def test_undo_with_device_id_removes_that_babys_latest_write(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     first, _ = await _two_diapers(hass, freezer, server)
 
@@ -484,7 +508,10 @@ async def test_undo_with_device_id_removes_that_babys_latest_write(
 
 
 async def test_undo_with_config_entry_id_removes_the_accounts_latest_write(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     _, second = await _two_diapers(hass, freezer, server)
 
@@ -503,7 +530,7 @@ async def test_undo_with_no_target_is_refused(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_an_unknown_account_is_a_validation_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     data = {
         "config_entry_id": "no-such-entry",
@@ -518,7 +545,7 @@ async def test_an_unknown_account_is_a_validation_error(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_an_account_that_is_not_loaded_is_a_validation_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     await hass.config_entries.async_unload(init_integration.entry_id)
     data = {
@@ -533,7 +560,7 @@ async def test_an_account_that_is_not_loaded_is_a_validation_error(
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
 async def test_another_integrations_entry_is_a_validation_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     other = MockConfigEntry(domain="other_integration")
     other.add_to_hass(hass)

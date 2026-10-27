@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
@@ -43,7 +44,7 @@ TWO_NURSING_TIMER = "sensor.baby_two_nursing_timer"
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -53,7 +54,10 @@ def _start_at_now(freezer: Any) -> None:
 
 
 async def test_nurse_left_then_right_then_right_writes_both_sides_and_finish_side_right(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "right"), (12, "right"))
 
@@ -68,7 +72,10 @@ async def test_nurse_left_then_right_then_right_writes_both_sides_and_finish_sid
 
 
 async def test_a_nursing_timer_posts_nothing_until_it_stops(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "right"), (7, "left"))
 
@@ -77,7 +84,10 @@ async def test_a_nursing_timer_posts_nothing_until_it_stops(
 
 
 async def test_pressing_the_running_side_again_stops_with_only_that_side(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "right"), (9, "right"))
 
@@ -86,7 +96,10 @@ async def test_pressing_the_running_side_again_stops_with_only_that_side(
 
 
 async def test_switching_sides_several_times_adds_up_each_side(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (2, "right"), (5, "left"), (9, "right"), (10, "right"))
 
@@ -97,7 +110,10 @@ async def test_switching_sides_several_times_adds_up_each_side(
 
 
 async def test_ending_on_the_left_sets_finish_side_left(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "right"), (4, "left"), (6, "left"))
 
@@ -106,7 +122,7 @@ async def test_ending_on_the_left_sets_finish_side_left(
 
 
 async def test_the_nursing_timer_sensor_shows_start_side_and_seconds(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     timer = state(hass, NURSING_TIMER)
@@ -127,7 +143,10 @@ async def test_the_nursing_timer_sensor_shows_start_side_and_seconds(
 
 
 async def test_stopping_under_30_seconds_writes_one_minute_on_that_side(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (0.25, "left"))
 
@@ -136,7 +155,10 @@ async def test_stopping_under_30_seconds_writes_one_minute_on_that_side(
 
 
 async def test_each_side_rounds_to_whole_minutes_half_up(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     # Left 89 seconds (1 minute), right 90 seconds (2 minutes).
     await nurse(hass, freezer, (0, "left"), (89 / 60, "right"), (179 / 60, "right"))
@@ -146,7 +168,10 @@ async def test_each_side_rounds_to_whole_minutes_half_up(
 
 
 async def test_a_short_first_side_rounds_to_zero_but_still_counts_the_other(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (0.25, "right"), (10.25, "right"))
 
@@ -155,7 +180,10 @@ async def test_a_short_first_side_rounds_to_zero_but_still_counts_the_other(
 
 
 async def test_a_forgotten_nursing_timer_clamps_each_side_to_240_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (300, "right"), (600, "right"))
 
@@ -164,7 +192,10 @@ async def test_a_forgotten_nursing_timer_clamps_each_side_to_240_minutes(
 
 
 async def test_a_nurse_press_while_the_baby_is_asleep_is_allowed(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -179,7 +210,10 @@ async def test_a_nurse_press_while_the_baby_is_asleep_is_allowed(
 
 
 async def test_two_babies_nursing_timers_run_independently(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     freezer.move_to(minutes(1))
@@ -196,7 +230,10 @@ async def test_two_babies_nursing_timers_run_independently(
 
 
 async def test_a_failed_nursing_write_keeps_the_timer_and_the_retry_lands_once(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     server.post_errors.append((BabyTrackerConnectionError("down"), False))
@@ -216,7 +253,10 @@ async def test_a_failed_nursing_write_keeps_the_timer_and_the_retry_lands_once(
 
 
 async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     # The post lands but the answer is lost, and the landing check fails too.
@@ -233,7 +273,10 @@ async def test_a_nursing_write_that_landed_despite_an_error_is_not_written_twice
 
 
 async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     freezer.move_to(minutes(5))
@@ -256,12 +299,12 @@ async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets
 
 
 async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     real_save = Store.async_save
 
-    async def save(self: Store[Any], data: Any) -> None:
+    async def save(self: Store[dict[str, Any]], data: dict[str, Any]) -> None:
         if self.key.endswith(".nursing"):
             raise OSError("disk full")
         await real_save(self, data)
@@ -277,7 +320,10 @@ async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
 
 
 async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "left"))
 

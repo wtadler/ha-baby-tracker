@@ -3,9 +3,9 @@ removed entry leaves behind."""
 
 import asyncio
 from datetime import timedelta
-from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -47,7 +47,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -74,7 +74,10 @@ async def test_log_pump_updates_the_last_pump_sensor_without_a_poll(
 
 
 async def test_the_pending_post_and_its_grace_window_survive_a_restart(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.post_errors.append((NoResponseError("timed out"), False))
@@ -91,7 +94,10 @@ async def test_the_pending_post_and_its_grace_window_survive_a_restart(
 
 
 async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -107,7 +113,10 @@ async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
 
 
 async def test_a_removed_entry_forgets_its_gap_clock(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -125,7 +134,10 @@ async def test_a_removed_entry_forgets_its_gap_clock(
 
 
 async def test_a_wet_press_bumps_todays_count_with_no_poll(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(NOW)
@@ -212,7 +224,10 @@ async def test_a_pump_updates_the_last_pump_sensor_without_a_poll(
 
 
 async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     # Metric display: the sensor still shows today's volume in mL, converted from the ounces.
     hass.config.units = METRIC_SYSTEM

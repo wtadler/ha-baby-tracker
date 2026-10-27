@@ -1,7 +1,6 @@
 """Core PR 14: the button platform snapshot and the buttons each baby has. Later PRs add their
 buttons to the snapshot."""
 
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -28,7 +27,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and

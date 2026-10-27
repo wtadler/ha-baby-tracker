@@ -1,9 +1,9 @@
 """Core PR 17: the Sleep switch."""
 
 from datetime import UTC, datetime
-from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -53,7 +53,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up."""
     freezer.move_to(NOW)
 
@@ -68,7 +68,10 @@ async def _expect_error(
 
 
 async def test_a_started_timer_sends_the_standard_offset_in_summer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.config.async_set_time_zone("America/New_York")
     freezer.move_to(datetime(2026, 7, 15, 16, 0, tzinfo=UTC))
@@ -98,7 +101,10 @@ async def test_turning_the_sleep_switch_on_starts_one_sleep_now(
 
 
 async def test_turning_the_sleep_switch_off_ends_the_sleep(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, SLEEP_SWITCH)
     freezer.move_to(minutes(25))
@@ -240,7 +246,10 @@ async def test_a_phone_and_home_assistant_ending_one_sleep_leave_one_finished_sl
 
 
 async def test_two_babies_sleep_switches_run_independently(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, SLEEP_SWITCH)
     assert state(hass, TWO_SLEEP_SWITCH).state == "off"
@@ -261,7 +270,10 @@ async def test_two_babies_sleep_switches_run_independently(
 
 
 async def test_the_sleep_switch_and_the_start_and_stop_actions_agree(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await hass.services.async_call(
         DOMAIN,

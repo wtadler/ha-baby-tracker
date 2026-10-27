@@ -1,5 +1,7 @@
 """Core PR 2: the reauthentication flow."""
 
+from collections.abc import Callable
+
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
@@ -36,7 +38,9 @@ async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
     return await entry.start_reauth_flow(hass)
 
 
-async def test_reauth_asks_for_the_password_only(hass: HomeAssistant, mock_config_entry) -> None:
+async def test_reauth_asks_for_the_password_only(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
     result = await _start_reauth(hass, mock_config_entry)
 
     assert result["type"] is FlowResultType.FORM
@@ -45,14 +49,16 @@ async def test_reauth_asks_for_the_password_only(hass: HomeAssistant, mock_confi
 
 
 async def test_reauth_shows_the_email_as_a_placeholder(
-    hass: HomeAssistant, mock_config_entry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     result = await _start_reauth(hass, mock_config_entry)
 
     assert result["description_placeholders"]["email"] == EMAIL
 
 
-async def test_reauth_refuses_an_email_field(hass: HomeAssistant, mock_config_entry) -> None:
+async def test_reauth_refuses_an_email_field(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
     result = await _start_reauth(hass, mock_config_entry)
 
     with pytest.raises(InvalidData):
@@ -60,7 +66,7 @@ async def test_reauth_refuses_an_email_field(hass: HomeAssistant, mock_config_en
 
 
 async def test_reauth_with_a_new_password_restores_the_entry(
-    hass: HomeAssistant, mock_config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
     result = await _start_reauth(hass, mock_config_entry)
@@ -75,7 +81,7 @@ async def test_reauth_with_a_new_password_restores_the_entry(
 
 
 async def test_reauth_signs_in_with_the_entrys_email(
-    hass: HomeAssistant, mock_config_entry, server: FakeServer
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     server.password = NEW_PASSWORD
     result = await _start_reauth(hass, mock_config_entry)
@@ -86,7 +92,9 @@ async def test_reauth_signs_in_with_the_entrys_email(
     assert server.sign_ins[0]["password"] == NEW_PASSWORD
 
 
-async def test_reauth_keeps_the_device_id(hass: HomeAssistant, mock_config_entry, server) -> None:
+async def test_reauth_keeps_the_device_id(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+) -> None:
     original = mock_config_entry.data[CONF_DEVICE_UUID]
     server.password = NEW_PASSWORD
     result = await _start_reauth(hass, mock_config_entry)
@@ -118,7 +126,7 @@ async def test_reauth_errors_show_on_the_form_and_the_flow_recovers(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
-    break_login,
+    break_login: Callable[[FakeServer], None],
     error: str,
 ) -> None:
     server.password = NEW_PASSWORD

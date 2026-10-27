@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -29,7 +30,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -54,7 +55,10 @@ async def test_a_running_synced_sleep_polls_every_minute_and_then_returns_to_the
 
 
 async def test_a_nursing_timer_polls_every_minute_and_then_returns_to_the_interval(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
     assert await sync_interval(hass, server) == timedelta(minutes=1)
@@ -65,7 +69,10 @@ async def test_a_nursing_timer_polls_every_minute_and_then_returns_to_the_interv
 
 
 async def test_a_sleep_home_assistant_starts_switches_polling_at_once(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, SLEEP_SWITCH)
@@ -81,7 +88,7 @@ async def test_a_second_account_polls_on_its_own_schedule(
     second_entry: MockConfigEntry,
     server: FakeServer,
     second_server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
 
@@ -91,7 +98,7 @@ async def test_a_second_account_polls_on_its_own_schedule(
 
 @pytest.mark.parametrize("options", [{}, {LEGACY_INTERVAL: 15}], ids=["new", "legacy"])
 async def test_a_running_sleep_polls_every_minute_and_five_when_it_stops(
-    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: Any
+    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: FrozenDateTimeFactory
 ) -> None:
     await entry_with_options(hass, options)
 
@@ -105,7 +112,7 @@ async def test_a_running_sleep_polls_every_minute_and_five_when_it_stops(
 
 @pytest.mark.parametrize("options", [{}, {LEGACY_INTERVAL: 15}], ids=["new", "legacy"])
 async def test_a_running_nursing_timer_polls_every_minute_and_five_when_it_stops(
-    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: Any
+    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: FrozenDateTimeFactory
 ) -> None:
     await entry_with_options(hass, options)
 

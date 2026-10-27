@@ -266,7 +266,9 @@ def nursing_posts(server: FakeServer) -> list[Nursing]:
     return [r for _, op, r in posted(server) if op == OP_ADD and isinstance(r, Nursing)]
 
 
-async def nurse(hass: HomeAssistant, freezer: Any, *steps: tuple[float, str]) -> None:
+async def nurse(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, *steps: tuple[float, str]
+) -> None:
     """Tap the nursing switches at the given minutes after NOW: (minute, "left" | "right")."""
     for minute, side in steps:
         freezer.move_to(minutes(minute))

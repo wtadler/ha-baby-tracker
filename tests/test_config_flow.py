@@ -1,6 +1,7 @@
 """Core PR 1: the config flow's user step."""
 
 import uuid
+from collections.abc import Callable
 from unittest.mock import AsyncMock
 
 import pytest
@@ -108,7 +109,7 @@ async def test_form_errors_show_on_the_form_and_the_flow_recovers(
     hass: HomeAssistant,
     server: FakeServer,
     mock_setup_entry: AsyncMock,
-    break_login,
+    break_login: Callable[[FakeServer], None],
     error: str,
 ) -> None:
     break_login(server)

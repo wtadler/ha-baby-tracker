@@ -1,8 +1,7 @@
 """Core PR 16: start_sleep and stop_sleep."""
 
-from typing import Any
-
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -36,7 +35,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -46,7 +45,10 @@ def _start_at_now(freezer: Any) -> None:
 
 
 async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, SLEEP_SWITCH)
@@ -61,7 +63,10 @@ async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
 
 
 async def test_start_sleep_with_a_past_start_and_a_note(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -76,7 +81,10 @@ async def test_start_sleep_with_a_past_start_and_a_note(
 
 
 async def test_start_sleep_with_an_object_id_retries_safely(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     object_id = "5EE90000-0000-4000-8000-0000000000AA"
@@ -89,7 +97,10 @@ async def test_start_sleep_with_an_object_id_retries_safely(
 
 
 async def test_start_sleep_while_a_sleep_is_running_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -103,7 +114,10 @@ async def test_start_sleep_while_a_sleep_is_running_is_refused(
 
 
 async def test_start_sleep_more_than_24_hours_ago_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
 
@@ -115,7 +129,10 @@ async def test_start_sleep_more_than_24_hours_ago_is_refused(
 
 
 async def test_stop_sleep_ends_a_phone_started_sleep_at_the_given_end(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -129,7 +146,10 @@ async def test_stop_sleep_ends_a_phone_started_sleep_at_the_given_end(
 
 
 async def test_stop_sleep_defaults_to_now(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     await call(hass, "start_sleep")
@@ -142,7 +162,10 @@ async def test_stop_sleep_defaults_to_now(
 
 
 async def test_stop_sleep_with_no_running_sleep_is_a_validation_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-90), duration=30)  # finished
@@ -156,7 +179,10 @@ async def test_stop_sleep_with_no_running_sleep_is_a_validation_error(
 
 
 async def test_stop_sleep_with_an_end_before_the_start_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-40))
@@ -170,7 +196,10 @@ async def test_stop_sleep_with_an_end_before_the_start_is_refused(
 
 
 async def test_stop_sleep_past_24_hours_writes_24_hours(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     phone_sleep(server, start=minutes(-60 * 23))

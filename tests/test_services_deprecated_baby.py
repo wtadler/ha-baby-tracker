@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 import voluptuous as vol
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -45,7 +46,7 @@ def only_pump(server: FakeServer) -> Pump:
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -59,14 +60,14 @@ def _issues(hass: HomeAssistant) -> list[ir.IssueEntry]:
     return [issue for (domain, _), issue in registry.issues.items() if domain == DOMAIN]
 
 
-def _effect(hass: HomeAssistant, server: Any) -> tuple[Any, ...]:
+def _effect(hass: HomeAssistant, server: FakeServer) -> tuple[Any, ...]:
     """What an action visibly changes: records sent, and the baby's nursing timer."""
     timer = hass.states.get("sensor.baby_one_nursing_timer")
     assert timer is not None
     return (len(server.posted), timer.state, timer.attributes.get("side"))
 
 
-async def _prepare(hass: HomeAssistant, action: str, freezer: Any) -> None:
+async def _prepare(hass: HomeAssistant, action: str, freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
     prepare = BABY_ACTIONS[action][1]
     if prepare is not None:
@@ -78,7 +79,9 @@ async def _call(hass: HomeAssistant, action: str, data: dict[str, Any]) -> None:
     await hass.services.async_call(DOMAIN, action, data, blocking=True)
 
 
-async def _two_diapers(hass: HomeAssistant, freezer: Any, server: Any) -> tuple[str, str]:
+async def _two_diapers(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, server: FakeServer
+) -> tuple[str, str]:
     """Write baby one's diaper, then baby two's. Returns their record IDs, oldest first."""
     freezer.move_to(NOW)
     await press(hass, "button.baby_one_wet_diaper")
@@ -88,7 +91,7 @@ async def _two_diapers(hass: HomeAssistant, freezer: Any, server: Any) -> tuple[
     return first, second
 
 
-def _deleted(server: Any) -> list[str]:
+def _deleted(server: FakeServer) -> list[str]:
     from custom_components.nighp_baby_tracker.pybabytracker import OP_DELETE
 
     return [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
@@ -139,7 +142,11 @@ async def test_baby_with_device_or_an_account_is_refused_as_two_targets(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_works_with_device_id_and_raises_no_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any, action: str
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
+    action: str,
 ) -> None:
     await _prepare(hass, action, freezer)
     before = _effect(hass, server)
@@ -154,7 +161,11 @@ async def test_a_baby_action_works_with_device_id_and_raises_no_repair(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_the_deprecated_baby_field_still_works_and_raises_a_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any, action: str
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
+    action: str,
 ) -> None:
     await _prepare(hass, action, freezer)
     before = _effect(hass, server)
@@ -198,7 +209,7 @@ async def test_each_action_gets_its_own_repair(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_with_both_fields_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     baby = device_id(hass, BABY_ONE_ID)
     with pytest.raises(vol.Invalid, match="at most one"):
@@ -209,7 +220,7 @@ async def test_a_baby_action_with_both_fields_is_refused(
 
 @pytest.mark.parametrize("action", ACTION_IDS)
 async def test_a_baby_action_with_no_target_is_refused(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, action: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, action: str
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, action, dict(BABY_ACTIONS[action][0]))
@@ -218,7 +229,7 @@ async def test_a_baby_action_with_no_target_is_refused(
 
 @pytest.mark.parametrize("field", ["device_id", "baby"])
 async def test_an_unknown_baby_device_is_a_validation_error(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, field: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, field: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await _call(hass, "log_diaper", {field: "0" * 32, "type": "wet"})
@@ -228,7 +239,7 @@ async def test_an_unknown_baby_device_is_a_validation_error(
 
 @pytest.mark.parametrize("field", ["device_id", "baby"])
 async def test_the_account_device_is_not_a_baby(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, field: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, field: str
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await _call(
@@ -241,7 +252,7 @@ async def test_the_account_device_is_not_a_baby(
 
 
 async def test_a_baby_of_an_unloaded_account_says_the_account_is_not_loaded(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     baby = device_id(hass, BABY_ONE_ID)
     await hass.config_entries.async_unload(init_integration.entry_id)
@@ -257,8 +268,8 @@ async def test_the_device_id_of_a_second_account_writes_to_that_account(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
-    server: Any,
-    second_server: Any,
+    server: FakeServer,
+    second_server: FakeServer,
 ) -> None:
     baby_three = device_id(hass, BABY_THREE_ID)
 
@@ -270,7 +281,7 @@ async def test_the_device_id_of_a_second_account_writes_to_that_account(
 
 @pytest.mark.parametrize("alias", ["device", "baby"])
 async def test_log_pump_still_takes_a_device_and_raises_a_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, alias: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, alias: str
 ) -> None:
     await _call(
         hass, "log_pump", {alias: account_device(hass, init_integration).id, "left_amount": 3}
@@ -291,7 +302,7 @@ async def test_log_pump_still_takes_a_device_and_raises_a_repair(
 
 @pytest.mark.parametrize("alias", ["device", "baby"])
 async def test_log_pump_with_a_babys_device_still_reaches_the_account(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, alias: str
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, alias: str
 ) -> None:
     await _call(hass, "log_pump", {alias: device_id(hass, BABY_ONE_ID), "left_amount": 3})
 
@@ -299,7 +310,10 @@ async def test_log_pump_with_a_babys_device_still_reaches_the_account(
 
 
 async def test_undo_still_takes_baby_and_raises_a_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     first, _ = await _two_diapers(hass, freezer, server)
 

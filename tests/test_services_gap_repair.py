@@ -1,9 +1,9 @@
 """Core PR 11: the repair issue for a gap in this device's own log."""
 
 from datetime import timedelta
-from typing import Any
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -18,7 +18,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up.
 
     Timers scheduled at setup then share the clock the tests move, so moving it forward and
@@ -40,7 +40,10 @@ async def test_a_gap_in_this_devices_own_log_raises_but_creates_no_repair_at_fir
 
 
 async def test_a_gap_that_keeps_failing_for_an_hour_creates_a_repair_issue(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -58,7 +61,10 @@ async def test_a_gap_that_keeps_failing_for_an_hour_creates_a_repair_issue(
 
 
 async def test_a_gap_still_failing_just_under_an_hour_later_creates_no_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
@@ -71,7 +77,10 @@ async def test_a_gap_still_failing_just_under_an_hour_later_creates_no_repair(
 
 
 async def test_many_quick_failures_do_not_add_up_to_a_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5
