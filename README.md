@@ -53,7 +53,7 @@ On first setup, Home Assistant loads your account's full history in one go. It s
 seen, so a restart fetches only what's new.
 
 Home Assistant signs in as its own device named "Home Assistant" and never borrows a phone's
-identity. It doesn't appear in the app's device list until a later version writes its first record.
+identity. It doesn't appear in the app's device list until it writes its first record.
 
 ### Options
 
