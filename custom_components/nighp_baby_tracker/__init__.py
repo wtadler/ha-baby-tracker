@@ -36,9 +36,10 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
 ]
 
-# Buttons an earlier version registered, as the ends of their unique IDs (``<baby_id>_<key>``).
-# The Sleep and Nursing switches replaced them. Matching is by suffix, so no button added later
-# may have a key that ends in one of these (a ``log_sleep`` button would be deleted on setup).
+# HACS-only: the legacy button cleanup. These are the ends of the unique IDs (``<baby_id>_<key>``)
+# of the Sleep and Nurse left/right buttons, which the timer switches cover. Matching is by suffix,
+# so no button may have a key that ends in one of these (a ``log_sleep`` button would be deleted
+# on setup).
 REMOVED_BUTTONS = ("_sleep", "_nurse_left", "_nurse_right")
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -67,15 +68,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
-    _remove_old_timer_buttons(hass, entry)
+    _remove_old_timer_buttons(hass, entry)  # HACS-only: the legacy button cleanup
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Drop the Sleep and Nurse left/right buttons an earlier version registered.
+    """Drop the Sleep and Nurse left/right buttons from the entity registry.
 
-    The timer switches replaced them, and a registry entry with no entity behind it would show
+    HACS-only: the legacy button cleanup. A registry entry with no entity behind it would show
     as an unavailable button. Every other button is left alone, and with none left this does
     nothing, so it is safe on every setup.
     """
@@ -92,11 +93,11 @@ def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry
 async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
     """Bring an older entry up to date, once.
 
-    Minor version 2: drop the per-baby last-pump entities an earlier version registered. Setup
-    used to do it every time; it now happens here, and doing it twice is harmless.
+    HACS-only: the config entry migration. Minor version 2 drops the per-baby last-pump
+    entities. Doing it twice is harmless.
     """
     if entry.version > CONFIG_ENTRY_VERSION:
-        # Made by a newer release than this one: don't guess at its layout.
+        # The entry's layout comes from a newer release than this one: don't guess at it.
         return False
     if entry.minor_version < 2:
         _remove_per_baby_last_pumps(hass, entry)
@@ -107,10 +108,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry
 
 
 def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Drop the per-baby last-pump entities an earlier version registered (``<baby_id>_last_pump``).
+    """Drop the per-baby last-pump entities (``<baby_id>_last_pump``).
 
-    A pump belongs to the account, so the sensor moved to the account's device
-    (``<entry_id>_last_pump``). Nothing else is touched, and it does nothing once they're gone.
+    HACS-only: the legacy pump cleanup, run by the config entry migration. A pump belongs to the
+    account, so the sensor lives on the account's device (``<entry_id>_last_pump``). Nothing else
+    is touched, and it does nothing once they're gone.
     """
     registry = er.async_get(hass)
     account_unique_id = f"{entry.entry_id}_last_pump"

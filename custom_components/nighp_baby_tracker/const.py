@@ -1,18 +1,18 @@
 """Constants for Baby Tracker (Nighp)."""
 
 from datetime import timedelta
+from enum import StrEnum
 
 DOMAIN = "nighp_baby_tracker"
 
-# The config entry's version: the minor number goes up when setup needs a one-time change.
+# HACS-only: the config entry's version. Minor version 2 is the entry migration in ``__init__.py``.
 CONFIG_ENTRY_VERSION = 1
 CONFIG_ENTRY_MINOR_VERSION = 2
 
 CONF_DEVICE_UUID = "device_uuid"
 
 # How often the account syncs. Fixed: Home Assistant's polling rules leave it to the user to
-# poll faster with ``homeassistant.update_entity``. An earlier version saved a ``scan_interval``
-# option; it is ignored, and the next options save drops it.
+# poll faster with ``homeassistant.update_entity``.
 SCAN_INTERVAL = timedelta(minutes=5)
 
 # A nursing timer is Home Assistant's alone (the app doesn't sync a running one), so a forgotten one
@@ -55,21 +55,25 @@ def is_account_identifier(identifier: str) -> bool:
     return identifier.endswith(ACCOUNT_SUFFIX)
 
 
-SERVICE_LOG_DIAPER = "log_diaper"
-SERVICE_LOG_BOTTLE = "log_bottle"
-SERVICE_LOG_NURSING = "log_nursing"
-SERVICE_LOG_SLEEP = "log_sleep"
-SERVICE_LOG_PUMP = "log_pump"
-SERVICE_START_PUMP = "start_pump"
-SERVICE_STOP_PUMP = "stop_pump"
-SERVICE_UNDO = "undo"
-SERVICE_START_SLEEP = "start_sleep"
-SERVICE_STOP_SLEEP = "stop_sleep"
-SERVICE_START_NURSING = "start_nursing"
-SERVICE_SWITCH_NURSING_SIDE = "switch_nursing_side"
-SERVICE_STOP_NURSING = "stop_nursing"
-SERVICE_DISCARD_NURSING = "discard_nursing"
-
 CONF_BOTTLE_SIZE = "bottle_size"
 CONF_BOTTLE_UNIT = "bottle_unit"
 CONF_BOTTLE_TYPE = "bottle_type"
+
+
+class BabyTrackerService(StrEnum):
+    """The names of the integration's actions."""
+
+    LOG_DIAPER = "log_diaper"
+    LOG_BOTTLE = "log_bottle"
+    LOG_NURSING = "log_nursing"
+    LOG_SLEEP = "log_sleep"
+    LOG_PUMP = "log_pump"
+    START_PUMP = "start_pump"
+    STOP_PUMP = "stop_pump"
+    UNDO = "undo"
+    START_SLEEP = "start_sleep"
+    STOP_SLEEP = "stop_sleep"
+    START_NURSING = "start_nursing"
+    SWITCH_NURSING_SIDE = "switch_nursing_side"
+    STOP_NURSING = "stop_nursing"
+    DISCARD_NURSING = "discard_nursing"

@@ -1161,7 +1161,7 @@ async def test_a_failing_save_does_not_replace_the_sync_error(
     assert "disk full" in caplog.text
 
 
-# The option an earlier version saved. It is no longer a setting, so these tests spell it out.
+# A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.
 
 
 @pytest.mark.parametrize(

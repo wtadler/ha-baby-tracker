@@ -493,20 +493,22 @@ async def _start_nursing_locked(
 ) -> None:
     _check_baby(coordinator, baby_id)
     now = dt_util.utcnow()
-    timer = coordinator.nursing.get(baby_id)
+    timer = coordinator.timers.nursing.get(baby_id)
     if timer is None:
-        await coordinator.async_set_nursing(baby_id, NursingTimer.start(_new_id(), side, now))
+        await coordinator.timers.async_set_nursing(
+            baby_id, NursingTimer.start(_new_id(), side, now)
+        )
     elif timer.side != side:
-        await coordinator.async_set_nursing(baby_id, timer.switched(side, now))
+        await coordinator.timers.async_set_nursing(baby_id, timer.switched(side, now))
 
 
 async def async_switch_nursing_side(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
     """Move the running nursing timer to the other side, keeping the time on the first."""
     async with coordinator.exclusive():
-        timer = coordinator.nursing.get(baby_id)
+        timer = coordinator.timers.nursing.get(baby_id)
         if timer is None:
             raise validation_error("no_nursing_timer")
-        await coordinator.async_set_nursing(
+        await coordinator.timers.async_set_nursing(
             baby_id, timer.switched(other_side(timer.side), dt_util.utcnow())
         )
 
@@ -527,7 +529,7 @@ async def async_stop_nursing(
 async def _stop_nursing_locked(
     coordinator: BabyTrackerCoordinator, baby_id: str, *, note: str = ""
 ) -> None:
-    timer = coordinator.nursing.get(baby_id)
+    timer = coordinator.timers.nursing.get(baby_id)
     if timer is None:
         raise validation_error("no_nursing_timer")
     left, right = timer.minutes(dt_util.utcnow())
@@ -547,7 +549,7 @@ async def _stop_nursing_locked(
         )
 
     await _add(coordinator, timer.object_id, add, locked=True)
-    await coordinator.async_set_nursing(baby_id, None)
+    await coordinator.timers.async_set_nursing(baby_id, None)
 
 
 async def async_discard_nursing(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
@@ -557,9 +559,9 @@ async def async_discard_nursing(coordinator: BabyTrackerCoordinator, baby_id: st
     so a stop already writing finishes first and this then finds no timer. It never syncs or posts.
     """
     async with coordinator.exclusive():
-        if coordinator.nursing.get(baby_id) is None:
+        if coordinator.timers.nursing.get(baby_id) is None:
             raise validation_error("no_nursing_timer")
-        await coordinator.async_set_nursing(baby_id, None)
+        await coordinator.timers.async_set_nursing(baby_id, None)
 
 
 async def async_turn_off_nursing_side(
@@ -571,7 +573,7 @@ async def async_turn_off_nursing_side(
     lock, against the timer as it is then, so a switch of sides in between isn't undone.
     """
     async with coordinator.exclusive():
-        timer = coordinator.nursing.get(baby_id)
+        timer = coordinator.timers.nursing.get(baby_id)
         if timer is not None and timer.side == side:
             await _stop_nursing_locked(coordinator, baby_id)
 
@@ -582,9 +584,9 @@ async def async_start_pump(coordinator: BabyTrackerCoordinator) -> None:
     Refused while it's running. Like every timer change, it holds the coordinator's lock.
     """
     async with coordinator.exclusive():
-        if coordinator.pump is not None:
+        if coordinator.timers.pump is not None:
             raise validation_error("pump_already_running")
-        await coordinator.async_set_pump(PumpTimer.start(_new_id(), dt_util.utcnow()))
+        await coordinator.timers.async_set_pump(PumpTimer.start(_new_id(), dt_util.utcnow()))
 
 
 async def async_stop_pump(
@@ -610,7 +612,7 @@ async def async_stop_pump(
         unit = configured_bottle(coordinator.hass, coordinator.config_entry.options)[1]
     zero_unit = _volume(0, unit).unit
     async with coordinator.exclusive():
-        timer = coordinator.pump
+        timer = coordinator.timers.pump
         if timer is None:
             raise validation_error("no_pump_timer")
         length = timer.minutes(dt_util.utcnow())
@@ -632,7 +634,7 @@ async def async_stop_pump(
             )
 
         await _add(coordinator, timer.object_id, add, locked=True)
-        await coordinator.async_set_pump(None)
+        await coordinator.timers.async_set_pump(None)
 
 
 def _most_recent_own(engine: SyncEngine, baby_id: str | None) -> str | None:

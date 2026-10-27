@@ -1,6 +1,7 @@
 """The integration's actions: the log_* actions, the timer actions, and undo."""
 
 import uuid
+from enum import StrEnum
 from typing import Any
 
 import probatio
@@ -13,20 +14,7 @@ from homeassistant.helpers import service
 from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES
 from .const import (
     DOMAIN,
-    SERVICE_DISCARD_NURSING,
-    SERVICE_LOG_BOTTLE,
-    SERVICE_LOG_DIAPER,
-    SERVICE_LOG_NURSING,
-    SERVICE_LOG_PUMP,
-    SERVICE_LOG_SLEEP,
-    SERVICE_START_NURSING,
-    SERVICE_START_PUMP,
-    SERVICE_START_SLEEP,
-    SERVICE_STOP_NURSING,
-    SERVICE_STOP_PUMP,
-    SERVICE_STOP_SLEEP,
-    SERVICE_SWITCH_NURSING_SIDE,
-    SERVICE_UNDO,
+    BabyTrackerService,
     is_account_identifier,
 )
 from .coordinator import BabyTrackerCoordinator
@@ -50,28 +38,31 @@ from .writes import (
     validation_error,
 )
 
-ATTR_DEVICE_ID = "device_id"
-# Deprecated aliases, kept for one release so existing automations keep working.
-ATTR_BABY = "baby"
-ATTR_DEVICE = "device"
-ATTR_TYPE = "type"
-ATTR_TIME = "time"
-ATTR_NOTE = "note"
-ATTR_CONFIG_ENTRY_ID = "config_entry_id"
-ATTR_OBJECT_ID = "object_id"
-ATTR_KIND = "kind"
-ATTR_AMOUNT = "amount"
-ATTR_UNIT = "unit"
-ATTR_MINUTES = "minutes"
-ATTR_LEFT_AMOUNT = "left_amount"
-ATTR_RIGHT_AMOUNT = "right_amount"
-ATTR_LEFT_MINUTES = "left_minutes"
-ATTR_RIGHT_MINUTES = "right_minutes"
-ATTR_FINISH_SIDE = "finish_side"
-ATTR_END_TIME = "end_time"
-ATTR_START = "start"
-ATTR_END = "end"
-ATTR_SIDE = "side"
+
+class BabyTrackerServiceArgument(StrEnum):
+    """The names of the fields the actions take."""
+
+    DEVICE_ID = "device_id"
+    BABY = "baby"  # HACS-only: the deprecated alias for ``device_id``
+    DEVICE = "device"  # HACS-only: the deprecated way to name an account's pump
+    TYPE = "type"
+    TIME = "time"
+    NOTE = "note"
+    CONFIG_ENTRY_ID = "config_entry_id"
+    OBJECT_ID = "object_id"
+    KIND = "kind"
+    AMOUNT = "amount"
+    UNIT = "unit"
+    MINUTES = "minutes"
+    LEFT_AMOUNT = "left_amount"
+    RIGHT_AMOUNT = "right_amount"
+    LEFT_MINUTES = "left_minutes"
+    RIGHT_MINUTES = "right_minutes"
+    FINISH_SIDE = "finish_side"
+    END_TIME = "end_time"
+    START = "start"
+    END = "end"
+    SIDE = "side"
 
 
 def _uuid_upper(value: object) -> str:
@@ -82,10 +73,10 @@ def _uuid_upper(value: object) -> str:
         raise probatio.Invalid("must be a UUID") from err
 
 
-# Every baby action names its baby with ``device_id``. ``baby`` is the deprecated alias.
+# Every baby action names its baby with ``device_id``. HACS-only: ``baby`` is the deprecated alias.
 _BABY_TARGET = {
-    probatio.Optional(ATTR_DEVICE_ID): cv.string,
-    probatio.Optional(ATTR_BABY): cv.string,
+    probatio.Optional(BabyTrackerServiceArgument.DEVICE_ID): cv.string,
+    probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
 }
 
 
@@ -93,17 +84,21 @@ def _baby_schema(fields: dict[Any, Any]) -> probatio.All[Any]:
     """Return the schema of an action that targets one baby."""
     return probatio.All(
         probatio.Schema({**_BABY_TARGET, **fields}),
-        cv.has_at_least_one_key(ATTR_DEVICE_ID, ATTR_BABY),
-        cv.has_at_most_one_key(ATTR_DEVICE_ID, ATTR_BABY),
+        cv.has_at_least_one_key(
+            BabyTrackerServiceArgument.DEVICE_ID, BabyTrackerServiceArgument.BABY
+        ),
+        cv.has_at_most_one_key(
+            BabyTrackerServiceArgument.DEVICE_ID, BabyTrackerServiceArgument.BABY
+        ),
     )
 
 
 LOG_DIAPER_SCHEMA = _baby_schema(
     {
-        probatio.Required(ATTR_TYPE): probatio.In(list(DIAPER_STATUS)),
-        probatio.Optional(ATTR_TIME): cv.datetime,
-        probatio.Optional(ATTR_NOTE, default=""): cv.string,
-        probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
+        probatio.Required(BabyTrackerServiceArgument.TYPE): probatio.In(list(DIAPER_STATUS)),
+        probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
     }
 )
 
@@ -121,112 +116,136 @@ def _whole_minutes(value: object) -> int:
 
 
 _COMMON = {
-    probatio.Optional(ATTR_NOTE, default=""): cv.string,
-    probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
+    probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+    probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
 }
 
 LOG_BOTTLE_SCHEMA = _baby_schema(
     {
         **_COMMON,
-        probatio.Required(ATTR_KIND): probatio.In(list(BOTTLE_KINDS)),
-        probatio.Required(ATTR_AMOUNT): probatio.Coerce(float),
-        probatio.Optional(ATTR_UNIT): _UNIT,
-        probatio.Optional(ATTR_TIME): cv.datetime,
+        probatio.Required(BabyTrackerServiceArgument.KIND): probatio.In(list(BOTTLE_KINDS)),
+        probatio.Required(BabyTrackerServiceArgument.AMOUNT): probatio.Coerce(float),
+        probatio.Optional(BabyTrackerServiceArgument.UNIT): _UNIT,
+        probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
     }
 )
 
 LOG_NURSING_SCHEMA = _baby_schema(
     {
         **_COMMON,
-        probatio.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
-        probatio.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
-        probatio.Optional(ATTR_FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
-        probatio.Optional(ATTR_END_TIME): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.LEFT_MINUTES, default=0): _whole_minutes,
+        probatio.Optional(BabyTrackerServiceArgument.RIGHT_MINUTES, default=0): _whole_minutes,
+        probatio.Optional(BabyTrackerServiceArgument.FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
+        probatio.Optional(BabyTrackerServiceArgument.END_TIME): cv.datetime,
     }
 )
 
 LOG_SLEEP_SCHEMA = _baby_schema(
     {
         **_COMMON,
-        probatio.Required(ATTR_START): cv.datetime,
-        probatio.Required(ATTR_END): cv.datetime,
+        probatio.Required(BabyTrackerServiceArgument.START): cv.datetime,
+        probatio.Required(BabyTrackerServiceArgument.END): cv.datetime,
     }
 )
 
-# A pump belongs to the account, not a baby, so it names an account. ``device`` and ``baby``
-# (an account's or a baby's device) are the deprecated ways to name one.
+# A pump belongs to the account, not a baby, so it names an account. HACS-only: ``device`` and
+# ``baby`` (an account's or a baby's device) are the deprecated ways to name one.
 _PUMP_COMMON = {
-    probatio.Optional(ATTR_NOTE, default=""): cv.string,
-    probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
+    probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+    probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
 }
 
 LOG_PUMP_SCHEMA = probatio.All(
     probatio.Schema(
         {
             **_PUMP_COMMON,
-            probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
-            probatio.Optional(ATTR_DEVICE): cv.string,
-            probatio.Optional(ATTR_BABY): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.DEVICE): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
             # The total, or the sides (checked in writes.py): so none has a default, and an
             # explicit 0 minutes alongside ``minutes`` is a conflict.
-            probatio.Optional(ATTR_AMOUNT): probatio.Coerce(float),
-            probatio.Optional(ATTR_MINUTES): _whole_minutes,
-            probatio.Optional(ATTR_LEFT_AMOUNT): probatio.Coerce(float),
-            probatio.Optional(ATTR_RIGHT_AMOUNT): probatio.Coerce(float),
-            probatio.Optional(ATTR_UNIT): _UNIT,
-            probatio.Optional(ATTR_LEFT_MINUTES): _whole_minutes,
-            probatio.Optional(ATTR_RIGHT_MINUTES): _whole_minutes,
-            probatio.Optional(ATTR_FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
-            probatio.Optional(ATTR_TIME): cv.datetime,
+            probatio.Optional(BabyTrackerServiceArgument.AMOUNT): probatio.Coerce(float),
+            probatio.Optional(BabyTrackerServiceArgument.MINUTES): _whole_minutes,
+            probatio.Optional(BabyTrackerServiceArgument.LEFT_AMOUNT): probatio.Coerce(float),
+            probatio.Optional(BabyTrackerServiceArgument.RIGHT_AMOUNT): probatio.Coerce(float),
+            probatio.Optional(BabyTrackerServiceArgument.UNIT): _UNIT,
+            probatio.Optional(BabyTrackerServiceArgument.LEFT_MINUTES): _whole_minutes,
+            probatio.Optional(BabyTrackerServiceArgument.RIGHT_MINUTES): _whole_minutes,
+            probatio.Optional(BabyTrackerServiceArgument.FINISH_SIDE): probatio.In(
+                list(FINISH_SIDES)
+            ),
+            probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
         }
     ),
-    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
-    cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
+    cv.has_at_least_one_key(
+        BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
+        BabyTrackerServiceArgument.DEVICE,
+        BabyTrackerServiceArgument.BABY,
+    ),
+    cv.has_at_most_one_key(
+        BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
+        BabyTrackerServiceArgument.DEVICE,
+        BabyTrackerServiceArgument.BABY,
+    ),
 )
 
 # The pump timer belongs to the account, so these name it by config entry.
-START_PUMP_SCHEMA = probatio.Schema({probatio.Required(ATTR_CONFIG_ENTRY_ID): cv.string})
+START_PUMP_SCHEMA = probatio.Schema(
+    {probatio.Required(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string}
+)
 
 STOP_PUMP_SCHEMA = probatio.Schema(
     {
-        probatio.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        probatio.Optional(ATTR_AMOUNT): probatio.Coerce(float),
-        probatio.Optional(ATTR_UNIT): _UNIT,
-        probatio.Optional(ATTR_NOTE, default=""): cv.string,
+        probatio.Required(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.AMOUNT): probatio.Coerce(float),
+        probatio.Optional(BabyTrackerServiceArgument.UNIT): _UNIT,
+        probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
     }
 )
 
 START_SLEEP_SCHEMA = _baby_schema(
     {
         **_COMMON,
-        probatio.Optional(ATTR_START): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.START): cv.datetime,
     }
 )
 
-STOP_SLEEP_SCHEMA = _baby_schema({probatio.Optional(ATTR_END): cv.datetime})
+STOP_SLEEP_SCHEMA = _baby_schema({probatio.Optional(BabyTrackerServiceArgument.END): cv.datetime})
 
-START_NURSING_SCHEMA = _baby_schema({probatio.Required(ATTR_SIDE): probatio.In(list(FINISH_SIDES))})
+START_NURSING_SCHEMA = _baby_schema(
+    {probatio.Required(BabyTrackerServiceArgument.SIDE): probatio.In(list(FINISH_SIDES))}
+)
 
 BABY_ONLY_SCHEMA = _baby_schema({})
 
-STOP_NURSING_SCHEMA = _baby_schema({probatio.Optional(ATTR_NOTE, default=""): cv.string})
+STOP_NURSING_SCHEMA = _baby_schema(
+    {probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string}
+)
 
 # A baby's undo takes its device. An account's undo takes its config entry.
 UNDO_SCHEMA = probatio.All(
     probatio.Schema(
         {
-            probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
-            probatio.Optional(ATTR_DEVICE_ID): cv.string,
-            probatio.Optional(ATTR_BABY): cv.string,
-            probatio.Optional(ATTR_OBJECT_ID): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.DEVICE_ID): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): cv.string,
         }
     ),
-    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE_ID, ATTR_BABY),
+    cv.has_at_least_one_key(
+        BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
+        BabyTrackerServiceArgument.DEVICE_ID,
+        BabyTrackerServiceArgument.BABY,
+    ),
 )
 
 
 def _warn_deprecated(call: ServiceCall, field: str, replacement: str) -> None:
-    """Raise a repair issue that says an old automation should use ``replacement`` instead."""
+    """Raise a repair issue that says an automation should use ``replacement`` instead.
+
+    HACS-only: the ``deprecated_action_field`` repair, for the deprecated ``baby`` and ``device``
+    fields.
+    """
     ir.async_create_issue(
         call.hass,
         DOMAIN,
@@ -281,22 +300,27 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
 
 def _baby(call: ServiceCall) -> tuple[BabyTrackerCoordinator, str]:
     """Return the coordinator and ID of the baby an action names, by ``device_id`` or ``baby``."""
-    if ATTR_DEVICE_ID in call.data:
-        return _from_baby_device(call.hass, call.data[ATTR_DEVICE_ID])
-    _warn_deprecated(call, ATTR_BABY, ATTR_DEVICE_ID)
-    return _from_baby_device(call.hass, call.data[ATTR_BABY])
+    if BabyTrackerServiceArgument.DEVICE_ID in call.data:
+        return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.DEVICE_ID])
+    # HACS-only: the deprecated ``baby`` alias
+    _warn_deprecated(call, BabyTrackerServiceArgument.BABY, BabyTrackerServiceArgument.DEVICE_ID)
+    return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.BABY])
 
 
 def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
     """Return the account a pump goes to.
 
-    That is the named config entry. The deprecated ``device`` and ``baby`` name the entry that
-    owns a device (a baby's or the account's).
+    That is the named config entry. HACS-only: the deprecated ``device`` and ``baby`` name the
+    entry that owns a device (a baby's or the account's).
     """
-    if ATTR_CONFIG_ENTRY_ID in call.data:
-        return _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
-    field = ATTR_DEVICE if ATTR_DEVICE in call.data else ATTR_BABY
-    _warn_deprecated(call, field, ATTR_CONFIG_ENTRY_ID)
+    if BabyTrackerServiceArgument.CONFIG_ENTRY_ID in call.data:
+        return _entry_coordinator(call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID])
+    field = (
+        BabyTrackerServiceArgument.DEVICE
+        if BabyTrackerServiceArgument.DEVICE in call.data
+        else BabyTrackerServiceArgument.BABY
+    )
+    _warn_deprecated(call, field, BabyTrackerServiceArgument.CONFIG_ENTRY_ID)
     return _from_device(call.hass, call.data[field])[0]
 
 
@@ -305,10 +329,10 @@ async def _log_diaper(call: ServiceCall) -> None:
     await async_log_diaper(
         coordinator,
         baby_id,
-        call.data[ATTR_TYPE],
-        time=call.data.get(ATTR_TIME),
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        call.data[BabyTrackerServiceArgument.TYPE],
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
@@ -317,12 +341,12 @@ async def _log_bottle(call: ServiceCall) -> None:
     await async_log_bottle(
         coordinator,
         baby_id,
-        call.data[ATTR_KIND],
-        call.data[ATTR_AMOUNT],
-        unit=call.data.get(ATTR_UNIT),
-        time=call.data.get(ATTR_TIME),
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        call.data[BabyTrackerServiceArgument.KIND],
+        call.data[BabyTrackerServiceArgument.AMOUNT],
+        unit=call.data.get(BabyTrackerServiceArgument.UNIT),
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
@@ -331,12 +355,12 @@ async def _log_nursing(call: ServiceCall) -> None:
     await async_log_nursing(
         coordinator,
         baby_id,
-        left_minutes=call.data[ATTR_LEFT_MINUTES],
-        right_minutes=call.data[ATTR_RIGHT_MINUTES],
-        finish_side=call.data.get(ATTR_FINISH_SIDE),
-        end_time=call.data.get(ATTR_END_TIME),
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        left_minutes=call.data[BabyTrackerServiceArgument.LEFT_MINUTES],
+        right_minutes=call.data[BabyTrackerServiceArgument.RIGHT_MINUTES],
+        finish_side=call.data.get(BabyTrackerServiceArgument.FINISH_SIDE),
+        end_time=call.data.get(BabyTrackerServiceArgument.END_TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
@@ -345,40 +369,42 @@ async def _log_sleep(call: ServiceCall) -> None:
     await async_log_sleep(
         coordinator,
         baby_id,
-        start=call.data[ATTR_START],
-        end=call.data[ATTR_END],
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        start=call.data[BabyTrackerServiceArgument.START],
+        end=call.data[BabyTrackerServiceArgument.END],
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
 async def _log_pump(call: ServiceCall) -> None:
     await async_log_pump(
         _account_coordinator(call),
-        amount=call.data.get(ATTR_AMOUNT),
-        minutes=call.data.get(ATTR_MINUTES),
-        left_amount=call.data.get(ATTR_LEFT_AMOUNT),
-        right_amount=call.data.get(ATTR_RIGHT_AMOUNT),
-        unit=call.data.get(ATTR_UNIT),
-        left_minutes=call.data.get(ATTR_LEFT_MINUTES),
-        right_minutes=call.data.get(ATTR_RIGHT_MINUTES),
-        finish_side=call.data.get(ATTR_FINISH_SIDE),
-        time=call.data.get(ATTR_TIME),
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        amount=call.data.get(BabyTrackerServiceArgument.AMOUNT),
+        minutes=call.data.get(BabyTrackerServiceArgument.MINUTES),
+        left_amount=call.data.get(BabyTrackerServiceArgument.LEFT_AMOUNT),
+        right_amount=call.data.get(BabyTrackerServiceArgument.RIGHT_AMOUNT),
+        unit=call.data.get(BabyTrackerServiceArgument.UNIT),
+        left_minutes=call.data.get(BabyTrackerServiceArgument.LEFT_MINUTES),
+        right_minutes=call.data.get(BabyTrackerServiceArgument.RIGHT_MINUTES),
+        finish_side=call.data.get(BabyTrackerServiceArgument.FINISH_SIDE),
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
 async def _start_pump(call: ServiceCall) -> None:
-    await async_start_pump(_entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID]))
+    await async_start_pump(
+        _entry_coordinator(call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID])
+    )
 
 
 async def _stop_pump(call: ServiceCall) -> None:
     await async_stop_pump(
-        _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID]),
-        amount=call.data.get(ATTR_AMOUNT),
-        unit=call.data.get(ATTR_UNIT),
-        note=call.data[ATTR_NOTE],
+        _entry_coordinator(call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID]),
+        amount=call.data.get(BabyTrackerServiceArgument.AMOUNT),
+        unit=call.data.get(BabyTrackerServiceArgument.UNIT),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
     )
 
 
@@ -387,20 +413,20 @@ async def _start_sleep(call: ServiceCall) -> None:
     await async_start_sleep(
         coordinator,
         baby_id,
-        start=call.data.get(ATTR_START),
-        note=call.data[ATTR_NOTE],
-        object_id=call.data.get(ATTR_OBJECT_ID),
+        start=call.data.get(BabyTrackerServiceArgument.START),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
     )
 
 
 async def _stop_sleep(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
-    await async_stop_sleep(coordinator, baby_id, end=call.data.get(ATTR_END))
+    await async_stop_sleep(coordinator, baby_id, end=call.data.get(BabyTrackerServiceArgument.END))
 
 
 async def _start_nursing(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
-    await async_start_nursing(coordinator, baby_id, call.data[ATTR_SIDE])
+    await async_start_nursing(coordinator, baby_id, call.data[BabyTrackerServiceArgument.SIDE])
 
 
 async def _switch_nursing_side(call: ServiceCall) -> None:
@@ -410,7 +436,7 @@ async def _switch_nursing_side(call: ServiceCall) -> None:
 
 async def _stop_nursing(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
-    await async_stop_nursing(coordinator, baby_id, note=call.data[ATTR_NOTE])
+    await async_stop_nursing(coordinator, baby_id, note=call.data[BabyTrackerServiceArgument.NOTE])
 
 
 async def _discard_nursing(call: ServiceCall) -> None:
@@ -420,39 +446,63 @@ async def _discard_nursing(call: ServiceCall) -> None:
 
 async def _undo(call: ServiceCall) -> None:
     baby_id: str | None = None
-    if ATTR_DEVICE_ID in call.data or ATTR_BABY in call.data:
+    if (
+        BabyTrackerServiceArgument.DEVICE_ID in call.data
+        or BabyTrackerServiceArgument.BABY in call.data
+    ):
         coordinator, baby_id = _baby(call)
     else:
-        coordinator = _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
-    await async_undo(coordinator, object_id=call.data.get(ATTR_OBJECT_ID), baby_id=baby_id)
+        coordinator = _entry_coordinator(
+            call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID]
+        )
+    await async_undo(
+        coordinator, object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID), baby_id=baby_id
+    )
 
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register the actions once for the integration, whatever entries are set up."""
-    hass.services.async_register(DOMAIN, SERVICE_LOG_DIAPER, _log_diaper, schema=LOG_DIAPER_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_LOG_BOTTLE, _log_bottle, schema=LOG_BOTTLE_SCHEMA)
     hass.services.async_register(
-        DOMAIN, SERVICE_LOG_NURSING, _log_nursing, schema=LOG_NURSING_SCHEMA
-    )
-    hass.services.async_register(DOMAIN, SERVICE_LOG_SLEEP, _log_sleep, schema=LOG_SLEEP_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_LOG_PUMP, _log_pump, schema=LOG_PUMP_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_START_PUMP, _start_pump, schema=START_PUMP_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_STOP_PUMP, _stop_pump, schema=STOP_PUMP_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_UNDO, _undo, schema=UNDO_SCHEMA)
-    hass.services.async_register(
-        DOMAIN, SERVICE_START_SLEEP, _start_sleep, schema=START_SLEEP_SCHEMA
-    )
-    hass.services.async_register(DOMAIN, SERVICE_STOP_SLEEP, _stop_sleep, schema=STOP_SLEEP_SCHEMA)
-    hass.services.async_register(
-        DOMAIN, SERVICE_START_NURSING, _start_nursing, schema=START_NURSING_SCHEMA
+        DOMAIN, BabyTrackerService.LOG_DIAPER, _log_diaper, schema=LOG_DIAPER_SCHEMA
     )
     hass.services.async_register(
-        DOMAIN, SERVICE_SWITCH_NURSING_SIDE, _switch_nursing_side, schema=BABY_ONLY_SCHEMA
+        DOMAIN, BabyTrackerService.LOG_BOTTLE, _log_bottle, schema=LOG_BOTTLE_SCHEMA
     )
     hass.services.async_register(
-        DOMAIN, SERVICE_STOP_NURSING, _stop_nursing, schema=STOP_NURSING_SCHEMA
+        DOMAIN, BabyTrackerService.LOG_NURSING, _log_nursing, schema=LOG_NURSING_SCHEMA
     )
     hass.services.async_register(
-        DOMAIN, SERVICE_DISCARD_NURSING, _discard_nursing, schema=BABY_ONLY_SCHEMA
+        DOMAIN, BabyTrackerService.LOG_SLEEP, _log_sleep, schema=LOG_SLEEP_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.LOG_PUMP, _log_pump, schema=LOG_PUMP_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.START_PUMP, _start_pump, schema=START_PUMP_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.STOP_PUMP, _stop_pump, schema=STOP_PUMP_SCHEMA
+    )
+    hass.services.async_register(DOMAIN, BabyTrackerService.UNDO, _undo, schema=UNDO_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.START_SLEEP, _start_sleep, schema=START_SLEEP_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.STOP_SLEEP, _stop_sleep, schema=STOP_SLEEP_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.START_NURSING, _start_nursing, schema=START_NURSING_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN,
+        BabyTrackerService.SWITCH_NURSING_SIDE,
+        _switch_nursing_side,
+        schema=BABY_ONLY_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.STOP_NURSING, _stop_nursing, schema=STOP_NURSING_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, BabyTrackerService.DISCARD_NURSING, _discard_nursing, schema=BABY_ONLY_SCHEMA
     )
