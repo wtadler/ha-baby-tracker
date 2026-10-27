@@ -1,0 +1,889 @@
+# serializer version: 1
+# name: test_sensors[sensor.baby_one_bottle_volume_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_bottle_volume_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Bottle volume today',
+    'options': dict({
+      'sensor': dict({
+        'suggested_display_precision': 0,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.VOLUME: 'volume'>,
+    'original_icon': None,
+    'original_name': 'Bottle volume today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'bottle_volume_today',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_bottle_volume_today',
+    'unit_of_measurement': <UnitOfVolume.MILLILITERS: 'mL'>,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_bottle_volume_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'volume',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Bottle volume today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: <UnitOfVolume.MILLILITERS: 'mL'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_bottle_volume_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '208.29',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_diapers_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_diapers_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Diapers today',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Diapers today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'diapers_today',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_diapers_today',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_diapers_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'dirty': 0,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Diapers today',
+      'mixed': 0,
+      'wet': 1,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_diapers_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_feeds_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_feeds_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Feeds today',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Feeds today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'feeds_today',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_feeds_today',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_feeds_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Feeds today',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_feeds_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '3',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_diaper-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_diaper',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last diaper',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last diaper',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_diaper',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_diaper',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_diaper-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last diaper',
+      'type': 'wet',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_diaper',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T12:00:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_feed-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_feed',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last feed',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last feed',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_feed',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_feed',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_feed-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'amount': 90.0,
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last feed',
+      'kind': 'pumped',
+      'unit': 'mL',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_feed',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T13:00:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_sleep-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_sleep',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last sleep',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last sleep',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_sleep',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_sleep',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_sleep-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'duration_minutes': 45,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last sleep',
+      'note': 'invented nap',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_sleep',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T13:30:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_nursing_timer-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_nursing_timer',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Nursing timer',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Nursing timer',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'nursing_timer',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_nursing_timer',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_nursing_timer-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Nursing timer',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_nursing_timer',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_sleep_timer-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_sleep_timer',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Sleep timer',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Sleep timer',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'sleep_timer',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_sleep_timer',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_sleep_timer-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Sleep timer',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_sleep_timer',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_tracker_account_last_pump-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_tracker_account_last_pump',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last pump',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last pump',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_pump',
+    'unique_id': '01TESTENTRY0000000000000000_last_pump',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_tracker_account_last_pump-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'amount': 5.0,
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Tracker account Last pump',
+      'unit': 'fl. oz.',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_tracker_account_last_pump',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T14:30:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_bottle_volume_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_bottle_volume_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Bottle volume today',
+    'options': dict({
+      'sensor': dict({
+        'suggested_display_precision': 0,
+      }),
+    }),
+    'original_device_class': <SensorDeviceClass.VOLUME: 'volume'>,
+    'original_icon': None,
+    'original_name': 'Bottle volume today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'bottle_volume_today',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_bottle_volume_today',
+    'unit_of_measurement': <UnitOfVolume.MILLILITERS: 'mL'>,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_bottle_volume_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'volume',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Bottle volume today',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: <UnitOfVolume.MILLILITERS: 'mL'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_bottle_volume_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '0.0',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_diapers_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_diapers_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Diapers today',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Diapers today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'diapers_today',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_diapers_today',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_diapers_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'dirty': 1,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Diapers today',
+      'mixed': 0,
+      'wet': 0,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_diapers_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_feeds_today-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_feeds_today',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Feeds today',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Feeds today',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'feeds_today',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_feeds_today',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_feeds_today-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Feeds today',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_feeds_today',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '0',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_diaper-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_diaper',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last diaper',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last diaper',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_diaper',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_diaper',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_diaper-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last diaper',
+      'type': 'dirty',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_diaper',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T12:10:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_feed-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_feed',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last feed',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last feed',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_feed',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_feed',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_feed-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last feed',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_feed',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_sleep-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_sleep',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last sleep',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Last sleep',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_sleep',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_sleep',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_sleep-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'duration_minutes': 0,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last sleep',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_sleep',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T14:00:00+00:00',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_nursing_timer-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_nursing_timer',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Nursing timer',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Nursing timer',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'nursing_timer',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_nursing_timer',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_nursing_timer-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Nursing timer',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_nursing_timer',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_sleep_timer-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_sleep_timer',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Sleep timer',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Sleep timer',
+    'platform': 'nighp_baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'sleep_timer',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_sleep_timer',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_sleep_timer-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Sleep timer',
+      'object_id': 'F0000000-0000-4000-8000-000000000005',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_sleep_timer',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-10-25T14:00:00+00:00',
+  })
+# ---

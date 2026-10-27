@@ -1,13 +1,18 @@
 """The per-baby devices and their last-activity sensors."""
 
+from unittest.mock import patch
+
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, snapshot_platform
+from syrupy.assertion import SnapshotAssertion
 
-from . import BABY_ONE
+from . import BABY_ONE, setup_integration
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
@@ -47,6 +52,21 @@ def _object_id(number: int) -> str:
 
 
 # Devices and entities
+
+
+async def test_sensors(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+    snapshot: SnapshotAssertion,
+    freezer: FrozenDateTimeFactory,
+    mock_config_entry: MockConfigEntry,
+    populated_server: FakeServer,
+) -> None:
+    freezer.move_to(at(180))
+    with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.SENSOR]):
+        await setup_integration(hass, mock_config_entry)
+
+    await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)
 
 
 async def test_two_babies_make_two_devices_each_with_their_own_sensors(

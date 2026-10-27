@@ -21,12 +21,13 @@ from . import (
     BABY_TWO,
     EMAIL,
     EMAIL_TWO,
+    ENTRY_ID,
     OWN_DEVICE,
     OWN_DEVICE_TWO,
     PASSWORD,
     setup_integration,
 )
-from .factories import DEVICE_A, DEVICE_B, at
+from .factories import DEVICE_A, DEVICE_B, at, volume
 from .fake_server import FakeClient, FakeServer
 
 
@@ -109,6 +110,7 @@ def mock_config_entry() -> MockConfigEntry:
         domain=DOMAIN,
         title=EMAIL,
         unique_id=EMAIL,
+        entry_id=ENTRY_ID,  # fixed, because the account sensor's unique ID is built from it
         data={
             CONF_EMAIL: EMAIL,
             CONF_PASSWORD: PASSWORD,
@@ -138,3 +140,53 @@ async def second_entry(hass: HomeAssistant, init_integration: MockConfigEntry) -
     await setup_integration(hass, entry)
     assert entry.state is ConfigEntryState.LOADED
     return entry
+
+
+@pytest.fixture
+def populated_server(server: FakeServer) -> FakeServer:
+    """The default server plus every kind of record a baby's entities read.
+
+    Baby one has a feed of each kind, a sleep, and a pump (which belongs to the account). Baby two
+    has a sleep still running. All of it falls on the same local day as ``at(180)``.
+    """
+    server.add_record(
+        DEVICE_A, "Formula", "F0000000-0000-4000-8000-000000000001", when=at(20), amount=volume(4)
+    )
+    server.add_record(
+        DEVICE_A,
+        "Nursing",
+        "F0000000-0000-4000-8000-000000000002",
+        when=at(40),
+        leftDuration=7,
+        rightDuration=12,
+        bothDuration=0,
+        finishSide=1,
+        note="invented note",
+    )
+    server.add_record(
+        DEVICE_A,
+        "Pumped",
+        "F0000000-0000-4000-8000-000000000003",
+        when=at(60),
+        amount=volume(90, english=False),
+    )
+    server.add_record(
+        DEVICE_A,
+        "Sleep",
+        "F0000000-0000-4000-8000-000000000004",
+        when=at(90),
+        duration=45,
+        note="invented nap",
+    )
+    server.add_record(
+        DEVICE_A,
+        "Sleep",
+        "F0000000-0000-4000-8000-000000000005",
+        when=at(120),
+        baby=BABY_TWO,
+        duration=0,
+    )
+    server.add_pump(
+        DEVICE_A, "F0000000-0000-4000-8000-000000000006", when=at(150), amount=volume(5)
+    )
+    return server
