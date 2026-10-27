@@ -1,13 +1,11 @@
 """Config flow for Baby Tracker (Nighp)."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -53,12 +51,12 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_BOTTLE_SIZE = 32  # fluid ounces: more than any bottle
 
-CREDENTIALS_SCHEMA = vol.Schema(
+CREDENTIALS_SCHEMA = probatio.Schema(
     {
-        vol.Required(CONF_EMAIL): TextSelector(
+        probatio.Required(CONF_EMAIL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="username")
         ),
-        vol.Required(CONF_PASSWORD): TextSelector(
+        probatio.Required(CONF_PASSWORD): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
         ),
     }
@@ -93,15 +91,18 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
+        """Set up the flow with a fresh device ID."""
         # Generated once per flow, and kept in the entry: this is Home Assistant's device ID.
         self._device_uuid = str(uuid4()).upper()
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> BabyTrackerOptionsFlow:
+        """Return the options flow."""
         return BabyTrackerOptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Ask for the account's email and password, then create the entry."""
         errors: dict[str, str] = {}
         if user_input is not None:
             email = user_input[CONF_EMAIL].strip()
@@ -127,11 +128,13 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """Start reauthentication when the saved password stops working."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Ask for the account's password again and update the entry."""
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -161,6 +164,7 @@ class BabyTrackerOptionsFlow(OptionsFlow):
     """Adjust how often Home Assistant checks for new records, and what the Bottle button logs."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Show and save the options."""
         if user_input is not None:
             return self.async_create_entry(
                 data={
@@ -172,9 +176,9 @@ class BabyTrackerOptionsFlow(OptionsFlow):
             )
         current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MINUTES)
         size, unit, kind = configured_bottle(self.config_entry.options)
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
+                probatio.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
                     NumberSelectorConfig(
                         min=MIN_SCAN_INTERVAL_MINUTES,
                         max=MAX_SCAN_INTERVAL_MINUTES,
@@ -183,17 +187,17 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                         unit_of_measurement="min",
                     )
                 ),
-                vol.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
+                probatio.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
                     NumberSelectorConfig(
                         min=0.1, max=MAX_BOTTLE_SIZE, step="any", mode=NumberSelectorMode.BOX
                     )
                 ),
-                vol.Required(CONF_BOTTLE_UNIT, default=unit): SelectSelector(
+                probatio.Required(CONF_BOTTLE_UNIT, default=unit): SelectSelector(
                     SelectSelectorConfig(
                         options=[OUNCES, MILLILITERS], mode=SelectSelectorMode.DROPDOWN
                     )
                 ),
-                vol.Required(CONF_BOTTLE_TYPE, default=kind): SelectSelector(
+                probatio.Required(CONF_BOTTLE_TYPE, default=kind): SelectSelector(
                     SelectSelectorConfig(
                         options=list(BOTTLE_KINDS),
                         mode=SelectSelectorMode.DROPDOWN,

@@ -1,7 +1,5 @@
 """Diaper buttons, the log_diaper action, and undo."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 from collections.abc import Iterator
@@ -10,8 +8,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import probatio
 import pytest
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -41,6 +39,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 
 from .conftest import EMAIL, PASSWORD, FakeServer
 from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, DEVICE_A, DEVICE_B, at, baby_payload
+from .helpers import get_baby_device
 from .write_fakes import WriteClient, add_write_state
 
 OWN_DEVICE = "EEEEEEEE-0000-4000-8000-0000000000EE"
@@ -116,7 +115,7 @@ async def press(hass: HomeAssistant, entity_id: str) -> None:
 
 
 def device_id(hass: HomeAssistant, baby_id: str) -> str:
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, baby_id)})
+    device = get_baby_device(dr.async_get(hass), baby_id)
     assert device is not None
     return device.id
 
@@ -156,7 +155,7 @@ async def test_each_baby_gets_wet_dirty_mixed_and_bottle_buttons(
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        device = devices.async_get_device(identifiers={(DOMAIN, baby_id)})
+        device = get_baby_device(devices, baby_id)
         assert device is not None
         buttons = [
             e for e in er.async_entries_for_device(entities, device.id) if e.domain == "button"
@@ -303,7 +302,7 @@ async def test_a_log_diaper_retry_with_the_same_object_id_does_not_post_twice(
 async def test_log_diaper_rejects_an_object_id_that_is_not_a_uuid(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, bad: str
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await log_diaper(hass, BABY_ONE_ID, "wet", object_id=bad)
     assert server.posted == []
 
@@ -350,7 +349,7 @@ async def test_a_log_diaper_object_id_belonging_to_another_record_is_an_error(
 async def test_log_diaper_rejects_an_unknown_type(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await log_diaper(hass, BABY_ONE_ID, "purple")
     assert server.posted == []
 
@@ -848,23 +847,23 @@ async def test_undo_with_a_baby_and_another_babys_record_id_is_a_validation_erro
     assert len(posted(server)) == 1  # nothing deleted
 
 
-async def test_a_baby_device_with_an_unloaded_and_a_loaded_entry_uses_the_loaded_one(
+async def test_a_baby_device_of_an_unloaded_entry_is_not_loaded_even_when_another_entry_is(
     hass: HomeAssistant,
     setup_entry: MockConfigEntry,
     second_entry: MockConfigEntry,
     server: FakeServer,
     second_server: FakeServer,
 ) -> None:
+    # A device belongs to exactly one config entry (Home Assistant 2026.9 and later), so it is
+    # never routed to the other, loaded account.
     baby_device = device_id(hass, BABY_ONE_ID)
-    dr.async_get(hass).async_update_device(baby_device, add_config_entry_id=second_entry.entry_id)
     await hass.config_entries.async_unload(setup_entry.entry_id)
 
-    # Routed to the loaded second entry, which doesn't know this baby: not "not loaded".
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
             DOMAIN, "log_diaper", {"baby": baby_device, "type": "wet"}, blocking=True
         )
-    assert raised.value.translation_key == "baby_not_found"
+    assert raised.value.translation_key == "entry_not_loaded"
 
 
 async def test_undo_with_an_object_id_removes_that_record(
@@ -934,7 +933,7 @@ async def test_undo_twice_deletes_once_and_then_refuses(
 async def test_undo_needs_a_baby_or_a_config_entry(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         await undo(hass)
 
 

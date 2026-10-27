@@ -1,7 +1,5 @@
 """Baby Tracker (Nighp)."""
 
-from __future__ import annotations
-
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -84,8 +82,11 @@ def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEnt
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
-    """Apply a new sync interval right away, without reloading the entry. While a timer runs,
-    syncing stays at one minute and the new interval takes over when it stops."""
+    """Apply a new sync interval right away, without reloading the entry.
+
+    While a timer runs, syncing stays at one minute and the new interval takes over when it
+    stops.
+    """
     coordinator = entry.runtime_data
     interval = coordinator.wanted_interval()
     if interval != coordinator.update_interval:

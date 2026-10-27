@@ -1,7 +1,5 @@
 """The vendoring script copies the library and records where it came from."""
 
-from __future__ import annotations
-
 import subprocess
 from pathlib import Path
 

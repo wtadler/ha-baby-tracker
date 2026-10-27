@@ -1,7 +1,5 @@
 """Last-activity, today, and timer sensors, one set per baby, and the account's last pump."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,9 +40,14 @@ def _note(record: Record) -> str | None:
     return note if isinstance(note, str) and note else None
 
 
+def _label(labels: dict[int, str], code: object) -> str | None:
+    """Return the label for a record's numeric code, or None when it has no known code."""
+    return labels.get(code) if isinstance(code, int) else None
+
+
 def _diaper_attributes(record: Record) -> dict[str, Any]:
     return _present(
-        {"type": DIAPER_TYPES.get(getattr(record, "status", None)), "note": _note(record)}
+        {"type": _label(DIAPER_TYPES, getattr(record, "status", None)), "note": _note(record)}
     )
 
 
@@ -55,7 +58,7 @@ def _feed_attributes(record: Record) -> dict[str, Any]:
         attributes["left_duration_minutes"] = getattr(record, "left_duration", None)
         attributes["right_duration_minutes"] = getattr(record, "right_duration", None)
         attributes["both_duration_minutes"] = getattr(record, "both_duration", None)
-        attributes["finish_side"] = SIDES.get(getattr(record, "finish_side", None))
+        attributes["finish_side"] = _label(SIDES, getattr(record, "finish_side", None))
     else:
         attributes["amount"], attributes["unit"] = volume_parts(getattr(record, "volume", None))
     attributes["note"] = _note(record)
@@ -127,8 +130,10 @@ async def async_setup_entry(
     entry: BabyTrackerConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the account's last-pump sensor, the sensors for every baby, and those for babies that
-    appear in later syncs."""
+    """Add the account's last-pump sensor and every baby's sensors.
+
+    Babies that appear in later syncs get theirs when they appear.
+    """
     coordinator = entry.runtime_data
     async_add_entities([BabyTrackerLastPumpSensor(coordinator, entry)])
     known: set[str] = set()
@@ -169,6 +174,7 @@ class BabyTrackerSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity)
         description: BabyTrackerSensorDescription,
         baby_id: str,
     ) -> None:
+        """Set up a sensor for one baby."""
         super().__init__(coordinator)
         self.entity_description = description
         self._baby_id = baby_id
@@ -189,15 +195,18 @@ class BabyTrackerSensor(CoordinatorEntity[BabyTrackerCoordinator], SensorEntity)
 
     @property
     def available(self) -> bool:
+        """Return whether the baby is still on the account."""
         return super().available and self._baby_id in self.coordinator.data
 
     @property
     def native_value(self) -> datetime | None:
+        """Return the time of the baby's newest matching record."""
         record = self._record
         return record.time if record is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the attributes of the baby's newest matching record."""
         record = self._record
         return self.entity_description.attributes_fn(record) if record is not None else None
 
@@ -213,6 +222,7 @@ class BabyTrackerLastPumpSensor(CoordinatorEntity[BabyTrackerCoordinator], Senso
     entity_description = LAST_PUMP
 
     def __init__(self, coordinator: BabyTrackerCoordinator, entry: BabyTrackerConfigEntry) -> None:
+        """Set up the account's last-pump sensor."""
         super().__init__(coordinator)
         # The entry's ID scopes it, as a baby's ID scopes a baby's sensors.
         self._attr_unique_id = f"{entry.entry_id}_{LAST_PUMP.key}"
@@ -226,11 +236,13 @@ class BabyTrackerLastPumpSensor(CoordinatorEntity[BabyTrackerCoordinator], Senso
 
     @property
     def native_value(self) -> datetime | None:
+        """Return the time of the last pump."""
         pump = self.coordinator.last_pump
         return pump.time if pump is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the attributes of the last pump."""
         pump = self.coordinator.last_pump
         return _pump_attributes(pump) if pump is not None else None
 
@@ -276,6 +288,7 @@ class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
+        """Return the unit of measurement, avoiding gallons for bottle volumes."""
         if self.entity_description.device_class is not SensorDeviceClass.VOLUME:
             return None
         # Home Assistant's US customary system measures volume in gallons: too big for a bottle.
@@ -285,6 +298,7 @@ class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | int | None:
+        """Return today's value for the baby."""
         baby = self._baby
         if baby is None:
             return None
@@ -296,6 +310,7 @@ class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the attributes for today's value."""
         baby = self._baby
         attributes_fn = self.entity_description.attributes_fn
         return attributes_fn(baby.today) if baby is not None and attributes_fn else None
@@ -354,10 +369,12 @@ class BabyTrackerTimerSensor(BabyTrackerBabyEntity, SensorEntity):
 
     @property
     def native_value(self) -> datetime | None:
+        """Return the timer's time for the baby."""
         baby = self._baby
         return self.entity_description.timer_fn(baby)[0] if baby is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the timer's attributes for the baby."""
         baby = self._baby
         return self.entity_description.timer_fn(baby)[1] if baby is not None else None

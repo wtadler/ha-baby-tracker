@@ -1,7 +1,5 @@
 """The setup screen, re-sign-in, and the options screen."""
 
-from __future__ import annotations
-
 import uuid
 
 import pytest
@@ -232,6 +230,7 @@ async def test_reauth_with_the_same_account_in_another_case_succeeds(
     server.password = NEW_PASSWORD
     result = await _start_reauth(hass, config_entry)
     result = await _submit(hass, result["flow_id"], email=EMAIL.upper(), password=NEW_PASSWORD)
+    await hass.async_block_till_done()
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
 

@@ -6,8 +6,6 @@ failed, and publishes the new state. This module adds the Home Assistant error t
 the checks that refuse bad input before anything is sent.
 """
 
-from __future__ import annotations
-
 import logging
 import math
 import uuid
@@ -76,10 +74,12 @@ def _error(key: str, **placeholders: str) -> HomeAssistantError:
 
 
 def validation_error(key: str) -> ServiceValidationError:
+    """Return a translated validation error for ``key``."""
     return ServiceValidationError(translation_domain=DOMAIN, translation_key=key)
 
 
 def issue_id(entry_id: str) -> str:
+    """Return the repair issue ID for an entry."""
     return f"own_log_gap_{entry_id}"
 
 
@@ -109,7 +109,9 @@ async def _write[T](
     locked: bool = False,
 ) -> T:
     """Run a write through the coordinator and turn library errors into Home Assistant's.
-    ``locked`` says the caller already holds the coordinator's lock."""
+
+    ``locked`` says the caller already holds the coordinator's lock.
+    """
     try:
         result = await coordinator.async_write(operation, locked=locked)
     except AuthenticationError as err:
@@ -138,7 +140,7 @@ async def _write[T](
 
 
 def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
-    """The moment (default now) and its UTC offset in Home Assistant's time zone, in seconds."""
+    """Return the moment (default now) and its UTC offset in seconds, in Home Assistant's zone."""
     zone = dt_util.get_default_time_zone()
     if time is None:
         time = dt_util.now()
@@ -150,7 +152,7 @@ def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
 
 
 def default_bottle() -> tuple[float, str, str]:
-    """The bottle size, unit, and type used until the options say otherwise.
+    """Return the bottle size, unit, and type used until the options say otherwise.
 
     Fluid ounces in every unit system: milliliter writes aren't supported yet.
     """
@@ -158,8 +160,10 @@ def default_bottle() -> tuple[float, str, str]:
 
 
 def configured_bottle(options: Mapping[str, Any]) -> tuple[float, str, str]:
-    """The bottle the options describe. Saved options that don't make sense (any one of the
-    three) give the defaults."""
+    """Return the bottle the options describe.
+
+    Saved options that don't make sense (any one of the three) give the defaults.
+    """
     size = options.get(CONF_BOTTLE_SIZE)
     unit = options.get(CONF_BOTTLE_UNIT)
     kind = options.get(CONF_BOTTLE_TYPE)
@@ -176,7 +180,7 @@ def configured_bottle(options: Mapping[str, Any]) -> tuple[float, str, str]:
 
 
 def _volume(amount: float, unit: str | None) -> Volume:
-    """An amount in a Home Assistant unit (default fl. oz.) as a library volume."""
+    """Convert an amount in a Home Assistant unit (default fl. oz.) to a library volume."""
     chosen = unit if unit is not None else OUNCES
     if chosen == MILLILITERS:
         # The library refuses metric writes until the app's metric format is confirmed.
@@ -262,8 +266,11 @@ async def async_log_bottle(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a formula or pumped-milk bottle. ``unit`` is fl. oz. (the default); mL is refused for
-    now (``metric_not_supported``). ``time`` defaults to now."""
+    """Add a formula or pumped-milk bottle.
+
+    ``unit`` is fl. oz. (the default); mL is refused for now (``metric_not_supported``).
+    ``time`` defaults to now.
+    """
     if kind not in BOTTLE_KINDS:
         raise validation_error("invalid_bottle_kind")
     volume = _volume(_checked_amount(amount), unit)
@@ -301,8 +308,11 @@ async def async_log_nursing(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a finished nursing session. The record starts ``left + right`` minutes before
-    ``end_time`` (default now); ``finish_side`` (left or right) defaults to the last side used."""
+    """Add a finished nursing session.
+
+    The record starts ``left + right`` minutes before ``end_time`` (default now);
+    ``finish_side`` (left or right) defaults to the last side used.
+    """
     if left_minutes + right_minutes <= 0:
         raise validation_error("no_duration")
     _checked_minutes(left_minutes, right_minutes)
@@ -335,8 +345,10 @@ async def async_log_sleep(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Add a finished sleep from ``start`` to ``end``. A time without an offset is read in Home
-    Assistant's time zone."""
+    """Add a finished sleep from ``start`` to ``end``.
+
+    A time without an offset is read in Home Assistant's time zone.
+    """
     begin, offset = _in_home_assistant_time(start)
     finish, _ = _in_home_assistant_time(end)
     if finish <= begin:
@@ -408,7 +420,7 @@ async def async_log_pump(
 
 
 def running_sleep(engine: SyncEngine, baby_id: str) -> Sleep | None:
-    """The baby's newest sleep if it's running, from any device (the asleep sensor's rule)."""
+    """Return the baby's newest sleep if it's running, from any device."""
     newest = engine.latest_records(baby_id).get("Sleep")
     return newest if isinstance(newest, Sleep) and newest.is_running else None
 
@@ -418,7 +430,7 @@ def _new_id() -> str:
 
 
 async def async_press_sleep(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
-    """The Sleep button: end the running sleep the button showed, else start one now.
+    """Handle the Sleep button: end the running sleep the button showed, else start one now.
 
     What the press means is fixed by what Home Assistant showed when it was pressed. If a phone
     changed things since (the sync before the write finds that sleep already ended, or a sleep
@@ -457,8 +469,11 @@ async def async_start_sleep(
     note: str = "",
     object_id: str | None = None,
 ) -> None:
-    """Start a sleep timer at ``start`` (default now). Refused while the baby's newest sleep is
-    running, unless that sleep is the one ``object_id`` names (a retry)."""
+    """Start a sleep timer at ``start`` (default now).
+
+    Refused while the baby's newest sleep is running, unless that sleep is the one ``object_id``
+    names (a retry).
+    """
     begin, offset = _in_home_assistant_time(start)
     now = dt_util.utcnow()
     if begin - now > START_SKEW or now - begin > MAX_SLEEP:
@@ -498,8 +513,10 @@ def _check_baby(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
 
 
 async def async_start_nursing(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
-    """Start Home Assistant's nursing timer on ``side``. If it's running on the other side, switch
-    to ``side``; if it's on ``side`` already, nothing changes. Nothing is written until the stop.
+    """Start Home Assistant's nursing timer on ``side``.
+
+    If it's running on the other side, switch to ``side``; if it's on ``side`` already, nothing
+    changes. Nothing is written until the stop.
 
     Every nursing timer change holds the coordinator's lock (``exclusive()``), so one can't land
     in the middle of a stop's write and be erased when the stop clears the timer.
@@ -536,10 +553,12 @@ async def async_switch_nursing_side(coordinator: BabyTrackerCoordinator, baby_id
 async def async_stop_nursing(
     coordinator: BabyTrackerCoordinator, baby_id: str, *, note: str = ""
 ) -> None:
-    """Stop the nursing timer and write one finished record: whole minutes per side, the side it
-    ended on, and the start time. The minutes count to when the lock is acquired. The timer is
-    cleared only once the write succeeds, and the record's ID was fixed at the start, so stopping
-    again after an error can't write twice."""
+    """Stop the nursing timer and write one finished record.
+
+    The record has whole minutes per side, the side it ended on, and the start time. The minutes
+    count to when the lock is acquired. The timer is cleared only once the write succeeds, and
+    the record's ID was fixed at the start, so stopping again after an error can't write twice.
+    """
     async with coordinator.exclusive():
         await _stop_nursing_locked(coordinator, baby_id, note=note)
 
@@ -571,8 +590,11 @@ async def _stop_nursing_locked(
 
 
 async def async_press_nurse(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
-    """A Nurse button: start ``side``, switch to it from the other side, or stop if it's the side
-    already running. Decided under the lock, against the timer as it is then."""
+    """Handle a Nurse button press.
+
+    Start ``side``, switch to it from the other side, or stop if it's the side already running.
+    Decided under the lock, against the timer as it is then.
+    """
     async with coordinator.exclusive():
         timer = coordinator.nursing.get(baby_id)
         if timer is not None and timer.side == side:

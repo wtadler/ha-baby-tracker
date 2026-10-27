@@ -1,10 +1,8 @@
 """The integration's actions: the log_* actions, the timer actions, and undo."""
 
-from __future__ import annotations
-
 import uuid
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
@@ -68,133 +66,133 @@ ATTR_SIDE = "side"
 
 
 def _uuid_upper(value: object) -> str:
-    """A UUID, in the uppercase form the app uses for record IDs."""
+    """Return a UUID in the uppercase form the app uses for record IDs."""
     try:
         return str(uuid.UUID(str(value))).upper()
     except ValueError as err:
-        raise vol.Invalid("must be a UUID") from err
+        raise probatio.Invalid("must be a UUID") from err
 
 
-LOG_DIAPER_SCHEMA = vol.Schema(
+LOG_DIAPER_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_BABY): cv.string,
-        vol.Required(ATTR_TYPE): vol.In(list(DIAPER_STATUS)),
-        vol.Optional(ATTR_TIME): cv.datetime,
-        vol.Optional(ATTR_NOTE, default=""): cv.string,
-        vol.Optional(ATTR_OBJECT_ID): _uuid_upper,
+        probatio.Required(ATTR_BABY): cv.string,
+        probatio.Required(ATTR_TYPE): probatio.In(list(DIAPER_STATUS)),
+        probatio.Optional(ATTR_TIME): cv.datetime,
+        probatio.Optional(ATTR_NOTE, default=""): cv.string,
+        probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
     }
 )
 
 # Amounts are checked in writes.py, so a bad one gets a translated message.
-_UNIT = vol.In([OUNCES, MILLILITERS])
+_UNIT = probatio.In([OUNCES, MILLILITERS])
 
 
 def _whole_minutes(value: object) -> int:
     """Whole minutes: 12 or 12.0 pass, 2.5 and text don't."""
     if isinstance(value, bool) or not isinstance(value, int | float) or int(value) != value:
-        raise vol.Invalid("must be a whole number of minutes")
+        raise probatio.Invalid("must be a whole number of minutes")
     if value < 0:
-        raise vol.Invalid("can't be negative")
+        raise probatio.Invalid("can't be negative")
     return int(value)
 
 
 _COMMON = {
-    vol.Required(ATTR_BABY): cv.string,
-    vol.Optional(ATTR_NOTE, default=""): cv.string,
-    vol.Optional(ATTR_OBJECT_ID): _uuid_upper,
+    probatio.Required(ATTR_BABY): cv.string,
+    probatio.Optional(ATTR_NOTE, default=""): cv.string,
+    probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
 }
 
-LOG_BOTTLE_SCHEMA = vol.Schema(
+LOG_BOTTLE_SCHEMA = probatio.Schema(
     {
         **_COMMON,
-        vol.Required(ATTR_KIND): vol.In(list(BOTTLE_KINDS)),
-        vol.Required(ATTR_AMOUNT): vol.Coerce(float),
-        vol.Optional(ATTR_UNIT): _UNIT,
-        vol.Optional(ATTR_TIME): cv.datetime,
+        probatio.Required(ATTR_KIND): probatio.In(list(BOTTLE_KINDS)),
+        probatio.Required(ATTR_AMOUNT): probatio.Coerce(float),
+        probatio.Optional(ATTR_UNIT): _UNIT,
+        probatio.Optional(ATTR_TIME): cv.datetime,
     }
 )
 
-LOG_NURSING_SCHEMA = vol.Schema(
+LOG_NURSING_SCHEMA = probatio.Schema(
     {
         **_COMMON,
-        vol.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
-        vol.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
-        vol.Optional(ATTR_FINISH_SIDE): vol.In(list(FINISH_SIDES)),
-        vol.Optional(ATTR_END_TIME): cv.datetime,
+        probatio.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
+        probatio.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
+        probatio.Optional(ATTR_FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
+        probatio.Optional(ATTR_END_TIME): cv.datetime,
     }
 )
 
-LOG_SLEEP_SCHEMA = vol.Schema(
+LOG_SLEEP_SCHEMA = probatio.Schema(
     {
         **_COMMON,
-        vol.Required(ATTR_START): cv.datetime,
-        vol.Required(ATTR_END): cv.datetime,
+        probatio.Required(ATTR_START): cv.datetime,
+        probatio.Required(ATTR_END): cv.datetime,
     }
 )
 
 # A pump belongs to the account, not a baby, so it names an account or a device in one.
 _PUMP_COMMON = {
-    vol.Optional(ATTR_NOTE, default=""): cv.string,
-    vol.Optional(ATTR_OBJECT_ID): _uuid_upper,
+    probatio.Optional(ATTR_NOTE, default=""): cv.string,
+    probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
 }
 
-LOG_PUMP_SCHEMA = vol.All(
-    vol.Schema(
+LOG_PUMP_SCHEMA = probatio.All(
+    probatio.Schema(
         {
             **_PUMP_COMMON,
-            vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
-            vol.Optional(ATTR_DEVICE): cv.string,
+            probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
+            probatio.Optional(ATTR_DEVICE): cv.string,
             # Kept as an alias of ``device``, so a caller that used ``baby`` still works.
-            vol.Optional(ATTR_BABY): cv.string,
-            vol.Optional(ATTR_LEFT_AMOUNT): vol.Coerce(float),
-            vol.Optional(ATTR_RIGHT_AMOUNT): vol.Coerce(float),
-            vol.Optional(ATTR_UNIT): _UNIT,
-            vol.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
-            vol.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
-            vol.Optional(ATTR_FINISH_SIDE): vol.In(list(FINISH_SIDES)),
-            vol.Optional(ATTR_TIME): cv.datetime,
+            probatio.Optional(ATTR_BABY): cv.string,
+            probatio.Optional(ATTR_LEFT_AMOUNT): probatio.Coerce(float),
+            probatio.Optional(ATTR_RIGHT_AMOUNT): probatio.Coerce(float),
+            probatio.Optional(ATTR_UNIT): _UNIT,
+            probatio.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
+            probatio.Optional(ATTR_RIGHT_MINUTES, default=0): _whole_minutes,
+            probatio.Optional(ATTR_FINISH_SIDE): probatio.In(list(FINISH_SIDES)),
+            probatio.Optional(ATTR_TIME): cv.datetime,
         }
     ),
     cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
     cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
 )
 
-START_SLEEP_SCHEMA = vol.Schema(
+START_SLEEP_SCHEMA = probatio.Schema(
     {
         **_COMMON,
-        vol.Optional(ATTR_START): cv.datetime,
+        probatio.Optional(ATTR_START): cv.datetime,
     }
 )
 
-STOP_SLEEP_SCHEMA = vol.Schema(
+STOP_SLEEP_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_BABY): cv.string,
-        vol.Optional(ATTR_END): cv.datetime,
+        probatio.Required(ATTR_BABY): cv.string,
+        probatio.Optional(ATTR_END): cv.datetime,
     }
 )
 
-START_NURSING_SCHEMA = vol.Schema(
+START_NURSING_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_BABY): cv.string,
-        vol.Required(ATTR_SIDE): vol.In(list(FINISH_SIDES)),
+        probatio.Required(ATTR_BABY): cv.string,
+        probatio.Required(ATTR_SIDE): probatio.In(list(FINISH_SIDES)),
     }
 )
 
-BABY_ONLY_SCHEMA = vol.Schema({vol.Required(ATTR_BABY): cv.string})
+BABY_ONLY_SCHEMA = probatio.Schema({probatio.Required(ATTR_BABY): cv.string})
 
-STOP_NURSING_SCHEMA = vol.Schema(
+STOP_NURSING_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_BABY): cv.string,
-        vol.Optional(ATTR_NOTE, default=""): cv.string,
+        probatio.Required(ATTR_BABY): cv.string,
+        probatio.Optional(ATTR_NOTE, default=""): cv.string,
     }
 )
 
-UNDO_SCHEMA = vol.All(
-    vol.Schema(
+UNDO_SCHEMA = probatio.All(
+    probatio.Schema(
         {
-            vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
-            vol.Optional(ATTR_BABY): cv.string,
-            vol.Optional(ATTR_OBJECT_ID): cv.string,
+            probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
+            probatio.Optional(ATTR_BABY): cv.string,
+            probatio.Optional(ATTR_OBJECT_ID): cv.string,
         }
     ),
     cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_BABY),
@@ -210,31 +208,30 @@ def _loaded(entry: BabyTrackerConfigEntry | None) -> BabyTrackerCoordinator:
 
 
 def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str, bool]:
-    """The coordinator that owns one of the integration's devices, the device's identifier, and
-    whether it is an account's device (rather than a baby's)."""
+    """Return the coordinator that owns one of the integration's devices.
+
+    Also returns the device's identifier and whether it is an account's device (rather than a
+    baby's).
+    """
     device = dr.async_get(hass).async_get(device_id)
     if device is None:
         raise validation_error("baby_not_found")
     identifier = next((ident for domain, ident in device.identifiers if domain == DOMAIN), None)
     if identifier is None:
         raise validation_error("baby_not_found")
-    loaded: list[BabyTrackerConfigEntry] = []
-    found_any = False
-    for entry_id in device.config_entries:
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is None or entry.domain != DOMAIN:
-            continue
-        found_any = True
-        if entry.state is ConfigEntryState.LOADED:
-            loaded.append(entry)
-    if loaded:
-        return loaded[0].runtime_data, identifier, is_account_identifier(identifier)
-    raise validation_error("entry_not_loaded" if found_any else "baby_not_found")
+    entry = hass.config_entries.async_get_entry(device.config_entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        raise validation_error("baby_not_found")
+    if entry.state is not ConfigEntryState.LOADED:
+        raise validation_error("entry_not_loaded")
+    return entry.runtime_data, identifier, is_account_identifier(identifier)
 
 
 def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:
-    """The coordinator that owns a baby's device, and the baby's ID. An account's device isn't a
-    baby."""
+    """Return the coordinator that owns a baby's device, and the baby's ID.
+
+    An account's device isn't a baby.
+    """
     coordinator, baby_id, is_account = _from_device(hass, device_id)
     if is_account:
         raise validation_error("baby_not_found")
@@ -242,8 +239,11 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
 
 
 def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
-    """The account a pump goes to: the named config entry, or the entry that owns the named
-    device (a baby's or the account's)."""
+    """Return the account a pump goes to.
+
+    That is the named config entry, or the entry that owns the named device (a baby's or the
+    account's).
+    """
     if ATTR_CONFIG_ENTRY_ID in call.data:
         return _loaded(call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID]))
     return _from_device(call.hass, call.data.get(ATTR_DEVICE) or call.data[ATTR_BABY])[0]

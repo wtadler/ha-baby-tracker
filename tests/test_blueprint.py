@@ -5,8 +5,6 @@ Companion app's notify service is a recorder, so the assertions are on the paylo
 documented Live Activity API would receive.
 """
 
-from __future__ import annotations
-
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path

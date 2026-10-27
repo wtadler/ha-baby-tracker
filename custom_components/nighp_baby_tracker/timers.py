@@ -10,8 +10,6 @@ refused: the press was deliberate, and a refusal would leave the timer running. 
 than 240 minutes (a forgotten timer) is written as 240, the most the library accepts.
 """
 
-from __future__ import annotations
-
 import logging
 import math
 from collections.abc import Mapping
@@ -31,6 +29,7 @@ SIDES = (LEFT, RIGHT)
 
 
 def other_side(side: str) -> str:
+    """Return the other side of the body."""
     return RIGHT if side == LEFT else LEFT
 
 
@@ -56,10 +55,11 @@ class NursingTimer:
 
     @classmethod
     def start(cls, object_id: str, side: str, now: datetime) -> NursingTimer:
+        """Start a timer on ``side`` at ``now``."""
         return cls(object_id, now, side, now)
 
     def switched(self, side: str, now: datetime) -> NursingTimer:
-        """The timer on ``side`` from ``now``, with the current stretch added to its side."""
+        """Return the timer on ``side`` from ``now``, with the current stretch added to its side."""
         if side == self.side:
             return self
         left, right = self.totals(now)
@@ -88,6 +88,7 @@ class NursingTimer:
         return min(left, MAX_MINUTES_PER_SIDE), min(right, MAX_MINUTES_PER_SIDE)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return the timer as saveable data."""
         return {
             "object_id": self.object_id,
             "started": self.started.isoformat(),
@@ -99,8 +100,10 @@ class NursingTimer:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> NursingTimer:
-        """Rebuild a saved timer. Raises ``ValueError`` (or ``KeyError``/``TypeError``) on bad
-        data."""
+        """Rebuild a saved timer.
+
+        Raises ``ValueError`` (or ``KeyError``/``TypeError``) on bad data.
+        """
         side = data["side"]
         if side not in SIDES:
             raise ValueError(f"unknown side {side!r}")
@@ -118,7 +121,7 @@ class NursingTimer:
 
 
 def load_timers(saved: Any) -> dict[str, NursingTimer]:
-    """The saved timers by baby ID. One that can't be read is dropped with a warning."""
+    """Return the saved timers by baby ID. One that can't be read is dropped with a warning."""
     if not isinstance(saved, Mapping):
         return {}
     timers: dict[str, NursingTimer] = {}

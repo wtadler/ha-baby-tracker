@@ -1,7 +1,5 @@
 """Today's counts, today's bottle volume, and the asleep sensor."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -39,7 +37,7 @@ from .factories import (
     baby_payload,
     volume,
 )
-from .helpers import tick
+from .helpers import get_baby_device, tick
 
 NEW_YORK = ZoneInfo("America/New_York")
 BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
@@ -156,7 +154,7 @@ async def test_each_baby_gets_the_four_new_entities(
     registry = er.async_get(hass)
     devices = dr.async_get(hass)
     for baby_id in (BABY_ONE_ID, BABY_TWO_ID):
-        device = devices.async_get_device(identifiers={(DOMAIN, baby_id)})
+        device = get_baby_device(devices, baby_id)
         assert device is not None
         by_key = {
             entity.translation_key: entity
@@ -745,7 +743,7 @@ async def test_asleep_is_a_binary_sensor_on_the_baby_device(
     found = er.async_get(hass).async_get("binary_sensor.baby_one_asleep")
     assert found is not None
     assert found.unique_id == f"{BABY_ONE_ID}_asleep"
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, BABY_ONE_ID)})
+    device = get_baby_device(dr.async_get(hass), BABY_ONE_ID)
     assert device is not None
     assert found.device_id == device.id
 

@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Home Assistant 2026.x requires Python 3.13 (see ruff target-version in pyproject.toml).
+      # Home Assistant 2026.10 requires Python 3.14 (see ruff target-version in pyproject.toml).
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
       - name: Install
@@ -27,6 +27,8 @@ jobs:
         run: ruff check .
       - name: ruff format
         run: ruff format --check .
+      - name: mypy
+        run: mypy --strict custom_components/nighp_baby_tracker
 
   hassfest:
     runs-on: ubuntu-latest
@@ -34,3 +36,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # home-assistant/actions publishes no release tags, so this is pinned to a commit on master.
       - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, 2026-10-26
+
+  hacs:
+    # The HACS action refuses private repositories outright (no ignore covers it), so this job
+    # is skipped while the repo is private and validates as soon as it is public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        with:
+          category: integration
