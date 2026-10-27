@@ -24,8 +24,8 @@ rules:
     status: exempt
     comment: The integration registers no device triggers.
   entity-event-setup:
-    status: exempt
-    comment: Entities read the coordinator's data and subscribe to no events of their own.
+    status: done
+    comment: Entities read the coordinator's data. The nursing time sensors also run a 30-second timer, subscribed in async_added_to_hass and cancelled with async_on_remove.
   entity-unique-id: done
   has-entity-name: done
   runtime-data: done
@@ -74,11 +74,11 @@ rules:
   dynamic-devices: done
   entity-category:
     status: exempt
-    comment: Every entity (the buttons, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
+    comment: Every entity (the buttons, the timer switches, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
   entity-device-class: done
   entity-disabled-by-default:
     status: done
-    comment: No entity starts disabled. The timer sensors drive the live activity blueprint, and the diaper buttons are the integration's main use, so none is a less popular entity.
+    comment: No entity starts disabled. The timer sensors drive the live activity blueprint, the diaper buttons and timer switches are the integration's main use, so none is a less popular entity.
   entity-translations: done
   exception-translations: done
   icon-translations: done

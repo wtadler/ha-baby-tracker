@@ -29,7 +29,17 @@ from .pybabytracker import BabyTrackerClient
 from .services import async_setup_services
 from .writes import forget_gap
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
+
+# Buttons an earlier version registered, as the ends of their unique IDs (``<baby_id>_<key>``).
+# The Sleep and Nursing switches replaced them. Matching is by suffix, so no button added later
+# may have a key that ends in one of these (a ``log_sleep`` button would be deleted on setup).
+REMOVED_BUTTONS = ("_sleep", "_nurse_left", "_nurse_right")
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -57,8 +67,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) 
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
+    _remove_old_timer_buttons(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
+    """Drop the Sleep and Nurse left/right buttons an earlier version registered.
+
+    The timer switches replaced them, and a registry entry with no entity behind it would show
+    as an unavailable button. Every other button is left alone, and with none left this does
+    nothing, so it is safe on every setup.
+    """
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            entity.domain == Platform.BUTTON
+            and entity.platform == DOMAIN
+            and entity.unique_id.endswith(REMOVED_BUTTONS)
+        ):
+            registry.async_remove(entity.entity_id)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:

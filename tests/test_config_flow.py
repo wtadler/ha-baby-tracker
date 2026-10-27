@@ -32,11 +32,11 @@ from .fake_server import FakeServer
 from .helpers import (
     INTEGRATION,
     LEGACY_INTERVAL,
-    SLEEP_BUTTON,
+    SLEEP_SWITCH,
     entry_with_options,
-    press,
     set_options,
     sync_interval,
+    toggle,
 )
 
 
@@ -290,7 +290,7 @@ async def test_saving_the_options_drops_a_legacy_interval(
 async def test_an_options_change_leaves_a_running_timer_at_one_minute(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
 
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
     await hass.config_entries.options.async_configure(

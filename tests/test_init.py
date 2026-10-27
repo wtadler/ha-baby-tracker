@@ -65,7 +65,7 @@ from .helpers import (
     NURSE_LEFT,
     NURSING_TIMER,
     PHONE_SLEEP,
-    SLEEP_BUTTON,
+    SLEEP_SWITCH,
     account_device,
     button,
     call,
@@ -85,6 +85,7 @@ from .helpers import (
     state_of,
     sync_interval,
     tick,
+    toggle,
     undo,
 )
 
@@ -103,6 +104,24 @@ def add_old_pump_entity(
         config_entry=entry,
         device_id=device.id,
         translation_key="last_pump",
+        has_entity_name=True,
+    )
+
+
+def add_old_timer_button(
+    hass: HomeAssistant, entry: MockConfigEntry, baby_id: str, key: str, name: str = "Baby"
+) -> er.RegistryEntry:
+    """What an earlier version registered: a button ``<baby_id>_<key>`` on the baby's device."""
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, baby_id)}, name=name
+    )
+    return er.async_get(hass).async_get_or_create(
+        "button",
+        DOMAIN,
+        f"{baby_id}_{key}",
+        config_entry=entry,
+        device_id=device.id,
+        translation_key=key,
         has_entity_name=True,
     )
 
@@ -421,10 +440,10 @@ async def test_a_sleep_home_assistant_starts_switches_polling_at_once(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
     assert await sync_interval(hass, server) == timedelta(minutes=1)
     freezer.move_to(minutes(3))
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
@@ -1189,11 +1208,11 @@ async def test_a_running_sleep_polls_every_minute_and_five_when_it_stops(
 ) -> None:
     await entry_with_options(hass, options)
 
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
     assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     freezer.tick(timedelta(minutes=3))
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
@@ -1203,18 +1222,18 @@ async def test_a_running_nursing_timer_polls_every_minute_and_five_when_it_stops
 ) -> None:
     await entry_with_options(hass, options)
 
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     freezer.tick(timedelta(minutes=3))
-    await press(hass, NURSE_LEFT)
+    await toggle(hass, NURSE_LEFT)
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_running_timer_syncs_every_minute(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, SLEEP_BUTTON)
+    await toggle(hass, SLEEP_SWITCH)
     calls = server.device_list_calls
 
     await tick(hass, minutes=1)
@@ -1478,3 +1497,95 @@ async def test_unloading_closes_the_client(
     await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
     assert server.open_clients == []
+
+
+# --- the old Sleep and Nurse buttons are removed on setup ------------------------------------
+
+
+OLD_TIMER_BUTTONS = ("sleep", "nurse_left", "nurse_right")
+
+
+async def test_setup_removes_the_old_sleep_and_nurse_buttons_from_the_registry(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    old = [
+        add_old_timer_button(hass, mock_config_entry, baby_id, key)
+        for baby_id in (BABY_ONE_ID, BABY_TWO_ID)
+        for key in OLD_TIMER_BUTTONS
+    ]
+    registry = er.async_get(hass)
+    assert all(registry.async_get(entry.entity_id) is not None for entry in old)
+
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    for entry in old:
+        assert registry.async_get(entry.entity_id) is None
+        assert hass.states.get(entry.entity_id) is None  # no orphaned "unavailable" button
+
+
+async def test_the_button_cleanup_leaves_the_other_buttons_and_sleep_named_sensors_alone(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    for key in OLD_TIMER_BUTTONS:
+        add_old_timer_button(hass, mock_config_entry, BABY_ONE_ID, key)
+    kept = [
+        add_old_timer_button(hass, mock_config_entry, BABY_ONE_ID, key)
+        for key in ("wet_diaper", "dirty_diaper", "mixed_diaper", "bottle")
+    ]
+    registry = er.async_get(hass)
+    before = {entry.unique_id: entry.id for entry in kept}
+
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    for unique_id, registry_id in before.items():
+        entity_id = registry.async_get_entity_id("button", DOMAIN, unique_id)
+        assert entity_id is not None, unique_id
+        entity = registry.async_get(entity_id)
+        assert entity is not None and entity.id == registry_id  # kept, not recreated
+    for key in ("last_sleep", "sleep_timer", "last_feed"):
+        assert registry.async_get_entity_id("sensor", DOMAIN, f"{BABY_ONE_ID}_{key}") is not None
+    assert registry.async_get_entity_id("switch", DOMAIN, f"{BABY_ONE_ID}_sleep") is not None
+
+
+async def test_the_button_cleanup_does_not_touch_another_integrations_buttons(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    other = registry.async_get_or_create("button", "other_integration", f"{BABY_ONE_ID}_sleep")
+
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(other.entity_id) is not None
+
+
+async def test_the_button_cleanup_runs_again_harmlessly_on_a_reload(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    add_old_timer_button(hass, mock_config_entry, BABY_ONE_ID, "nurse_left")
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    switches = {
+        e.entity_id
+        for e in er.async_entries_for_config_entry(er.async_get(hass), mock_config_entry.entry_id)
+        if e.domain == "switch"
+    }
+
+    assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert (
+        er.async_get(hass).async_get_entity_id("button", DOMAIN, f"{BABY_ONE_ID}_nurse_left")
+        is None
+    )
+    assert switches == {
+        e.entity_id
+        for e in er.async_entries_for_config_entry(er.async_get(hass), mock_config_entry.entry_id)
+        if e.domain == "switch"
+    }

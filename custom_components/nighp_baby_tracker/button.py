@@ -1,4 +1,4 @@
-"""Diaper, Bottle, Sleep, and Nurse buttons, one set per baby."""
+"""Diaper, Bottle, and Discard nursing buttons, one set per baby."""
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -9,12 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .entity import BabyTrackerBabyEntity
-from .writes import (
-    async_log_configured_bottle,
-    async_log_diaper,
-    async_press_nurse,
-    async_press_sleep,
-)
+from .writes import async_discard_nursing, async_log_configured_bottle, async_log_diaper
 
 # The coordinator's lock serializes writes, so Home Assistant needn't.
 PARALLEL_UPDATES = 0
@@ -34,13 +29,6 @@ def _diaper(kind: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None
     return press
 
 
-def _nurse(side: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None]]:
-    async def press(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
-        await async_press_nurse(coordinator, baby_id, side)
-
-    return press
-
-
 BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     BabyTrackerButtonDescription(
         key="wet_diaper", translation_key="wet_diaper", press_fn=_diaper("wet")
@@ -55,14 +43,11 @@ BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     BabyTrackerButtonDescription(
         key="bottle", translation_key="bottle", press_fn=async_log_configured_bottle
     ),
-    # Starts a sleep, or ends the running one (from any device).
-    BabyTrackerButtonDescription(key="sleep", translation_key="sleep", press_fn=async_press_sleep),
-    # Start a side, switch to it, or stop when it's the side already running.
+    # For a nursing timer left running by mistake: drops it without writing anything.
     BabyTrackerButtonDescription(
-        key="nurse_left", translation_key="nurse_left", press_fn=_nurse("left")
-    ),
-    BabyTrackerButtonDescription(
-        key="nurse_right", translation_key="nurse_right", press_fn=_nurse("right")
+        key="discard_nursing",
+        translation_key="discard_nursing",
+        press_fn=async_discard_nursing,
     ),
 )
 
@@ -93,7 +78,7 @@ async def async_setup_entry(
 
 
 class BabyTrackerButton(BabyTrackerBabyEntity, ButtonEntity):
-    """Logs one thing, or moves a timer along, right now, for one baby."""
+    """Logs one thing, or drops the nursing timer, right now, for one baby."""
 
     entity_description: BabyTrackerButtonDescription
 

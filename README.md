@@ -31,6 +31,12 @@ timers. See
     `side` (`left` or `right`), `side_started` (when the current side began), and
     `left_seconds` and `right_seconds` (time on each side before the current one). The current
     side's time is now minus `side_started`.
+- Timer controls on each baby (see [Timers](#timers)):
+  - Switches: **Sleep**, **Nursing left**, and **Nursing right**. A switch is on while its timer
+    runs.
+  - Sensors **Nursing left time** and **Nursing right time**: the minutes on each side this
+    session, counting up while it runs, or unknown when no session runs.
+  - A **Discard nursing** button.
 - Babies that appear later in your account are added without a restart.
 
 ## Installation
@@ -75,7 +81,7 @@ daylight saving, as the app does.
 Home Assistant asks you to sign in again. Enter the account's current password. The email is the
 one the entry was set up with, and it isn't asked again.
 
-## Buttons and actions
+## Buttons, switches, and actions
 
 Each baby has **Wet diaper**, **Dirty diaper**, **Mixed diaper**, and **Bottle** buttons.
 Pressing one logs that diaper, or the bottle your options describe, for that baby, right now, as
@@ -83,18 +89,39 @@ Home Assistant's own device in your account.
 
 ### Timers
 
-- **Sleep** starts a sleep, or ends the one running, wherever it started. The app syncs a running
-  sleep, so the phones show it at once and Home Assistant sees theirs. A press does what Home
-  Assistant showed when you pressed it: if a phone already ended that sleep, or already started
-  one, the press writes nothing rather than starting a second sleep, and shows an error saying so.
-- **Nurse left** and **Nurse right** run Home Assistant's own nursing timer. Press a side to start
-  it, the other side to switch (the first side's time is kept), and the running side again to stop.
-  The app doesn't sync a running nursing timer, so Home Assistant can't see one running on a phone,
-  and the phones see Home Assistant's only when it stops: one nursing record with each side's whole
-  minutes (rounded half up), the side it ended on, and the start time. A stop within 30 seconds is
-  saved as 1 minute on that side, and more than 240 minutes on a side is saved as 240. The timer
-  survives a restart (if it can't be saved, the press still works and shows an error), and nursing
-  while the baby is asleep is fine. A timer for a baby no longer in the account is dropped.
+The timers are switches, so you can see that one is running. They replace the Sleep and Nurse
+buttons of earlier versions: upgrading removes those buttons from the entity registry, so update
+any dashboard or automation that used one.
+
+- **Sleep** is on while the baby's newest sleep is running, wherever it started. The app syncs a
+  running sleep, so the phones show one started here at once and Home Assistant sees theirs. Turn
+  it on to start a sleep, and off to end the running one, even one a phone started. These do what
+  the `start_sleep` and `stop_sleep` actions do, errors included: turning it on while a sleep runs,
+  or off when none does (a phone may have ended it since the switch last updated), raises an error
+  and writes nothing.
+- **Nursing left** and **Nursing right** work like the app's two side buttons and run Home
+  Assistant's own nursing timer. A side is on while the timer runs on it, so at most one is on.
+  - Turn a side on with no session running to start one on that side.
+  - Turn the other side on to switch to it. The first side's time is kept, and its switch turns
+    off.
+  - Turn the running side off to stop the whole session and log it: one nursing record with each
+    side's whole minutes (rounded half up), the side it ended on, and the start time. A stop within
+    30 seconds is saved as 1 minute on that side, and more than 240 minutes on a side is saved as
+    240.
+  - Turning on the side that's already running, or off a side that isn't, does nothing.
+  - **The switches show only Home Assistant's own timer.** The app doesn't sync a running nursing
+    timer, so Home Assistant can't see one running on a phone, and the phones see Home
+    Assistant's only when it stops. They do what the `start_nursing` (which also switches
+    sides) and `stop_nursing` actions do.
+  - The timer survives a restart (if it can't be saved, the change still happens and an error says
+    so), and nursing while the baby is asleep is fine. A timer for a baby no longer in the account
+    is dropped.
+- **Nursing left time** and **Nursing right time** show the minutes on each side this session,
+  including the running side's time so far, to a tenth of a minute. They refresh every 30 seconds
+  while a session runs, with no sync needed, and are unknown (like the timer sensors) when no
+  session runs.
+- **Discard nursing** drops the running nursing timer without writing anything (the
+  `discard_nursing` action). With no timer running it shows an error.
 - While a sleep or a nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
   up quickly. It returns to every 5 minutes when none is running. A nursing timer that has run for
   an hour or more no longer counts: it's probably forgotten, and a [repair](#troubleshooting) asks
@@ -197,8 +224,8 @@ sends no notifications; the blueprint does, from the timer sensors.
   instead of restarting. The notification's title can't change once the activity starts, so the
   side is in the message, not the title.
 - A nursing timer started in the phone app can't show: the app doesn't sync a running nursing
-  timer, so Home Assistant never sees it. Only timers started from Home Assistant (the **Nurse
-  left** and **Nurse right** buttons or actions) do. Sleep timers show from any device.
+  timer, so Home Assistant never sees it. Only timers started from Home Assistant (the **Nursing
+  left** and **Nursing right** switches or actions) do. Sleep timers show from any device.
 - If Home Assistant restarts mid-session, a running timer's activity stays as it was and the
   blueprint sends nothing new until the timer changes; ending it still ends the activity.
 - A sync failure mid-timer (running, then unavailable, then unknown) still ends the activity; going unavailable and back to the same running timer leaves it alone.
@@ -216,7 +243,10 @@ now, and the phones show it after their next sync. A mistaken press is fixed wit
 
 **A 3 a.m. dashboard.** One card with **Last diaper**, **Last feed**, and **Asleep**, plus the
 buttons. The last-activity sensors are timestamps, so the card can show "23 minutes ago" instead of
-a clock time. **Sleep** starts or ends a sleep, so a night wake-up needs one tap.
+a clock time. The **Sleep** switch shows whether a sleep is running and starts or ends it, so a
+night wake-up needs one tap. For feeds, put **Nursing left**, **Nursing right**, and the two time
+sensors on the card: tap a side to start, tap the other to switch, and tap the lit side to stop and
+log the session. The time sensors show how long each side has gone.
 
 **Quiet notifications while the baby sleeps.** Mute announcements, or dim a hallway light, while
 `binary_sensor.baby_asleep` is on. It turns on for a sleep started from any phone as well as from
@@ -276,8 +306,8 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
 ## Known limitations
 
 - **A running nursing timer on a phone isn't visible.** The app doesn't sync one until it stops.
-  Home Assistant shows only its own nursing timer (the **Nurse left** and **Nurse right**
-  buttons). A sleep timer is synced, so it shows from any device.
+  Home Assistant shows only its own nursing timer (the **Nursing left** and **Nursing right**
+  switches). A sleep timer is synced, so it shows from any device.
 - **A forgotten nursing timer is only caught after an hour.** Because only Home Assistant can see
   its nursing timer, one left running keeps going until you stop or discard it. After an hour a
   repair appears and Home Assistant goes back to checking every 5 minutes. A running sleep has no
@@ -327,9 +357,10 @@ after the next restart unless something still uses the old field.
 
 **A repair says a nursing timer has run for over an hour.** Home Assistant's own nursing timer for
 that baby was probably forgotten: the app doesn't show a running nursing timer, so nothing else
-will end it. Either stop it (press the **Nurse** button for the side it is on, or call
+will end it. Either stop it (turn off the **Nursing** switch that is on, or call
 `nighp_baby_tracker.stop_nursing`) to save one nursing record, with each side capped at 240
-minutes, or call `nighp_baby_tracker.discard_nursing` to throw it away without saving anything. The
+minutes, or press **Discard nursing** (or call `nighp_baby_tracker.discard_nursing`) to throw it
+away without saving anything. The
 repair clears when the timer stops or is discarded, and returns after a restart if the timer is
 still over an hour old. This guard applies only to nursing: a running sleep is synced, so it is
 never flagged or capped.
