@@ -95,6 +95,9 @@
     },
     "stop_nursing": {
       "service": "mdi:timer-stop"
+    },
+    "discard_nursing": {
+      "service": "mdi:timer-off"
     }
   }
 }

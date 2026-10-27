@@ -12,6 +12,7 @@ from homeassistant.helpers import service
 
 from .const import (
     DOMAIN,
+    SERVICE_DISCARD_NURSING,
     SERVICE_LOG_BOTTLE,
     SERVICE_LOG_DIAPER,
     SERVICE_LOG_NURSING,
@@ -32,6 +33,7 @@ from .writes import (
     FINISH_SIDES,
     MILLILITERS,
     OUNCES,
+    async_discard_nursing,
     async_log_bottle,
     async_log_diaper,
     async_log_nursing,
@@ -377,6 +379,11 @@ async def _stop_nursing(call: ServiceCall) -> None:
     await async_stop_nursing(coordinator, baby_id, note=call.data[ATTR_NOTE])
 
 
+async def _discard_nursing(call: ServiceCall) -> None:
+    coordinator, baby_id = _baby(call)
+    await async_discard_nursing(coordinator, baby_id)
+
+
 async def _undo(call: ServiceCall) -> None:
     baby_id: str | None = None
     if ATTR_DEVICE_ID in call.data or ATTR_BABY in call.data:
@@ -409,4 +416,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_STOP_NURSING, _stop_nursing, schema=STOP_NURSING_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_DISCARD_NURSING, _discard_nursing, schema=BABY_ONLY_SCHEMA
     )

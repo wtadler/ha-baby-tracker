@@ -324,3 +324,12 @@ stop_nursing:
       example: Fell asleep at the end
       selector:
         text:
+
+discard_nursing:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: nighp_baby_tracker

@@ -14,7 +14,7 @@ import logging
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.util import dt as dt_util
@@ -66,6 +66,13 @@ class NursingTimer:
         """
         left, right = self.totals(now)
         return replace(self, side=side, side_started=now, left_seconds=left, right_seconds=right)
+
+    def is_overdue(self, now: datetime, after: timedelta) -> bool:
+        """Whether the timer has run for ``after`` or longer since it started.
+
+        A side switch doesn't restart this: it counts from the start of the session.
+        """
+        return now - self.started >= after
 
     def totals(self, now: datetime) -> tuple[float, float]:
         """Seconds on each side, counting the current stretch up to ``now``."""

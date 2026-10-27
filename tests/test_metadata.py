@@ -108,6 +108,7 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "start_nursing",
         "switch_nursing_side",
         "stop_nursing",
+        "discard_nursing",
     }
     assert set(services["log_diaper"]["fields"]) == {
         "device_id",
@@ -153,11 +154,16 @@ def test_every_error_and_issue_the_integration_raises_has_a_translation() -> Non
         "auth_failed",
         "sync_failed",
         "write_failed",
+        "no_nursing_timer",
     }
     assert all(item["message"] for item in strings["exceptions"].values())
     assert strings["issues"]["own_log_gap"]["title"]
     assert "{account}" in strings["issues"]["own_log_gap"]["description"]
     assert {"wet_diaper", "dirty_diaper", "mixed_diaper"} <= set(strings["entity"]["button"])
+    long_timer = strings["issues"]["nursing_timer_long"]
+    assert long_timer["title"]
+    assert "{baby}" in long_timer["title"] or "{baby}" in long_timer["description"]
+    assert "discard" in long_timer["description"].lower()
 
 
 def test_the_action_setup_rule_is_done() -> None:
@@ -187,6 +193,7 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "start_nursing",
         "switch_nursing_side",
         "stop_nursing",
+        "discard_nursing",
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
     assert fields["log_bottle"] == {

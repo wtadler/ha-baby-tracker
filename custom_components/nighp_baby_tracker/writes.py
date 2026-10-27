@@ -609,6 +609,18 @@ async def _stop_nursing_locked(
     await coordinator.async_set_nursing(baby_id, None)
 
 
+async def async_discard_nursing(coordinator: BabyTrackerCoordinator, baby_id: str) -> None:
+    """Throw away the running nursing timer without writing anything.
+
+    For a timer left running by mistake. It holds the coordinator's lock like every timer change,
+    so a stop already writing finishes first and this then finds no timer. It never syncs or posts.
+    """
+    async with coordinator.exclusive():
+        if coordinator.nursing.get(baby_id) is None:
+            raise validation_error("no_nursing_timer")
+        await coordinator.async_set_nursing(baby_id, None)
+
+
 async def async_press_nurse(coordinator: BabyTrackerCoordinator, baby_id: str, side: str) -> None:
     """Handle a Nurse button press.
 

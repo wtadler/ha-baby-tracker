@@ -306,6 +306,7 @@ BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {
     "start_nursing": ({"side": "left"}, None),
     "switch_nursing_side": ({}, "button.baby_one_nurse_left"),
     "stop_nursing": ({}, "button.baby_one_nurse_left"),
+    "discard_nursing": ({}, "button.baby_one_nurse_left"),
 }
 
 ACTION_IDS = list(BABY_ACTIONS)

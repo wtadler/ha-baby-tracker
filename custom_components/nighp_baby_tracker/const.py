@@ -15,6 +15,11 @@ CONF_DEVICE_UUID = "device_uuid"
 # option; it is ignored, and the next options save drops it.
 SCAN_INTERVAL = timedelta(minutes=5)
 
+# A nursing timer is Home Assistant's alone (the app doesn't sync a running one), so a forgotten one
+# can't be seen or ended anywhere else. Once it has run this long it raises a repair and stops
+# counting toward the one-minute polling. Sleeps are synced, so they have no such limit.
+NURSING_TIMER_GUARD_AFTER = timedelta(minutes=60)
+
 # How Home Assistant names itself in the account's device list.
 DEVICE_NAME = "Home Assistant"
 
@@ -26,6 +31,11 @@ ACCOUNT_DEVICE_MODEL = "Account"
 # The device's name is the "account" device string ("Baby Tracker account"): fixed, so the
 # account's email never ends up in an entity ID. A second entry gets "_2".
 ACCOUNT_SUFFIX = "_account"
+
+
+def nursing_guard_issue_id(entry_id: str, baby_id: str) -> str:
+    """Return the repair issue ID for a baby's overlong nursing timer."""
+    return f"nursing_timer_long_{entry_id}_{baby_id}"
 
 
 def account_identifier(entry_id: str) -> str:
@@ -49,6 +59,7 @@ SERVICE_STOP_SLEEP = "stop_sleep"
 SERVICE_START_NURSING = "start_nursing"
 SERVICE_SWITCH_NURSING_SIDE = "switch_nursing_side"
 SERVICE_STOP_NURSING = "stop_nursing"
+SERVICE_DISCARD_NURSING = "discard_nursing"
 
 CONF_BOTTLE_SIZE = "bottle_size"
 CONF_BOTTLE_UNIT = "bottle_unit"

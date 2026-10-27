@@ -58,7 +58,7 @@ identity. It doesn't appear in the app's device list until it writes its first r
 ### Options
 
 There is no sync interval option. Home Assistant checks for new records every 5 minutes, and every
-minute while a sleep or nursing timer runs. To check sooner, call `homeassistant.update_entity`
+minute while a sleep timer or a nursing timer under an hour old runs. To check sooner, call `homeassistant.update_entity`
 on any Baby Tracker entity from an automation or a script. An earlier version's saved interval is
 ignored, and saving these options removes it.
 
@@ -95,8 +95,11 @@ Home Assistant's own device in your account.
   saved as 1 minute on that side, and more than 240 minutes on a side is saved as 240. The timer
   survives a restart (if it can't be saved, the press still works and shows an error), and nursing
   while the baby is asleep is fine. A timer for a baby no longer in the account is dropped.
-- While any sleep or nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
-  up quickly. It returns to every 5 minutes when none is running.
+- While a sleep or a nursing timer runs, Home Assistant syncs every minute, so a phone's stop shows
+  up quickly. It returns to every 5 minutes when none is running. A nursing timer that has run for
+  an hour or more no longer counts: it's probably forgotten, and a [repair](#troubleshooting) asks
+  you to stop or discard it. A running sleep always counts, however long, because the app syncs it
+  and every phone shows it.
 - A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a
   forgotten timer can always be stopped; fix the length in the app.
 
@@ -141,6 +144,9 @@ and the field to switch to: `device_id` for a baby, and `config_entry_id` for an
 - `nighp_baby_tracker.switch_nursing_side` takes `device_id` and moves the timer to the other side.
 - `nighp_baby_tracker.stop_nursing` takes `device_id` and an optional `note`, and saves the nursing
   record. Switching or stopping with no timer running is refused.
+- `nighp_baby_tracker.discard_nursing` takes `device_id` and throws away Home Assistant's running
+  nursing timer without saving anything. Use it for a timer started or left running by mistake. It
+  is refused when that baby has no timer running, and it never contacts the service.
 - Every `log_*` action, and `start_sleep`, also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
   Send the same one to retry a write that may have landed: it's added once, never twice.
 
@@ -272,8 +278,13 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
 - **A running nursing timer on a phone isn't visible.** The app doesn't sync one until it stops.
   Home Assistant shows only its own nursing timer (the **Nurse left** and **Nurse right**
   buttons). A sleep timer is synced, so it shows from any device.
+- **A forgotten nursing timer is only caught after an hour.** Because only Home Assistant can see
+  its nursing timer, one left running keeps going until you stop or discard it. After an hour a
+  repair appears and Home Assistant goes back to checking every 5 minutes. A running sleep has no
+  such limit.
 - **Records arrive on a schedule, not instantly.** Home Assistant checks for new records every 5
-  minutes, and every minute while a sleep or nursing timer runs. No option changes this. Records
+  minutes, and every minute while a sleep timer or a nursing timer under an hour old runs. No option
+  changes this. Records
   Home Assistant writes show at once. Call `homeassistant.update_entity` to check sooner.
 - **A sleep is at most 24 hours.** Stopping a sleep later than that saves 24 hours. Fix the length
   in the app. A sleep can't start in the future or more than 24 hours ago, and nursing and pump
@@ -313,6 +324,15 @@ still works for one more release. The repair names the action and the field to s
 `device_id` for a baby, and `config_entry_id` for an account. Edit the automation, script, or
 dashboard button that calls the action, save it, and run it again. The repair clears on its own
 after the next restart unless something still uses the old field.
+
+**A repair says a nursing timer has run for over an hour.** Home Assistant's own nursing timer for
+that baby was probably forgotten: the app doesn't show a running nursing timer, so nothing else
+will end it. Either stop it (press the **Nurse** button for the side it is on, or call
+`nighp_baby_tracker.stop_nursing`) to save one nursing record, with each side capped at 240
+minutes, or call `nighp_baby_tracker.discard_nursing` to throw it away without saving anything. The
+repair clears when the timer stops or is discarded, and returns after a restart if the timer is
+still over an hour old. This guard applies only to nursing: a running sleep is synced, so it is
+never flagged or capped.
 
 **A write says "the last entry is still being confirmed."** The service didn't answer the last
 write. Wait a minute and try again. Reusing the same `object_id` on a retry adds the record once.
