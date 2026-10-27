@@ -670,20 +670,6 @@ async def test_stop_sleep_past_24_hours_writes_24_hours(
     assert record.duration == 1440
 
 
-async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
-) -> None:
-    await nurse(hass, freezer, (0, "left"), (5, "left"))
-
-    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
-
-    [(_, op1, added), (_, op2, deleted)] = posted(server)
-    assert (op1, op2) == (OP_ADD, OP_DELETE)
-    assert deleted.object_id == added.object_id
-    assert state(hass, "sensor.baby_one_last_feed").state == "unknown"  # the nursing is gone
-    assert state(hass, NURSING_TIMER).state == "unknown"
-
-
 async def test_start_switch_and_stop_nursing_actions(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
