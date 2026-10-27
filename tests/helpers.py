@@ -25,6 +25,22 @@ async def tick(hass: HomeAssistant, minutes: float = 5) -> None:
     await hass.async_block_till_done()
 
 
+async def sync_interval(hass: HomeAssistant, server: FakeServer) -> timedelta:
+    """How often the integration syncs, found by moving the clock and counting the reads.
+
+    A sync already scheduled at the old interval runs first, so the first minute is let go by.
+    """
+    await tick(hass, minutes=1)
+    calls = server.device_list_calls
+    await tick(hass, minutes=1)
+    if server.device_list_calls > calls:
+        return timedelta(minutes=1)
+    await tick(hass, minutes=5)
+    if server.device_list_calls > calls:
+        return timedelta(minutes=5)
+    raise AssertionError("no sync within five minutes")
+
+
 def get_baby_device(registry: dr.DeviceRegistry, baby_id: str) -> dr.DeviceEntry | None:
     """Return the device registered for a baby, or None."""
     devices = registry.async_get_devices(identifiers={(DOMAIN, baby_id)})

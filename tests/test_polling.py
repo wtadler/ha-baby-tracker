@@ -21,7 +21,7 @@ from custom_components.nighp_baby_tracker.const import (
 
 from . import EMAIL, PASSWORD
 from .fake_server import FakeServer
-from .helpers import press, tick
+from .helpers import press, sync_interval, tick
 
 # The option an earlier version saved. It is no longer a setting, so these tests spell it out.
 LEGACY_INTERVAL = "scan_interval"
@@ -56,11 +56,11 @@ async def _entry_with_options(hass: HomeAssistant, options: dict[str, Any]) -> M
     ids=["no-options", "legacy-1-minute", "legacy-15-minutes", "legacy-a-day"],
 )
 async def test_polling_is_five_minutes_whatever_an_old_install_saved(
-    hass: HomeAssistant, options: dict[str, Any]
+    hass: HomeAssistant, server: FakeServer, options: dict[str, Any]
 ) -> None:
-    entry = await _entry_with_options(hass, options)
+    await _entry_with_options(hass, options)
 
-    assert entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_legacy_interval_does_not_make_syncs_run_early(
@@ -90,30 +90,30 @@ async def test_a_legacy_interval_does_not_make_syncs_slower(
 
 @pytest.mark.parametrize("options", [{}, {LEGACY_INTERVAL: 15}], ids=["new", "legacy"])
 async def test_a_running_sleep_polls_every_minute_and_five_when_it_stops(
-    hass: HomeAssistant, options: dict[str, Any], freezer: Any
+    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: Any
 ) -> None:
-    entry = await _entry_with_options(hass, options)
+    await _entry_with_options(hass, options)
 
     await press(hass, SLEEP_BUTTON)
-    assert entry.runtime_data.update_interval == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     freezer.tick(timedelta(minutes=3))
     await press(hass, SLEEP_BUTTON)
-    assert entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 @pytest.mark.parametrize("options", [{}, {LEGACY_INTERVAL: 15}], ids=["new", "legacy"])
 async def test_a_running_nursing_timer_polls_every_minute_and_five_when_it_stops(
-    hass: HomeAssistant, options: dict[str, Any], freezer: Any
+    hass: HomeAssistant, server: FakeServer, options: dict[str, Any], freezer: Any
 ) -> None:
-    entry = await _entry_with_options(hass, options)
+    await _entry_with_options(hass, options)
 
     await press(hass, NURSE_LEFT)
-    assert entry.runtime_data.update_interval == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     freezer.tick(timedelta(minutes=3))
     await press(hass, NURSE_LEFT)
-    assert entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_running_timer_syncs_every_minute(
@@ -173,7 +173,9 @@ async def test_saving_the_options_saves_only_the_bottle(
     }
 
 
-async def test_saving_the_options_drops_a_legacy_interval(hass: HomeAssistant) -> None:
+async def test_saving_the_options_drops_a_legacy_interval(
+    hass: HomeAssistant, server: FakeServer
+) -> None:
     entry = await _entry_with_options(hass, {LEGACY_INTERVAL: 15, CONF_BOTTLE_SIZE: 6})
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -186,11 +188,11 @@ async def test_saving_the_options_drops_a_legacy_interval(hass: HomeAssistant) -
 
     assert LEGACY_INTERVAL not in entry.options
     assert entry.state is ConfigEntryState.LOADED
-    assert entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_an_options_change_leaves_a_running_timer_at_one_minute(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await press(hass, SLEEP_BUTTON)
 
@@ -201,7 +203,7 @@ async def test_an_options_change_leaves_a_running_timer_at_one_minute(
     )
     await hass.async_block_till_done()
 
-    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
 
 
 async def test_no_update_listener_is_left_to_apply_an_interval(
@@ -213,7 +215,7 @@ async def test_no_update_listener_is_left_to_apply_an_interval(
 async def test_saving_the_options_neither_reloads_nor_syncs(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = init_integration.runtime_data
+    clients = len(server.clients)
     calls = server.device_list_calls
 
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
@@ -223,5 +225,6 @@ async def test_saving_the_options_neither_reloads_nor_syncs(
     )
     await hass.async_block_till_done()
 
-    assert init_integration.runtime_data is coordinator
+    assert init_integration.state is ConfigEntryState.LOADED
+    assert len(server.clients) == clients  # not reloaded: no new client signed in
     assert server.device_list_calls == calls

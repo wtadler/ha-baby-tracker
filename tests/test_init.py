@@ -10,7 +10,8 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.nighp_baby_tracker.const import (
     CONF_DEVICE_UUID,
@@ -25,7 +26,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 from . import BABY_ONE, NEW_PASSWORD
 from .factories import DEVICE_A, DEVICE_B, OP_DELETE, at, volume
 from .fake_server import FakeServer
-from .helpers import tick
+from .helpers import press, sync_interval, tick
 
 DIAPER = "sensor.baby_one_last_diaper"
 
@@ -170,26 +171,33 @@ async def test_a_sync_reads_only_what_is_newer_than_what_was_seen(
 
 
 async def test_syncs_run_on_the_default_five_minute_interval(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    assert init_integration.runtime_data.update_interval == timedelta(minutes=5)
-
-
-async def test_engine_use_is_serialized_behind_one_lock(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = init_integration.runtime_data
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
+
+
+async def test_a_scheduled_sync_waits_for_a_write_in_progress(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    gate = asyncio.Event()
+    server.post_gate = gate  # the write's post waits here, so the write keeps its turn
+    write = hass.async_create_task(press(hass, "button.baby_one_wet_diaper"))
+    for _ in range(20):
+        await asyncio.sleep(0)
+    assert "post" in server.calls
     calls = server.device_list_calls
 
-    async with coordinator.lock:
-        refresh = asyncio.create_task(coordinator.async_refresh())
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=5, seconds=1))
+    for _ in range(20):
         await asyncio.sleep(0)
-        await asyncio.sleep(0)
-        assert server.device_list_calls == calls  # waiting on the lock
-        assert not refresh.done()
+    assert server.device_list_calls == calls  # the sync is waiting for the write
 
-    await refresh
-    assert server.device_list_calls == calls + 1
+    gate.set()
+    await write
+    await hass.async_block_till_done()
+
+    assert server.device_list_calls == calls + 1  # then it runs
+    assert [op for _, op, _ in server.posted] == [0]
 
 
 # Errors while running

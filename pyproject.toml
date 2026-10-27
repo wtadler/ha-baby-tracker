@@ -10,7 +10,7 @@ line-length = 100
 extend-exclude = ["custom_components/nighp_baby_tracker/pybabytracker"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D", "SLF"]
 # Home Assistant core's docstring ignores.
 ignore = ["D202", "D203", "D213", "D406", "D407", "D417"]
 

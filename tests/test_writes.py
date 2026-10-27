@@ -31,7 +31,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 )
 
 from . import EMAIL, OWN_DEVICE, OWN_DEVICE_TWO
-from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, DEVICE_A, at
+from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, DEVICE_A, DEVICE_B, at
 from .fake_server import FakeServer
 from .helpers import (
     NOW,
@@ -312,17 +312,22 @@ async def test_a_write_syncs_first_so_it_sees_records_other_devices_just_added(
     assert hass.states.get(LAST_DIAPER).state == at(30).isoformat()  # the newest by time
 
 
-async def test_a_write_before_the_first_sync_completes_syncs_first_and_then_writes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+async def test_a_write_saves_what_it_synced_and_posted(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
 ) -> None:
-    # An engine that has never synced knows no babies; the write must sync before it posts.
-    init_integration.runtime_data.engine = SyncEngine(OWN_DEVICE)
+    server.add_record(
+        DEVICE_B, "Diaper", "D0000000-0000-4000-8000-0000000000C1", when=at(30), status=1
+    )
 
     await press(hass, button("baby_one", "wet"))
 
-    [(number, op, record)] = posted(server)
-    assert (number, op) == (1, OP_ADD)
-    assert record.baby.object_id == BABY_ONE_ID
+    saved = hass_storage[f"{DOMAIN}.{init_integration.entry_id}"]["data"]
+    assert saved["last_seen"][DEVICE_B] == 1  # the sync before the post
+    assert saved["last_seen"][OWN_DEVICE] == 1  # and the post itself
+    assert [op for _, op, _ in posted(server)] == [OP_ADD]
 
 
 async def test_a_failed_sync_before_a_write_posts_nothing(
@@ -652,38 +657,6 @@ async def test_a_removed_entry_forgets_its_gap_clock(
     await _fail_to_write(hass)
 
     assert _gap_issue(hass, init_integration) is None
-
-
-def test_writes_use_the_coordinators_public_write_method_not_its_private_members() -> None:
-    source = (INTEGRATION / "writes.py").read_text()
-    assert "SLF001" not in source
-    assert "_async_save" not in source
-    assert "_snapshot" not in source
-    assert "coordinator.lock" not in source
-
-
-async def test_the_coordinators_write_method_locks_syncs_saves_and_publishes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    coordinator = init_integration.runtime_data
-    seen: dict[str, Any] = {}
-
-    async def operation(engine: SyncEngine, client: Any) -> str:
-        seen["locked"] = coordinator.lock.locked()
-        seen["engine"] = engine is coordinator.engine
-        seen["client"] = client is coordinator.client
-        return "result"
-
-    updates: list[object] = []
-    coordinator.async_add_listener(lambda: updates.append(1))
-    with patch.object(Store, "async_save", autospec=True) as save:
-        result = await coordinator.async_write(operation)
-
-    assert result == "result"
-    assert seen == {"locked": True, "engine": True, "client": True}
-    assert server.calls[0] == "devices"  # it synced first
-    assert save.call_count == 1
-    assert updates
 
 
 async def test_a_gap_in_the_own_log_still_saves_state(

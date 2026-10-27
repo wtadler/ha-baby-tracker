@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import EVENT_STATE_REPORTED
+from homeassistant.const import EVENT_STATE_REPORTED, STATE_UNAVAILABLE
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -29,7 +29,7 @@ from custom_components.nighp_baby_tracker.sensor import (
     BabyTrackerTodaySensor,
 )
 
-from .factories import BABY_ONE_ID, BABY_TWO_ID, OP_UPDATE, at, baby_payload
+from .factories import BABY_ONE_ID, OP_UPDATE, at, baby_payload
 from .fake_server import FakeServer
 from .helpers import tick
 
@@ -236,70 +236,13 @@ async def test_a_record_changed_by_another_phone_still_updates_the_sensor(
 async def test_a_pump_alone_reaches_the_account_sensor_on_a_refresh(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    """The last pump lives in the coordinator's data, so a pump-only change isn't dropped."""
+    """The last pump lives in the sync data, so a pump-only change isn't dropped."""
     assert hass.states.get(LAST_PUMP).state == "unknown"
     server.add_pump(
         "BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45)
     )
     await tick(hass)
     assert hass.states.get(LAST_PUMP).state == at(45).isoformat()
-
-
-async def test_the_coordinator_data_is_one_frozen_object_holding_the_last_pump(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    server.add_pump(
-        "BBBBBBBB-0000-4000-8000-00000000000B", "F0000000-0000-4000-8000-000000000001", when=at(45)
-    )
-    await tick(hass)
-    data = init_integration.runtime_data.data
-    assert set(data.babies) == {BABY_ONE_ID, BABY_TWO_ID}
-    assert data.last_pump is not None
-    assert data.last_pump.time == at(45)
-    with pytest.raises(AttributeError):
-        data.last_pump = None  # type: ignore[misc]
-
-
-async def test_building_a_snapshot_changes_nothing(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    """``_snapshot`` is a pure builder: no pruning, no interval change, no saves."""
-    coordinator = init_integration.runtime_data
-    from custom_components.nighp_baby_tracker.timers import NursingTimer
-
-    orphan = "99999999-0000-4000-8000-000000000099"
-    now = at(0)
-    coordinator.nursing[orphan] = NursingTimer(
-        object_id="AB000000-0000-4000-8000-000000000001",
-        started=now,
-        side="left",
-        side_started=now,
-    )
-    interval = coordinator.update_interval
-
-    coordinator._snapshot()
-
-    assert orphan in coordinator.nursing
-    assert coordinator.update_interval == interval
-
-
-async def test_an_orphaned_nursing_timer_is_pruned_by_the_next_update_and_saved(
-    hass: HomeAssistant, init_integration: MockConfigEntry, hass_storage: dict[str, Any]
-) -> None:
-    from custom_components.nighp_baby_tracker.timers import NursingTimer
-
-    coordinator = init_integration.runtime_data
-    orphan = "99999999-0000-4000-8000-000000000099"
-    coordinator.nursing[orphan] = NursingTimer(
-        object_id="AB000000-0000-4000-8000-000000000001",
-        started=at(0),
-        side="left",
-        side_started=at(0),
-    )
-    await tick(hass)
-    assert orphan not in coordinator.nursing
-    key = f"{DOMAIN}.{init_integration.entry_id}.nursing"
-    assert orphan not in hass_storage[key]["data"]
 
 
 # Errors carry translation keys
@@ -319,13 +262,17 @@ async def test_a_failed_first_sync_is_reported_with_a_translation_key(
 
 
 async def test_a_failed_later_sync_raises_a_translated_update_failure(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     server.request_error = BabyTrackerConnectionError("offline")
     await tick(hass)
-    error = init_integration.runtime_data.last_exception
-    assert error.translation_domain == DOMAIN
-    assert error.translation_key == "sync_failed_update"
+
+    assert hass.states.get(DIAPER).state == STATE_UNAVAILABLE
+    # The message is the translated one, not the key.
+    assert "Couldn't sync with the service: offline" in caplog.text
 
 
 async def test_a_rejected_login_is_reported_with_a_translation_key(

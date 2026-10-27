@@ -34,7 +34,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 from . import BABY_ONE, BABY_TWO
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, record_payload
 from .fake_server import FakeServer
-from .helpers import NOW, device_id, get_baby_device, posted, press, tick, undo
+from .helpers import NOW, device_id, get_baby_device, posted, press, sync_interval, tick, undo
 
 PHONE_SLEEP = "5EE90000-0000-4000-8000-000000000001"
 PHONE_SLEEP_TWO = "5EE90000-0000-4000-8000-000000000002"
@@ -52,6 +52,16 @@ TWO_ASLEEP = "binary_sensor.baby_two_asleep"
 
 
 # Helpers
+
+
+@pytest.fixture(autouse=True)
+def _start_at_now(freezer: Any) -> None:
+    """Freeze the clock at NOW before anything is set up.
+
+    Timers scheduled at setup then share the clock the tests move, so moving it forward and
+    ticking reaches them the way it does in core's tests.
+    """
+    freezer.move_to(NOW)
 
 
 def minutes(n: float) -> datetime:
@@ -81,8 +91,8 @@ def phone_ends_sleep(
 
 
 async def sync(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    await entry.runtime_data.async_refresh()
-    await hass.async_block_till_done()
+    """Let the clock reach the next scheduled sync."""
+    await tick(hass)
 
 
 async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
@@ -95,14 +105,6 @@ def state(hass: HomeAssistant, entity_id: str) -> Any:
     found = hass.states.get(entity_id)
     assert found is not None, f"{entity_id} doesn't exist"
     return found
-
-
-def sleeps(entry: MockConfigEntry, object_id: str) -> list[Sleep]:
-    return [
-        r
-        for r in entry.runtime_data.engine.records.values()
-        if isinstance(r, Sleep) and r.object_id == object_id
-    ]
 
 
 def nursing_posts(server: FakeServer) -> list[Nursing]:
@@ -211,7 +213,7 @@ async def test_a_sleep_press_while_a_phone_started_sleep_runs_ends_it_now(
     assert record.timestamp == NOW
     assert state(hass, ASLEEP).state == "off"
     assert state(hass, SLEEP_TIMER).state == "unknown"
-    assert len(sleeps(init_integration, PHONE_SLEEP)) == 1
+    assert state(hass, LAST_SLEEP).attributes["duration_minutes"] == 40  # one sleep, now ended
 
 
 async def test_a_second_sleep_press_ends_the_sleep_home_assistant_started(
@@ -296,14 +298,10 @@ async def test_a_phone_and_home_assistant_ending_one_sleep_leave_one_finished_sl
     await press(hass, SLEEP_BUTTON)
     await sync(hass, init_integration)
 
-    [only] = sleeps(init_integration, PHONE_SLEEP)
-    assert not only.is_running
-    assert only.duration == 39  # the phone's end is newer, so it wins
+    assert state(hass, LAST_SLEEP).attributes["duration_minutes"] == 39  # the phone's end wins
     assert [(n, op) for n, op, _ in posted(server)] == [(1, OP_UPDATE)]
     assert state(hass, ASLEEP).state == "off"
-    assert [
-        s for s in init_integration.runtime_data.engine.records.values() if isinstance(s, Sleep)
-    ] == [only]
+    assert state(hass, SLEEP_TIMER).state == "unknown"
 
 
 async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
@@ -661,7 +659,8 @@ async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
     [(_, op1, added), (_, op2, deleted)] = posted(server)
     assert (op1, op2) == (OP_ADD, OP_DELETE)
     assert deleted.object_id == added.object_id
-    assert added.object_id not in init_integration.runtime_data.engine.records
+    assert state(hass, "sensor.baby_one_last_feed").state == "unknown"  # the nursing is gone
+    assert state(hass, NURSING_TIMER).state == "unknown"
 
 
 # Nursing: the actions
@@ -783,65 +782,52 @@ async def test_removing_the_entry_deletes_the_saved_nursing_timers(
 async def test_a_running_synced_sleep_polls_every_minute_and_then_returns_to_the_interval(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = init_integration.runtime_data
-    assert coordinator.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
     start = dt_util.utcnow().replace(microsecond=0) - timedelta(minutes=10)
     phone_sleep(server, start=start)
     await tick(hass, minutes=5)  # the five-minute sync finds the running sleep
-    assert coordinator.update_interval == timedelta(minutes=1)
-
-    calls = server.device_list_calls
-    await tick(hass, minutes=1)
-    assert server.device_list_calls == calls + 1
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     phone_ends_sleep(server, PHONE_SLEEP, start=start, duration=11, changed=start)
     await tick(hass, minutes=1)
-    assert coordinator.update_interval == timedelta(minutes=5)
     assert state(hass, ASLEEP).state == "off"
-    calls = server.device_list_calls
-    await tick(hass, minutes=2)
-    assert server.device_list_calls == calls  # no sync a minute or two later
-    await tick(hass, minutes=5)
-    assert server.device_list_calls == calls + 1
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_nursing_timer_polls_every_minute_and_then_returns_to_the_interval(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
-    coordinator = init_integration.runtime_data
     await nurse(hass, freezer, (0, "left"))
-    assert coordinator.update_interval == timedelta(minutes=1)
-    calls = server.device_list_calls
-    freezer.move_to(minutes(1))
-    await tick(hass, minutes=0)
-    assert server.device_list_calls == calls + 1
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
 
     await nurse(hass, freezer, (2, "left"))
 
-    assert coordinator.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_sleep_home_assistant_starts_switches_polling_at_once(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
-    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
     freezer.move_to(minutes(3))
     await press(hass, SLEEP_BUTTON)
-    assert init_integration.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_second_account_polls_on_its_own_schedule(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     second_entry: MockConfigEntry,
+    server: FakeServer,
+    second_server: FakeServer,
     freezer: Any,
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
 
-    assert init_integration.runtime_data.update_interval == timedelta(minutes=1)
-    assert second_entry.runtime_data.update_interval == timedelta(minutes=5)
+    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, second_server) == timedelta(minutes=5)
 
 
 # Baby two's sleep, from a phone
@@ -868,13 +854,19 @@ async def test_a_nursing_stop_waiting_for_the_lock_counts_the_time_until_it_gets
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await nurse(hass, freezer, (0, "left"))
-    coordinator = init_integration.runtime_data
     freezer.move_to(minutes(5))
-    async with coordinator.lock:  # a sync is running
-        stop = hass.async_create_task(press(hass, NURSE_LEFT))
-        for _ in range(5):
-            await asyncio.sleep(0)
-        freezer.move_to(minutes(8))
+    gate = asyncio.Event()
+    server.post_gate = gate  # another write holds its turn at the post
+    busy = hass.async_create_task(press(hass, "button.baby_two_wet_diaper"))
+    for _ in range(20):
+        await asyncio.sleep(0)
+    assert "post" in server.calls
+    stop = hass.async_create_task(press(hass, NURSE_LEFT))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    freezer.move_to(minutes(8))
+    gate.set()
+    await busy
     await stop
 
     [record] = nursing_posts(server)
@@ -908,7 +900,10 @@ async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
 
 
 async def test_a_saved_nursing_timer_for_a_baby_no_longer_in_the_account_is_dropped(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, hass_storage: dict[str, Any]
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
 ) -> None:
     key = f"{DOMAIN}.{mock_config_entry.entry_id}.nursing"
     gone = "99999999-0000-4000-8000-000000000099"
@@ -925,19 +920,25 @@ async def test_a_saved_nursing_timer_for_a_baby_no_longer_in_the_account_is_drop
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    coordinator = mock_config_entry.runtime_data
-    assert coordinator.update_interval == timedelta(minutes=5)
-    assert gone not in coordinator.nursing
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    assert state(hass, NURSING_TIMER).state == "unknown"  # no timer runs for anyone
     assert gone not in hass_storage[key]["data"]
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_nursing_timer_that_cannot_be_saved_raises_but_still_runs(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
 ) -> None:
-    coordinator = init_integration.runtime_data
     freezer.move_to(NOW)
+    real_save = Store.async_save
+
+    async def save(self: Store[Any], data: Any) -> None:
+        if self.key.endswith(".nursing"):
+            raise OSError("disk full")
+        await real_save(self, data)
+
     with (
-        patch.object(coordinator._nursing_store, "async_save", side_effect=OSError("disk full")),
+        patch.object(Store, "async_save", save),
         pytest.raises(HomeAssistantError) as err,
     ):
         await press(hass, NURSE_LEFT)

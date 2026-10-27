@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import probatio
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -983,9 +984,9 @@ async def test_a_bottle_press_uses_the_options_as_they_are_after_a_change(
 
 
 async def test_changing_the_bottle_options_does_not_reload_the_entry(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    coordinator = init_integration.runtime_data
+    clients = len(server.clients)
 
     await set_options(
         hass,
@@ -993,7 +994,8 @@ async def test_changing_the_bottle_options_does_not_reload_the_entry(
         **{CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
     )
 
-    assert init_integration.runtime_data is coordinator
+    assert init_integration.state is ConfigEntryState.LOADED
+    assert len(server.clients) == clients  # not reloaded: no new client signed in
     assert init_integration.options[CONF_BOTTLE_SIZE] == 5
 
 
