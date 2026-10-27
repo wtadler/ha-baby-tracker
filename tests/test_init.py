@@ -93,7 +93,7 @@ from .helpers import (
 def add_old_pump_entity(
     hass: HomeAssistant, entry: MockConfigEntry, baby_id: str, name: str
 ) -> er.RegistryEntry:
-    """What an earlier version registered: ``<baby_id>_last_pump`` on the baby's device."""
+    """Register a legacy per-baby ``<baby_id>_last_pump`` sensor on the baby's device."""
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id, identifiers={(DOMAIN, baby_id)}, name=name
     )
@@ -111,7 +111,7 @@ def add_old_pump_entity(
 def add_old_timer_button(
     hass: HomeAssistant, entry: MockConfigEntry, baby_id: str, key: str, name: str = "Baby"
 ) -> er.RegistryEntry:
-    """What an earlier version registered: a button ``<baby_id>_<key>`` on the baby's device."""
+    """Register a legacy ``<baby_id>_<key>`` timer button on the baby's device."""
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id, identifiers={(DOMAIN, baby_id)}, name=name
     )
