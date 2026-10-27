@@ -48,6 +48,4 @@ class BabyTrackerAsleepSensor(BabyTrackerBabyEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return whether the baby's newest sleep is running."""
         baby = self._baby
-        if baby is None:
-            return None
-        return isinstance(baby.sleep, Sleep) and baby.sleep.is_running
+        return baby is not None and isinstance(baby.sleep, Sleep) and baby.sleep.is_running

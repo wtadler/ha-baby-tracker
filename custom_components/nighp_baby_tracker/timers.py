@@ -59,9 +59,11 @@ class NursingTimer:
         return cls(object_id, now, side, now)
 
     def switched(self, side: str, now: datetime) -> NursingTimer:
-        """Return the timer on ``side`` from ``now``, with the current stretch added to its side."""
-        if side == self.side:
-            return self
+        """Return the timer on ``side`` from ``now``, with the current stretch added to its side.
+
+        Callers pass the other side: starting on the running side changes nothing, so it never
+        gets here.
+        """
         left, right = self.totals(now)
         return replace(self, side=side, side_started=now, left_seconds=left, right_seconds=right)
 

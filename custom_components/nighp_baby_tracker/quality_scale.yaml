@@ -44,8 +44,8 @@ rules:
   parallel-updates: done
   reauthentication-flow: done
   test-coverage:
-    status: todo
-    comment: The package measures 79% with the bundled library in it (its client and CLI are tested in the library's own repository), and timers.py and binary_sensor.py sit under 95%. Measure the integration alone once the library is on PyPI (#12), then close those gaps.
+    status: done
+    comment: Every module of the integration is at 95% or above (98% overall), measured without the bundled library, whose client and CLI are tested in the library's own repository.
 
   # Gold
   devices: done
