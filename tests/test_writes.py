@@ -854,8 +854,8 @@ async def test_a_baby_device_of_an_unloaded_entry_is_not_loaded_even_when_anothe
     server: FakeServer,
     second_server: FakeServer,
 ) -> None:
-    # A device belongs to exactly one config entry (Home Assistant 2026.10), so it is never routed
-    # to the other, loaded account.
+    # A device belongs to exactly one config entry (Home Assistant 2026.9 and later), so it is
+    # never routed to the other, loaded account.
     baby_device = device_id(hass, BABY_ONE_ID)
     await hass.config_entries.async_unload(setup_entry.entry_id)
 
