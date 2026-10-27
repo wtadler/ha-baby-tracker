@@ -67,10 +67,10 @@ rules:
   docs-supported-functions: done
   docs-troubleshooting:
     status: done
-    comment: The README's Troubleshooting section covers reauthentication, both repairs, stale sensors, and diagnostics.
+    comment: The README's Troubleshooting section covers reauthentication, the four repairs, stale sensors, and diagnostics.
   docs-use-cases:
     status: done
-    comment: The README's Use cases section gives five, with automation examples.
+    comment: The README's Use cases section gives six, with automation examples.
   dynamic-devices: done
   entity-category:
     status: exempt

@@ -20,6 +20,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -162,6 +163,7 @@ async def test_turning_the_switch_on_posts_nothing_and_shows_the_start_time(
 async def test_turning_the_switch_on_then_off_posts_one_pump_with_equal_rounded_durations(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
+    hass.config.units = US_CUSTOMARY_SYSTEM  # the zero follows the unit system
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(NOW + timedelta(minutes=12, seconds=20))
 
@@ -340,6 +342,7 @@ async def test_the_switch_on_then_start_pump_is_the_same_error(
 async def test_stop_pump_without_an_amount_logs_the_minutes_with_an_amount_of_zero(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
+    hass.config.units = US_CUSTOMARY_SYSTEM  # the zero follows the unit system
     await start(hass, init_integration)
     freezer.move_to(minutes(7))
 
@@ -911,3 +914,50 @@ async def test_a_pump_with_a_real_amount_still_shows_it(
     await sync(hass, init_integration)
 
     assert state(hass, LAST_PUMP).attributes["amount"] == 120
+
+
+async def test_stop_pump_with_no_amount_and_an_explicit_ml_writes_a_zero_in_ml(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await start(hass, init_integration)
+    freezer.move_to(minutes(5))
+
+    await stop(hass, init_integration, unit="mL")
+
+    record = only_pump(server)
+    assert record.to_payload()["amount"]["englishMeasure"] == "false"
+    assert record.volume == Volume(0, "ml")
+
+
+async def test_stop_pump_with_no_amount_and_an_explicit_fl_oz_writes_a_zero_in_ounces(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await start(hass, init_integration)
+    freezer.move_to(minutes(5))
+
+    await stop(hass, init_integration, unit="fl. oz.")
+
+    assert only_pump(server).volume == Volume(0, "oz")
+
+
+async def test_with_no_amount_and_no_unit_the_zero_follows_the_bottle_unit_the_account_uses(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    from .helpers import set_options
+
+    cases = [
+        (US_CUSTOMARY_SYSTEM, {}, Volume(0, "oz")),
+        (METRIC_SYSTEM, {}, Volume(0, "ml")),
+        (US_CUSTOMARY_SYSTEM, {"bottle_unit": "mL"}, Volume(0, "ml")),
+    ]
+    for index, (units, options, expected) in enumerate(cases):
+        hass.config.units = units
+        if options:
+            await set_options(
+                hass, init_integration, bottle_size=120, bottle_type="formula", **options
+            )
+        server.posted.clear()
+        await start(hass, init_integration)
+        freezer.move_to(minutes(5 + index * 10))
+        await stop(hass, init_integration)
+        assert only_pump(server).volume == expected, (units, options)

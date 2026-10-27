@@ -643,13 +643,18 @@ async def async_stop_pump(
     """Stop the pump timer and write one finished pump.
 
     The record starts when the timer did and has equal whole minutes on both sides. ``amount``
-    (fl. oz. unless ``unit`` says mL) is the total; without it the record's amount is 0, as the
-    app writes a timed pump with no volume. A bad
+    (fl. oz. unless ``unit`` says mL) is the total; without it the record's amount is 0 (as the
+    app writes a timed pump with no volume), in ``unit`` or else the Bottle button's unit. A bad
     amount is refused and the timer keeps running. The timer is cleared only once the write
     succeeds, and the record's ID was fixed at the start, so stopping again after an error can't
     write twice.
     """
     volume = _volume(_checked_amount(amount), unit) if amount is not None else None
+    # The unit of the zero written when there's no amount: the one given, else the unit the
+    # Bottle button uses (the options, or fl. oz. / mL by the unit system).
+    if unit is None:
+        unit = configured_bottle(coordinator.hass, coordinator.config_entry.options)[1]
+    zero_unit = _volume(0, unit).unit
     async with coordinator.exclusive():
         timer = coordinator.pump
         if timer is None:
@@ -663,6 +668,7 @@ async def async_stop_pump(
             return await engine.add_pump(
                 client,
                 amount=volume,
+                default_unit=zero_unit,
                 left_minutes=length,
                 right_minutes=length,
                 time=start,
