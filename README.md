@@ -201,8 +201,8 @@ sends no notifications; the blueprint does, from the timer sensors.
 ## Removing a baby
 
 A baby you delete in the app is removed from Home Assistant, with its device and entities, at the
-next sync. A baby you add back later gets its device and entities again. You can also delete the
-device of a baby that has left your account from its device page (**Delete** in the device's menu).
+next sync. A baby you add back later gets its device and entities again. If a baby's device is
+ever left behind, you can delete it from its device page (**Delete** in the device's menu).
 A baby still on the account can't be deleted, because the next sync would add it back, and neither
 can the account's own device.
 

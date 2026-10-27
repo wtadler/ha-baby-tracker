@@ -348,5 +348,5 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                     and identifier not in data.babies
                     and self.engine.is_deleted(identifier)
                 ):
-                    registry.async_update_device(device.id, remove_config_entry_id=entry_id)
+                    registry.async_remove_device(device.id)
                     break
