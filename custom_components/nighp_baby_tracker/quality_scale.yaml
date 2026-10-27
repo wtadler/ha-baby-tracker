@@ -59,26 +59,26 @@ rules:
   docs-data-update: done
   docs-examples: done
   docs-known-limitations:
-    status: todo
-    comment: The README states the limits in passing (a phone's running nursing timer isn't visible, a sleep is capped at 24 hours) but has no section that gathers them.
+    status: done
+    comment: The README's Known limitations section gathers them.
   docs-supported-devices:
     status: exempt
     comment: The integration connects to an account in the app's cloud service. The babies it shows as devices are records in that account, not physical devices.
   docs-supported-functions: done
   docs-troubleshooting:
-    status: todo
-    comment: The README covers a changed password and the repair for a stalled log, but has no troubleshooting section that gathers them.
+    status: done
+    comment: The README's Troubleshooting section covers reauthentication, both repairs, stale sensors, and diagnostics.
   docs-use-cases:
-    status: todo
-    comment: The README has the live activity blueprint as one example and no section on what to use the integration for.
+    status: done
+    comment: The README's Use cases section gives five, with automation examples.
   dynamic-devices: done
   entity-category:
     status: exempt
     comment: Every entity (the buttons, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
   entity-device-class: done
   entity-disabled-by-default:
-    status: todo
-    comment: Undecided whether the sleep and nursing timer sensors, which only the live activity blueprint reads, and the three per-type diaper buttons should start disabled.
+    status: done
+    comment: No entity starts disabled. The timer sensors drive the live activity blueprint, and the diaper buttons are the integration's main use, so none is a less popular entity.
   entity-translations: done
   exception-translations: done
   icon-translations: done
