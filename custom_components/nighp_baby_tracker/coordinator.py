@@ -210,7 +210,9 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 nursing=self.timers.nursing.get(baby_id),
             )
         return BabyTrackerData(
-            babies=babies, last_pump=self.engine.latest_pump(), pump=self.timers.pump
+            babies=babies,
+            last_pump=self.engine.latest_pump(),
+            pump=self.timers.pump,
         )
 
     def _rebuild(self) -> BabyTrackerData:
