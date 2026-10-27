@@ -371,6 +371,7 @@ async def test_removing_a_deleted_baby_logs_no_warning_or_error(
     assert noisy == []
 
 
+@pytest.mark.engine
 async def test_a_corrupt_store_removes_no_device_until_a_real_delete_syncs(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

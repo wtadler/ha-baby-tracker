@@ -187,6 +187,7 @@ async def test_a_diaper_from_another_device_is_counted_after_the_next_sync(
     assert _breakdown(state) == (0, 1, 0)
 
 
+@pytest.mark.engine
 async def test_a_diaper_dated_today_but_deleted_is_not_counted(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -199,6 +200,7 @@ async def test_a_diaper_dated_today_but_deleted_is_not_counted(
     assert _breakdown(state) == (1, 0, 0)
 
 
+@pytest.mark.engine
 async def test_a_diaper_deleted_after_the_first_sync_drops_out_of_the_count(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -210,6 +212,7 @@ async def test_a_diaper_deleted_after_the_first_sync_drops_out_of_the_count(
     assert baby_value(hass, "diapers_today") == "0"
 
 
+@pytest.mark.engine
 async def test_a_diaper_edited_to_another_day_leaves_the_count(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -245,6 +248,7 @@ async def test_other_feeds_pump_sessions_and_diapers_are_not_feeds(
     assert baby_value(hass, "feeds_today") == "0"
 
 
+@pytest.mark.engine
 async def test_a_deleted_feed_is_not_counted(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -336,6 +340,7 @@ async def test_a_bottle_with_no_readable_unit_counts_as_a_feed_but_adds_no_volum
     assert float(baby_value(hass, "bottle_volume_today")) == pytest.approx(60)
 
 
+@pytest.mark.engine
 async def test_a_deleted_bottle_is_not_summed(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -349,6 +354,7 @@ async def test_a_deleted_bottle_is_not_summed(
     assert float(baby_value(hass, "bottle_volume_today")) == 0
 
 
+@pytest.mark.engine
 async def test_a_bottle_edited_to_a_new_amount_changes_the_total(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:
@@ -391,6 +397,7 @@ async def test_a_baby_whose_records_are_all_old_has_zero_counts(
     assert baby_value(hass, "feeds_today") == "0"
 
 
+@pytest.mark.engine
 async def test_a_raw_record_the_library_cannot_model_is_ignored_by_the_counts(
     hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
 ) -> None:

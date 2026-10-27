@@ -78,6 +78,7 @@ async def test_babies_do_not_share_records(
     )
 
 
+@pytest.mark.engine
 async def test_an_older_record_arriving_later_does_not_replace_the_newest(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -86,6 +87,7 @@ async def test_an_older_record_arriving_later_does_not_replace_the_newest(
     assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
 
 
+@pytest.mark.engine
 async def test_a_deleted_latest_diaper_falls_back_to_the_previous_one(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -179,6 +181,7 @@ async def test_a_baby_with_only_a_diaper_has_unknown_other_sensors(
         assert state.attributes[attribute] is None
 
 
+@pytest.mark.engine
 async def test_a_record_type_the_integration_does_not_model_breaks_nothing(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -193,6 +196,7 @@ async def test_a_record_type_the_integration_does_not_model_breaks_nothing(
         assert _sensor_state(hass, "baby_one", key).state == "unknown"
 
 
+@pytest.mark.engine
 async def test_a_modeled_type_with_values_the_library_cannot_read_breaks_nothing(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -210,6 +214,7 @@ async def test_a_modeled_type_with_values_the_library_cannot_read_breaks_nothing
     assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
 
 
+@pytest.mark.engine
 async def test_an_undecodable_transaction_breaks_nothing(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -232,6 +237,7 @@ async def test_babies_are_restored_from_saved_state_after_a_restart(
         assert _sensor_state(hass, baby, "last_diaper").state != "unknown"
 
 
+@pytest.mark.engine
 async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

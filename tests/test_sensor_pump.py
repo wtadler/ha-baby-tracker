@@ -179,6 +179,7 @@ async def test_a_pumped_bottle_is_not_a_pump_session(
     assert state_of(hass, init_integration).state == "unknown"
 
 
+@pytest.mark.engine
 async def test_a_deleted_pump_falls_back_to_the_one_before(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

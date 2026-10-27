@@ -90,6 +90,7 @@ async def test_the_diaper_note_is_an_attribute_when_there_is_one(
     assert _sensor_state(hass, "baby_two", "last_diaper").attributes["note"] is None
 
 
+@pytest.mark.engine
 async def test_an_edit_from_another_device_updates_the_details(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -186,6 +187,7 @@ async def test_ending_a_sleep_updates_the_duration(
     assert state.attributes["duration_minutes"] == 40
 
 
+@pytest.mark.engine
 async def test_a_feed_with_an_amount_in_an_unexpected_shape_still_shows(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

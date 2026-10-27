@@ -71,6 +71,7 @@ async def test_setup_backfills_each_device_from_the_start(
     assert hass.states.get(DIAPER).state != "unknown"
 
 
+@pytest.mark.engine
 async def test_first_setup_pages_through_a_long_log_in_one_sync(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -297,6 +298,7 @@ async def test_a_restart_fetches_only_what_is_newer(
     assert hass.states.get(DIAPER).state == at(120).isoformat()
 
 
+@pytest.mark.engine
 @pytest.mark.parametrize(
     "corrupt",
     [
@@ -398,6 +400,7 @@ async def test_repeated_reloads_leave_one_open_client(
     assert len(server.open_clients) == 1
 
 
+@pytest.mark.engine
 async def test_a_deleted_record_from_another_device_is_dropped(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -423,6 +426,7 @@ async def test_a_deleted_record_from_another_device_is_dropped(
     assert hass.states.get(DIAPER).state == at(0).isoformat()
 
 
+@pytest.mark.engine
 async def test_volumes_in_the_sync_format_do_not_break_a_sync(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -438,6 +442,7 @@ async def test_volumes_in_the_sync_format_do_not_break_a_sync(
     assert hass.states.get("sensor.baby_one_last_feed").state == at(15).isoformat()
 
 
+@pytest.mark.engine
 async def test_saved_state_from_the_earlier_library_version_still_loads(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
