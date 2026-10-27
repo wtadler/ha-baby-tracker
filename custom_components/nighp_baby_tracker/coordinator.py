@@ -286,12 +286,13 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         today = dt_util.now().date()
         start = dt_util.start_of_local_day(today)
         end = dt_util.start_of_local_day(today + timedelta(days=1))
-        deleted = self._deleted_baby_ids()
         names = {
-            baby_id: name for baby_id, name in self._baby_names.items() if baby_id not in deleted
+            baby_id: name
+            for baby_id, name in self._baby_names.items()
+            if not self.engine.is_deleted(baby_id)
         }
         for baby_id, baby in self.engine.babies().items():
-            if baby_id not in deleted:
+            if not self.engine.is_deleted(baby_id):
                 names[baby_id] = baby.name
         babies: dict[str, BabyData] = {}
         for baby_id, name in names.items():
@@ -306,18 +307,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 nursing=self.nursing.get(baby_id),
             )
         return BabyTrackerData(babies=babies, last_pump=self.engine.latest_pump())
-
-    def _deleted_baby_ids(self) -> set[str]:
-        """Return the IDs of babies the account deleted, and no one has added back since.
-
-        The app deletes a baby by posting a delete (opcode 2) of its ``Baby`` record, and the
-        baby's older records can stay in the logs, still embedding it, so ``engine.babies()``
-        alone would keep listing it. The library keeps a tombstone for every deleted record and
-        exposes them only in its saved state, so that is where this reads them. A baby whose
-        records are all deleted, with no delete of the baby itself, is not counted: the sync data
-        can't tell that apart from a baby with nothing logged yet.
-        """
-        return {entry["object_id"] for entry in self.engine.to_dict()["tombstones"]}
 
     def _rebuild(self) -> BabyTrackerData:
         """Build the data, then do what a new snapshot calls for.

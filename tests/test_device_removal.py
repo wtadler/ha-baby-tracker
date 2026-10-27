@@ -6,6 +6,7 @@ through the fake sync server and Home Assistant's own device-removal command.
 """
 
 from typing import Any
+from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -15,6 +16,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.nighp_baby_tracker.const import account_identifier
+from custom_components.nighp_baby_tracker.pybabytracker import SyncEngine
 
 from . import BABY_TWO
 from .factories import (
@@ -229,3 +231,15 @@ async def test_nothing_can_be_removed_while_the_entry_is_not_loaded(
     assert await hass.config_entries.async_unload(init_integration.entry_id)
 
     assert not await remove_device(hass, hass_ws_client, init_integration, device)
+
+
+async def test_a_sync_and_refresh_do_not_encode_the_engine_to_find_deleted_babies(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+) -> None:
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    with patch.object(SyncEngine, "to_dict", side_effect=AssertionError("encoded the engine")):
+        await init_integration.runtime_data.async_refresh()
+
+    assert BABY_TWO_ID not in init_integration.runtime_data.data.babies
