@@ -60,7 +60,7 @@ Each baby has three sensors. Their state is the time of the baby's newest record
 
 - A wall dashboard of last activity. Put **Last diaper**, **Last feed**, and **Last sleep** on one card. The sensors are timestamps, so the card can show how long ago each happened, for example "23 minutes ago".
 - A reminder when a feed is overdue. Send a message when **Last feed** hasn't changed for a set time. See the first example below.
-- A message when a diaper is logged on another phone, so the other caregiver knows without asking. See the second example below.
+- A message when a diaper is logged on another phone, so whoever is away knows without asking. See the second example below.
 
 ## Baby Tracker (Nighp) automation examples
 
@@ -185,7 +185,7 @@ Home Assistant couldn't connect to the Baby Tracker service.
 
 ### Symptom: Sensors are unavailable after you change your password
 
-The sensors show **Unavailable**, and the log says the service rejected the sign-in.
+The sensors show **Unavailable**, or after a restart the integration card shows that setup failed. The log says the service rejected the sign-in.
 
 #### Description
 
