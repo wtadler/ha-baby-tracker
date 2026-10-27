@@ -56,6 +56,12 @@ Each baby has three sensors. Their state is the time of the baby's newest record
 - **Last sleep**
   - **Description**: When the baby's newest sleep was logged.
 
+## Use cases
+
+- A wall dashboard of last activity. Put **Last diaper**, **Last feed**, and **Last sleep** on one card. The sensors are timestamps, so the card can show how long ago each happened, for example "23 minutes ago".
+- A reminder when a feed is overdue. Send a message when **Last feed** hasn't changed for a set time. See the first example below.
+- A message when a diaper is logged on another phone, so the other caregiver knows without asking. See the second example below.
+
 ## Baby Tracker (Nighp) automation examples
 
 These examples use a baby named Juniper, so the sensors are `sensor.juniper_last_feed` and `sensor.juniper_last_diaper`. The entity IDs in your Home Assistant follow your baby's name.
@@ -172,6 +178,26 @@ Home Assistant couldn't connect to the Baby Tracker service.
 
 1. Check that your Home Assistant instance is connected to the internet.
 2. Wait a few minutes and try again. The service may be down for a short time.
+
+{% enddetails %}
+
+{% details "Sensors are unavailable after you change your password" %}
+
+### Symptom: Sensors are unavailable after you change your password
+
+The sensors show **Unavailable**, and the log says the service rejected the sign-in.
+
+#### Description
+
+Baby Tracker rejected the saved password, usually because it was changed in the app. The integration keeps the password you entered during setup and can't ask for a new one.
+
+#### Resolution
+
+1. Go to **Settings** > **Devices & services** and select the **Baby Tracker (Nighp)** card.
+2. Remove the integration. Next to your account, select the three dots {% icon "mdi:dots-vertical" %} menu, and then select **Delete**. Confirm the deletion.
+3. Add **Baby Tracker (Nighp)** again with your email address and your current password.
+
+Adding the integration again loads your account's history again.
 
 {% enddetails %}
 

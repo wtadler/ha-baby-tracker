@@ -369,3 +369,25 @@ def test_the_source_comment_states_the_scope_and_the_polling_caveat() -> None:
     top = body.lstrip().split("\n\n", 1)[0]
     assert "user config flow, coordinator, Last diaper, Last feed, and Last sleep sensors" in top
     assert "every minute while a timer runs" in top
+
+
+def test_the_troubleshooting_section_covers_a_changed_password_without_a_prompt() -> None:
+    # The first core PR has no reauthentication step, so the way out is to add the account again.
+    _, body = _split()
+    section = body.split("## Troubleshooting", 1)[-1].split("\n## ", 1)[0]
+    assert "change your password" in section
+    assert "remove the integration" in section.lower()
+    assert re.search(r"add .*baby tracker \(nighp\).* again", section.lower())
+
+
+def test_the_page_has_a_use_cases_section_grounded_in_the_three_sensors() -> None:
+    _, body = _split()
+    assert re.search(r"^## Use cases$", body, re.MULTILINE)
+    section = body.split("## Use cases", 1)[-1].split("\n## ", 1)[0]
+    for name in ("Last diaper", "Last feed", "Last sleep"):
+        assert f"**{name}**" in section
+
+
+def test_the_page_says_late_babies_need_a_reload() -> None:
+    _, body = _split()
+    assert "reload the integration or restart Home Assistant" in body
