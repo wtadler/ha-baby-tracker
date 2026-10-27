@@ -5,8 +5,11 @@ the baby's older records still in the logs and still embedding it. These tests d
 through the fake sync server and Home Assistant's own device-removal command.
 """
 
+import logging
 from typing import Any
 from unittest.mock import patch
+
+import pytest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -347,3 +350,47 @@ def entity_ids_on_wet_button(hass: HomeAssistant) -> str:
     ]
     assert len(ids) == 1
     return ids[0]
+
+
+async def test_removing_a_deleted_baby_logs_no_warning_or_error(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG):
+        server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+        await tick(hass)
+
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
+    noisy = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno >= logging.WARNING or record.name == "homeassistant.helpers.frame"
+    ]
+    assert noisy == []
+
+
+async def test_a_corrupt_store_removes_no_device_until_a_real_delete_syncs(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
+) -> None:
+    key = f"{init_integration.domain}.{init_integration.entry_id}"
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key, "data": "corrupt"}
+    assert await hass.config_entries.async_setup(init_integration.entry_id)
+    await hass.async_block_till_done()
+
+    # The fresh engine backfilled the whole log: both babies are still on the account.
+    assert init_integration.runtime_data.data.babies.keys() == {BABY_ONE_ID, BABY_TWO_ID}
+    assert get_baby_device(dr.async_get(hass), BABY_ONE_ID) is not None
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is not None
+
+    server.add_payload(DEVICE_B, BABY_TWO, op=OP_DELETE)
+    await tick(hass)
+
+    assert get_baby_device(dr.async_get(hass), BABY_ONE_ID) is not None
+    assert get_baby_device(dr.async_get(hass), BABY_TWO_ID) is None
