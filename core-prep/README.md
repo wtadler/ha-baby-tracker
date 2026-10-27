@@ -4,7 +4,21 @@ This folder holds what `scripts/core_cut.py` needs to write a planned Home Assis
 
 - `plan.yaml`: the PR each file, key, and quality-scale status belongs to.
 - `quality_scale/prNN.yaml`: the core `quality_scale.yaml` for each planned PR. They're generated: run `scripts/core_cut.py --quality-scales` after changing `plan.yaml`.
-- `overlay/prNN/`: core-only files that replace the cut's own, from that PR on. `integration/` is the integration's folder and `tests/` its tests. A snapshot is the usual case: generate it in core with `pytest --snapshot-update`, then copy it here.
+- `overlay/prNN/`: core-only files that replace the cut's own, from that PR on. `integration/` is the integration's folder and `tests/` its tests. A snapshot is the usual case. `snapshot-sources.sha256` records what the snapshot was made from, and a test in this repository fails when those sources change.
+
+## Refreshing a snapshot overlay
+
+When `test_the_pr1_snapshot_was_made_from_the_current_sources` fails (or the cut warns that a snapshot was made from other sources):
+
+```sh
+scripts/core_cut.py 1 ~/path/to/core
+(cd ~/path/to/core && python -m script.translations develop --integration nighp_baby_tracker \
+  && pytest tests/components/nighp_baby_tracker/test_sensor.py --snapshot-update)
+cp ~/path/to/core/tests/components/nighp_baby_tracker/snapshots/test_sensor.ambr core-prep/overlay/pr01/tests/snapshots/
+scripts/core_cut.py --record-snapshot 1
+```
+
+Read the snapshot's diff before committing it: it should change only the way the sources did.
 
 ## Cutting a PR
 
@@ -31,6 +45,7 @@ pytest tests/components/nighp_baby_tracker --cov=homeassistant.components.nighp_
 Python files are cut by comments, described at the top of `scripts/core_cut.py`:
 
 - `# Core PR N` on its own line marks the statement under it, and as a trailing comment marks its line (or the whole statement that starts there).
-- `# HACS-only` (or `# HACS only`) works the same way for code that never goes to core. So does a docstring line starting `HACS-only:`, and a test marked `@pytest.mark.engine`.
+- `# HACS-only` (or `# HACS only`) works the same way for code that never goes to core. So does a docstring whose summary line starts `HACS-only:`, and a test marked `@pytest.mark.engine`.
+- A marker can't mark an `elif`, `else`, `except`, `finally`, or `case` clause; mark the statements inside it.
 - `# Core: <code>` is a line core needs instead: on its own line it becomes `<code>`, and as a trailing comment it replaces its line. It's for core APIs newer than the oldest Home Assistant this repository supports.
 - A test module's docstring starts with `Core PR N` or `HACS only`, which places the whole file.

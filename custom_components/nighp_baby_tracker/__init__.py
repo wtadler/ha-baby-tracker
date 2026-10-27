@@ -80,6 +80,7 @@ async def async_setup_entry(
     return True  # HACS-only: core's entry methods return None (2026.11 and later)
 
 
+# HACS-only: the legacy button cleanup
 def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
     """Drop the Sleep and Nurse left/right buttons from the entity registry.
 
@@ -97,6 +98,7 @@ def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry
             registry.async_remove(entity.entity_id)
 
 
+# HACS-only: the config entry migration
 async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> bool:
     """Bring an older entry up to date, once.
 
@@ -114,6 +116,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry
     return True
 
 
+# HACS-only: the legacy pump cleanup
 def _remove_per_baby_last_pumps(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
     """Drop the per-baby last-pump entities (``<baby_id>_last_pump``).
 

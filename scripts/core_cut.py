@@ -4,20 +4,28 @@
 Usage:
     scripts/core_cut.py <pr-number> <core-checkout>
     scripts/core_cut.py --quality-scales
+    scripts/core_cut.py --record-snapshot <pr-number>
 
 The first form replaces ``homeassistant/components/nighp_baby_tracker/`` and
 ``tests/components/nighp_baby_tracker/`` in the checkout with everything planned for PRs 1 to
 <pr-number>, then formats them with the checkout's ruff. The second regenerates
-``core-prep/quality_scale/prNN.yaml``. The plan is ``core-prep/plan.yaml``.
+``core-prep/quality_scale/prNN.yaml``. The third records what a refreshed snapshot overlay was
+made from (see ``core-prep/README.md``). The plan is ``core-prep/plan.yaml``.
 
 Python files are cut by markers, so the cut is mechanical:
 
 - A comment line ``# Core PR N`` (or ``# HACS-only``, ``# HACS only``) marks the statement right
-  under it. Any comments directly above that statement go with it.
+  under it. Every comment directly above that statement goes with it, a section comment meant
+  for the statements after it included, so keep a blank line under a section comment.
 - The same marker as a trailing comment marks its line. When a statement starts on that line, it
-  marks the whole statement.
-- A function or class with a docstring line that starts with ``HACS-only:`` is HACS-only, and so
-  is a test marked ``@pytest.mark.engine`` (it moves to the library's repository).
+  marks the whole statement. Otherwise only that physical line goes, so it must leave a valid
+  expression behind: an item of an import list or a tuple is fine, but
+  a ``+ 2  # Core PR 7`` line inside ``x = (1 + 2)`` split over lines quietly leaves ``x = (1)``.
+- A marker can't mark an ``elif``, ``else``, ``except``, ``finally``, or ``case`` clause: that's
+  an error, because a clause isn't a statement of its own (an ``elif`` runs on through its
+  ``else``). Mark the statements inside it instead.
+- A function or class whose docstring's summary line starts with ``HACS-only:`` is HACS-only,
+  and so is a test marked ``@pytest.mark.engine`` (it moves to the library's repository).
 
 A statement for a later PR, or for HACS only, is left out. Markers left in are removed.
 
@@ -28,6 +36,7 @@ repository supports), a ``# Core: <code>`` comment gives it: as a line of its ow
 
 import argparse
 import ast
+import hashlib
 import io
 import json
 import re
@@ -53,7 +62,8 @@ GENERATED = {"manifest.json", "strings.json", "icons.json", "services.yaml", "qu
 HACS = "hacs"
 
 MARKER = re.compile(r"#\s*(?:Core PR (?P<pr>\d+)\b|(?P<hacs>HACS[- ]only)\b)")
-DOCSTRING_HACS = re.compile(r"^\s*HACS[- ]only:", re.MULTILINE)
+DOCSTRING_HACS = re.compile(r"\s*HACS[- ]only:")
+CLAUSE = re.compile(r"(elif|else|except|finally|case)\b(?!\s*[=.,)\]])")
 CORE_LINE = re.compile(r"#\s*Core:\s?(?P<code>.*)$")
 MODULE_DOCSTRING_PR = re.compile(r'^(?P<quote>"""|\'\'\')Core PRs? [^:]*: ')
 IMPORT_REWRITES = (
@@ -125,7 +135,7 @@ def _hacs_by_definition(tree: ast.AST) -> list[int]:
             continue
         docstring = ast.get_docstring(node, clean=False) or ""
         engine = any(ast.unparse(d) == "pytest.mark.engine" for d in node.decorator_list)
-        if engine or DOCSTRING_HACS.search(docstring):
+        if engine or DOCSTRING_HACS.match(docstring.split("\n", 1)[0]):
             starts.append(min([node.lineno, *(d.lineno for d in node.decorator_list)]))
     return starts
 
@@ -167,10 +177,17 @@ def cut_python(text: str, pr: int) -> str:
         if owner is None:
             continue
         keep = _included(owner, pr)
-        if full_line_comment(line) and lines[line - 1].lstrip() == lines[line - 1][column:]:
-            below = line + 1
-            while full_line_comment(below):
-                below += 1
+        own_line = full_line_comment(line) and lines[line - 1].lstrip() == lines[line - 1][column:]
+        target = line
+        if own_line:
+            while full_line_comment(target + 1):
+                target += 1
+            target += 1
+        # A clause isn't a statement of its own: an elif's range runs on through its else.
+        if 1 <= target <= len(lines) and (clause := CLAUSE.match(lines[target - 1].lstrip())):
+            raise ValueError(f"line {line}: a marker can't mark the {clause[1]} clause")
+        if own_line:
+            below = target
             if below not in spans:
                 raise ValueError(f"line {line}: {comment!r} marks no statement")
             if keep:
@@ -236,7 +253,16 @@ def _subset(data: dict[str, Any], pr: int, prefix: str = "") -> dict[str, Any]:
     return out
 
 
+def _has(data: dict[str, Any], path: str) -> bool:
+    for part in path.split("."):
+        if not isinstance(data, dict) or part not in data:
+            return False
+        data = data[part]
+    return True
+
+
 def _set(data: dict[str, Any], path: str, value: str) -> None:
+    """Set ``path`` when the subset has it: a key of a later PR is left out on purpose."""
     *parents, leaf = path.split(".")
     for parent in parents:
         if parent not in data:
@@ -248,7 +274,11 @@ def _set(data: dict[str, Any], path: str, value: str) -> None:
 
 def core_strings(pr: int) -> dict[str, Any]:
     """Return strings.json for core PR ``pr``."""
-    strings = _subset(json.loads((INTEGRATION / "strings.json").read_text()), pr)
+    source = json.loads((INTEGRATION / "strings.json").read_text())
+    for path in [*PLAN["references"], *PLAN["overrides"]]:
+        if not _has(source, path):
+            raise KeyError(f"{path} is planned in core-prep/plan.yaml but isn't in strings.json")
+    strings = _subset(source, pr)
     for path, reference in PLAN["references"].items():
         _set(strings, path, reference)
     for path, override in PLAN["overrides"].items():
@@ -378,9 +408,47 @@ def _overlays(pr: int) -> dict[Path, Path]:
             if path.is_file():
                 relative = path.relative_to(folder)
                 parts = relative.parts
-                base = COMPONENT if parts[0] == "integration" else CORE_TESTS
-                found[base.joinpath(*parts[1:])] = path
+                bases = {"integration": COMPONENT, "tests": CORE_TESTS}
+                if parts[0] in bases:
+                    found[bases[parts[0]].joinpath(*parts[1:])] = path
     return found
+
+
+# What a snapshot overlay was generated from. The snapshot is stale once any of these changes.
+SNAPSHOT_SOURCES = (
+    COMPONENT / "coordinator.py",
+    COMPONENT / "entity.py",
+    COMPONENT / "sensor.py",
+    COMPONENT / "strings.json",
+    CORE_TESTS / "conftest.py",
+    CORE_TESTS / "test_sensor.py",
+)
+
+
+SNAPSHOT_RECORD = "snapshot-sources.sha256"
+
+
+def stale_snapshot(pr: int) -> Path | None:
+    """Return the record of the overlay ``pr`` uses when its sources have changed since."""
+    records = [
+        folder / SNAPSHOT_RECORD
+        for folder in sorted((CORE_PREP / "overlay").glob("pr[0-9][0-9]"))
+        if int(folder.name[2:]) <= pr and (folder / SNAPSHOT_RECORD).exists()
+    ]
+    if not records:
+        return None
+    latest = records[-1]
+    made_for = int(latest.parent.name[2:])
+    return None if latest.read_text().strip() == snapshot_sources_hash(made_for) else latest
+
+
+def snapshot_sources_hash(pr: int) -> str:
+    """Return a hash of what the sensor snapshot for ``pr`` is generated from, as cut."""
+    files = planned_files(pr)
+    digest = hashlib.sha256()
+    for path in SNAPSHOT_SOURCES:
+        digest.update(f"{path}\n{files[path]}\n".encode())
+    return digest.hexdigest()
 
 
 def _source(path: Path, pr: int) -> str:
@@ -483,9 +551,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="regenerate core-prep/quality_scale/prNN.yaml and stop",
     )
+    parser.add_argument(
+        "--record-snapshot",
+        action="store_true",
+        help="record the sources of <pr-number>'s snapshot overlay, after refreshing it, and stop",
+    )
     args = parser.parse_args(argv)
     if args.quality_scales:
         write_quality_scales()
+        return 0
+    if args.record_snapshot:
+        if args.pr is None:
+            parser.error("give the PR whose snapshot overlay was refreshed")
+        record = CORE_PREP / "overlay" / f"pr{args.pr:02d}" / SNAPSHOT_RECORD
+        record.write_text(snapshot_sources_hash(args.pr) + "\n")
+        print(f"Recorded {record.relative_to(ROOT)}")
         return 0
     if args.pr is None or args.core is None:
         parser.error("give a PR number and a core checkout")
@@ -498,6 +578,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("no ruff found: set up the core checkout's virtual environment first")
     cut(args.pr, core, ruff=ruff)
     print(f"Cut PR {args.pr} into {core / COMPONENT} and {core / CORE_TESTS}")
+    if stale := stale_snapshot(args.pr):
+        print(
+            f"Warning: {stale.relative_to(ROOT)} was made from other sources. Refresh the "
+            "snapshot as core-prep/README.md says.",
+            file=sys.stderr,
+        )
     return 0
 
 

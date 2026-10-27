@@ -159,8 +159,7 @@ def test_a_decorated_statement_drops_with_its_decorators(core_cut: ModuleType) -
         "# HACS-only: the old cleanup\nOLD = 1\nNEW = 2\n",
         "# HACS only\nOLD = 1\nNEW = 2\n",
         "OLD = 1  # HACS-only: the old cleanup\nNEW = 2\n",
-        'def old() -> None:\n    """Clean up.\n\n    HACS-only: the old cleanup.\n    """\n\n\n'
-        "NEW = 2\n",
+        'def old() -> None:\n    """HACS-only: clean up.\n\n    More.\n    """\n\n\nNEW = 2\n',
         "@pytest.mark.engine\nasync def test_old() -> None:\n    pass\n\n\nNEW = 2\n",
     ],
     ids=["comment", "comment-with-space", "trailing", "docstring", "engine-test"],
@@ -170,6 +169,38 @@ def test_hacs_only_code_never_reaches_core(core_cut: ModuleType, source: str) ->
     assert "OLD" not in out
     assert "old" not in out
     assert out.strip().endswith("NEW = 2")
+
+
+def test_hacs_only_further_down_a_docstring_marks_nothing(core_cut: ModuleType) -> None:
+    source = 'def kept() -> None:\n    """Do it.\n\n    HACS-only: one detail of it.\n    """\n'
+    assert core_cut.cut_python(source, 1) == source
+
+
+CLAUSES = {
+    "elif": "if a:\n    x = 1\nelif b:{m}\n    x = 2\nelse:\n    x = 3\n",
+    "else": "if a:\n    x = 1\nelse:{m}\n    x = 3\n",
+    "except": "try:\n    x = 1\nexcept ValueError:{m}\n    x = 2\n",
+    "finally": "try:\n    x = 1\nfinally:{m}\n    x = 2\n",
+    "case": "match a:\n    case 1:{m}\n        x = 1\n    case _:\n        x = 2\n",
+}
+
+
+@pytest.mark.parametrize("clause", list(CLAUSES))
+def test_a_trailing_marker_on_a_clause_is_an_error(core_cut: ModuleType, clause: str) -> None:
+    source = CLAUSES[clause].format(m="  # Core PR 7")
+    with pytest.raises(ValueError, match=f"line .*: a marker can't mark the {clause} clause"):
+        core_cut.cut_python(source, 1)
+
+
+@pytest.mark.parametrize("clause", ["elif", "case"])
+def test_a_marker_line_above_a_clause_is_an_error(core_cut: ModuleType, clause: str) -> None:
+    source = CLAUSES[clause].format(m="")
+    lines = source.splitlines(keepends=True)
+    index = next(i for i, line in enumerate(lines) if line.lstrip().startswith(clause))
+    indent = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
+    lines.insert(index, f"{indent}# Core PR 7\n")
+    with pytest.raises(ValueError, match=f"a marker can't mark the {clause} clause"):
+        core_cut.cut_python("".join(lines), 1)
 
 
 def test_a_marker_with_nothing_under_it_is_an_error(core_cut: ModuleType) -> None:
@@ -260,6 +291,16 @@ def test_pr1_strings_use_core_references(core_cut: ModuleType) -> None:
     assert config["abort"]["already_configured"] == (
         "[%key:common::config_flow::abort::already_configured_account%]"
     )
+
+
+@pytest.mark.parametrize("table", ["references", "overrides"])
+def test_a_planned_string_that_is_missing_is_an_error(
+    core_cut: ModuleType, monkeypatch: pytest.MonkeyPatch, table: str
+) -> None:
+    value = {"until": 2, "text": "x"} if table == "overrides" else "[%key:x%]"
+    monkeypatch.setitem(core_cut.PLAN, table, {"config.error.renamed_away": value})
+    with pytest.raises(KeyError, match="config.error.renamed_away"):
+        core_cut.core_strings(1)
 
 
 def test_auth_failed_does_not_promise_reauthentication_before_pr2(core_cut: ModuleType) -> None:
@@ -512,3 +553,40 @@ def test_json_is_written_the_way_cores_formatter_leaves_it(
     strings = (core / COMPONENT / "strings.json").read_text()
     assert json.loads(strings) == core_cut.core_strings(1)
     assert strings.startswith('{\n  "config": {\n')
+
+
+def test_the_pr1_snapshot_was_made_from_the_current_sources(core_cut: ModuleType) -> None:
+    """Fails when the PR 1 sensors change: refresh the snapshot as core-prep/README.md says."""
+    recorded = (CORE_PREP / "overlay" / "pr01" / "snapshot-sources.sha256").read_text().strip()
+    assert core_cut.snapshot_sources_hash(1) == recorded
+
+
+def test_the_snapshot_hash_follows_the_sensor_source(
+    core_cut: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    before = core_cut.snapshot_sources_hash(1)
+    real = core_cut.planned_files
+
+    def renamed(pr: int) -> dict[Path, str]:
+        files = real(pr)
+        sensor = core_cut.COMPONENT / "sensor.py"
+        files[sensor] = files[sensor].replace("last_diaper", "latest_diaper")
+        return files
+
+    monkeypatch.setattr(core_cut, "planned_files", renamed)
+    assert core_cut.snapshot_sources_hash(1) != before
+
+
+def test_the_overlay_record_is_not_copied_into_core(core_cut: ModuleType, core: Path) -> None:
+    core_cut.cut(1, core, ruff=None)
+    assert not list(core.rglob("snapshot-sources.sha256"))
+
+
+def test_the_cut_names_a_stale_snapshot(
+    core_cut: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = CORE_PREP / "overlay" / "pr01" / "snapshot-sources.sha256"
+    assert core_cut.stale_snapshot(3) is None
+    monkeypatch.setattr(core_cut, "snapshot_sources_hash", lambda pr: "changed")
+    assert core_cut.stale_snapshot(1) == record
+    assert core_cut.stale_snapshot(3) == record
