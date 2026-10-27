@@ -43,7 +43,7 @@ rules:
   reauthentication-flow: done
   test-coverage:
     status: done
-    comment: Every module of the integration is at 95% or above (98% overall), measured without the bundled library, whose client and CLI are tested in the library's own repository.
+    comment: Every module of the integration is at 95% or above (98% overall), measured on the integration alone; the library is tested in its own repository.
 
   # Gold
   devices: done
