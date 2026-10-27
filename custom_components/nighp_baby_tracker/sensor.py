@@ -382,11 +382,15 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
 
 
 # One row per kind of sensor: its descriptions and the entity class built from each.
-ACCOUNT_SENSORS: tuple[tuple[tuple[SensorEntityDescription, ...], type[SensorEntity]], ...] = (
+ACCOUNT_SENSORS: tuple[
+    tuple[tuple[SensorEntityDescription, ...], type[BabyTrackerAccountEntity]], ...
+] = (
     ((LAST_PUMP,), BabyTrackerLastPumpSensor),
     ((PUMP_TIMER,), BabyTrackerPumpTimerSensor),
 )
-BABY_SENSORS: tuple[tuple[tuple[Any, ...], type[SensorEntity]], ...] = (
+BABY_SENSORS: tuple[
+    tuple[tuple[SensorEntityDescription, ...], type[BabyTrackerBabyEntity]], ...
+] = (
     (SENSORS, BabyTrackerSensor),
     (TODAY_SENSORS, BabyTrackerTodaySensor),
     (TIMER_SENSORS, BabyTrackerTimerSensor),
@@ -405,7 +409,7 @@ async def async_setup_entry(
     """
     coordinator = entry.runtime_data
     async_add_entities(
-        entity_class(coordinator, description)  # type: ignore[call-arg]
+        entity_class(coordinator, description)
         for descriptions, entity_class in ACCOUNT_SENSORS
         for description in descriptions
     )
@@ -419,7 +423,7 @@ async def async_setup_entry(
         known.update(new)
         for descriptions, entity_class in BABY_SENSORS:
             async_add_entities(
-                entity_class(coordinator, description, baby_id)  # type: ignore[call-arg]
+                entity_class(coordinator, description, baby_id)
                 for baby_id in new
                 for description in descriptions
             )
