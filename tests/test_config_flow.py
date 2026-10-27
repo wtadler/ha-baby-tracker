@@ -1,8 +1,10 @@
 """The setup screen, re-sign-in, and the options screen."""
 
+import ast
 import json
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -14,6 +16,7 @@ from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.nighp_baby_tracker import config_flow
 from custom_components.nighp_baby_tracker.const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
@@ -635,3 +638,17 @@ async def test_options_errors_keep_the_form_open_and_the_flow_recovers(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert init_integration.options == good
+
+
+def test_config_flow_takes_its_bottle_options_from_bottle_not_writes() -> None:
+    source = Path(config_flow.__file__).read_text()
+    imported = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.ImportFrom):
+            imported.add(f"{'.' * node.level}{node.module or ''}")
+            imported.update(f"{'.' * node.level}{node.module or ''}.{a.name}" for a in node.names)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+
+    assert not {name for name in imported if name.endswith("writes")}
+    assert ".bottle" in imported

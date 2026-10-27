@@ -9,23 +9,18 @@ the checks that refuse bad input before anything is sent.
 import logging
 import math
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
-from typing import Any
 
-from homeassistant.const import CONF_EMAIL, UnitOfVolume
+from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 
-from .const import (
-    CONF_BOTTLE_SIZE,
-    CONF_BOTTLE_TYPE,
-    CONF_BOTTLE_UNIT,
-    DOMAIN,
-)
+from .bottle import BOTTLE_KINDS, OUNCES, VOLUME_UNITS, configured_bottle
+from .const import DOMAIN
 from .coordinator import BabyTrackerCoordinator, SyncBeforeWriteError
 from .pybabytracker import (
     DIAPER_DIRTY,
@@ -33,8 +28,6 @@ from .pybabytracker import (
     DIAPER_WET,
     SIDE_LEFT,
     SIDE_RIGHT,
-    UNIT_MILLILITERS,
-    UNIT_OUNCES,
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
@@ -58,16 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DIAPER_STATUS = {"wet": DIAPER_WET, "dirty": DIAPER_DIRTY, "mixed": DIAPER_MIXED}
 
-# Home Assistant's names for the two bottle units, and the library's.
-OUNCES = UnitOfVolume.FLUID_OUNCES.value
-MILLILITERS = UnitOfVolume.MILLILITERS.value
-VOLUME_UNITS = {OUNCES: UNIT_OUNCES, MILLILITERS: UNIT_MILLILITERS}
-BOTTLE_KINDS = ("formula", "pumped")
 FINISH_SIDES = {"left": SIDE_LEFT, "right": SIDE_RIGHT}
-
-DEFAULT_BOTTLE_KIND = "formula"
-DEFAULT_BOTTLE_OUNCES = 4
-DEFAULT_BOTTLE_MILLILITERS = 120
 
 
 def _error(key: str, **placeholders: str) -> HomeAssistantError:
@@ -170,36 +154,6 @@ def _in_home_assistant_time(time: datetime | None) -> tuple[datetime, int]:
     elif time.tzinfo is None:
         time = time.replace(tzinfo=zone)
     return time, standard_offset_seconds(zone, time)
-
-
-def default_bottle(hass: HomeAssistant) -> tuple[float, str, str]:
-    """Return the bottle size, unit, and type used until the options say otherwise.
-
-    120 mL in a metric unit system, 4 fl. oz. otherwise.
-    """
-    if hass.config.units.volume_unit == UnitOfVolume.LITERS:
-        return DEFAULT_BOTTLE_MILLILITERS, MILLILITERS, DEFAULT_BOTTLE_KIND
-    return DEFAULT_BOTTLE_OUNCES, OUNCES, DEFAULT_BOTTLE_KIND
-
-
-def configured_bottle(hass: HomeAssistant, options: Mapping[str, Any]) -> tuple[float, str, str]:
-    """Return the bottle the options describe.
-
-    Saved options that don't make sense (any one of the three) give the defaults.
-    """
-    size = options.get(CONF_BOTTLE_SIZE)
-    unit = options.get(CONF_BOTTLE_UNIT)
-    kind = options.get(CONF_BOTTLE_TYPE)
-    if (
-        isinstance(size, int | float)
-        and not isinstance(size, bool)
-        and math.isfinite(size)
-        and size > 0
-        and unit in VOLUME_UNITS
-        and kind in BOTTLE_KINDS
-    ):
-        return size, unit, kind
-    return default_bottle(hass)
 
 
 def _volume(amount: float, unit: str | None) -> Volume:
