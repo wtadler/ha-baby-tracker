@@ -12,7 +12,7 @@ rules:
   config-flow: done
   dependency-transparency:
     status: todo
-    comment: library bundled while private; PyPI at go-public (#12)
+    comment: Library bundled while private; goes to PyPI at go-public (#12).
   docs-actions: done
   docs-conditions:
     status: exempt
@@ -32,10 +32,65 @@ rules:
   test-before-configure: done
   test-before-setup: done
   unique-config-entry: done
-  # Silver, built with this ticket
+
+  # Silver
+  action-exceptions: done
   config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
   reauthentication-flow: done
-  # Gold, built with the structure ticket
+  test-coverage:
+    status: todo
+    comment: The package measures 79% with the bundled library in it (its client and CLI are tested in the library's own repository), and four integration modules sit under 95%. Measure the integration alone once the library is on PyPI (#12), then close the gaps in timers.py, binary_sensor.py, coordinator.py, and __init__.py.
+
+  # Gold
+  devices: done
   diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: A cloud account has no devices to discover on a network, so there is no address to update.
+  discovery:
+    status: exempt
+    comment: A cloud account has no devices to discover on a network.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations:
+    status: todo
+    comment: The README states the limits in passing (a phone's running nursing timer isn't visible, a sleep is capped at 24 hours) but has no section that gathers them.
+  docs-supported-devices:
+    status: exempt
+    comment: The integration connects to an account in the app's cloud service. The babies it shows as devices are records in that account, not physical devices.
+  docs-supported-functions: done
+  docs-troubleshooting:
+    status: todo
+    comment: The README covers a changed password and the repair for a stalled log, but has no troubleshooting section that gathers them.
+  docs-use-cases:
+    status: todo
+    comment: The README has the live activity blueprint as one example and no section on what to use the integration for.
+  dynamic-devices: done
+  entity-category:
+    status: exempt
+    comment: Every entity (the buttons, the last-activity and timer sensors, and the asleep sensor) is a primary entity, for which the default category is right.
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: todo
+    comment: Undecided whether the sleep and nursing timer sensors, which only the live activity blueprint reads, and the three per-type diaper buttons should start disabled.
+  entity-translations: done
+  exception-translations: done
   icon-translations: done
+  reconfiguration-flow:
+    status: exempt
+    comment: The only settings in the config flow are the account's credentials, and the reauthentication flow handles the password. A different email is a different account, which gets its own entry.
+  repair-issues: done
   stale-devices: done
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+  strict-typing:
+    status: todo
+    comment: mypy --strict passes on the integration in CI, but it skips the bundled library's types, and sensor.py still probes record fields with getattr. Finish when the library is a PyPI package that ships py.typed (#12).
