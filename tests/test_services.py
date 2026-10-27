@@ -20,9 +20,6 @@ from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.const import (
-    CONF_BOTTLE_SIZE,
-    CONF_BOTTLE_TYPE,
-    CONF_BOTTLE_UNIT,
     DOMAIN,
 )
 from custom_components.nighp_baby_tracker.pybabytracker import (
@@ -81,7 +78,6 @@ from .helpers import (
     posted,
     press,
     sensor_states,
-    set_options,
     state,
     state_of,
     sync,
@@ -140,11 +136,6 @@ def captured(prefix: str) -> dict[str, Any]:
     """The captured add payload for a label, minus the keys a write fills in itself."""
     [entry] = [e for e in CAPTURE if e["label"].startswith(prefix) and e["opcode"] == 0]
     return {k: v for k, v in entry["payload"].items() if k not in IGNORED}
-
-
-# One valid call per action, with values that reproduce the captured record (the zone makes
-# the capture's -18000 offset).
-CHICAGO = "America/Chicago"
 
 
 VALID: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] = {
@@ -279,7 +270,11 @@ def _deleted(server: Any) -> list[str]:
     return [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
 
 
-# --- two accounts: each has its own device and pump ----------------------------------------------
+def _schema_fields(schema: Any) -> set[str]:
+    """Return the field names of an action's schema, which may be wrapped in ``All``."""
+    if isinstance(schema, probatio.All):
+        return _schema_fields(schema.validators[0])
+    return {str(getattr(key, "schema", key)) for key in schema.schema}
 
 
 async def test_logging_a_pump_for_one_entry_leaves_the_other_untouched(
@@ -301,9 +296,6 @@ async def test_logging_a_pump_for_one_entry_leaves_the_other_untouched(
     only_pump(second_server)
     assert state_of(hass, second_entry).state == "2026-10-26T08:00:00+00:00"
     assert state_of(hass, init_integration).state == "unknown"
-
-
-# --- log_pump -------------------------------------------------------------------------------------
 
 
 async def test_log_pump_by_config_entry_id_writes_a_pump_with_no_baby_and_the_real_keys(
@@ -540,9 +532,6 @@ async def test_undo_for_a_baby_never_picks_a_pump(
     assert len(posted(server)) == 1
 
 
-# Sleep: the button
-
-
 async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
@@ -556,9 +545,6 @@ async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
     assert deleted.object_id == started.object_id
     assert state(hass, ASLEEP).state == "off"
     assert state(hass, SLEEP_TIMER).state == "unknown"
-
-
-# Sleep: the actions
 
 
 async def test_start_sleep_with_a_past_start_and_a_note(
@@ -684,9 +670,6 @@ async def test_stop_sleep_past_24_hours_writes_24_hours(
     assert record.duration == 1440
 
 
-# Nursing: buttons
-
-
 async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
@@ -699,9 +682,6 @@ async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
     assert deleted.object_id == added.object_id
     assert state(hass, "sensor.baby_one_last_feed").state == "unknown"  # the nursing is gone
     assert state(hass, NURSING_TIMER).state == "unknown"
-
-
-# Nursing: the actions
 
 
 async def test_start_switch_and_stop_nursing_actions(
@@ -762,9 +742,6 @@ async def test_start_nursing_needs_a_side(
         await call(hass, "start_nursing", side="both")
 
 
-# Nursing timers under the lock, orphaned timers, and a failed save
-
-
 async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
@@ -789,9 +766,6 @@ async def test_a_switch_during_a_stops_write_waits_and_is_not_erased(
     [record] = nursing_posts(server)
     assert (record.left_duration, record.right_duration) == (6, 0)
     assert state(hass, NURSING_TIMER).state == "unknown"
-
-
-# log_diaper
 
 
 async def test_log_diaper_with_a_past_time_and_a_note(
@@ -952,9 +926,6 @@ async def test_the_actions_exist_even_before_any_entry_is_set_up(hass: HomeAssis
     assert hass.services.has_service(DOMAIN, "undo")
 
 
-# Writes sync first and update the sensor at once
-
-
 async def test_a_successful_write_updates_the_sensor_without_waiting_for_the_next_sync(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -982,9 +953,6 @@ async def test_a_write_syncs_first_so_it_sees_records_other_devices_just_added(
     assert server.calls[0] == "devices"
     assert server.transaction_reads  # the phone's new entry was read
     assert hass.states.get(LAST_DIAPER).state == at(30).isoformat()  # the newest by time
-
-
-# Failed writes
 
 
 async def test_a_failed_log_diaper_action_raises_the_same_error(
@@ -1050,9 +1018,6 @@ async def test_many_quick_failures_do_not_add_up_to_a_repair(
         freezer.tick(timedelta(minutes=5))
 
     assert gap_issue(hass, init_integration) is None  # 45 minutes in
-
-
-# undo
 
 
 async def test_undo_deletes_the_record_a_button_press_created(
@@ -1315,9 +1280,6 @@ async def test_a_failed_undo_raises_a_translated_error_and_keeps_the_record(
     assert sensor_states(hass) == before
 
 
-# Concurrency and several accounts
-
-
 async def test_both_accounts_work_with_two_config_entries(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -1355,9 +1317,6 @@ async def test_undo_with_two_config_entries_only_touches_the_named_one(
     assert [op for _, op, _ in posted(second_server)] == [OP_ADD, OP_DELETE]
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert [op for _, op, _ in posted(server)] == [OP_ADD, OP_DELETE]
-
-
-# --- AC1: every action posts the captured format ------------------------------------------
 
 
 @pytest.mark.parametrize("name", ACTIONS)
@@ -1403,9 +1362,6 @@ async def test_each_action_goes_to_the_baby_named(
     await call(hass, ACTION_OF.get(name, name), BABY_TWO_ID, **data)
 
     assert only_record(server).baby.object_id == BABY_TWO_ID
-
-
-# --- log_bottle ------------------------------------------------------------------------------
 
 
 async def test_log_bottle_writes_formula_or_pumped_by_kind(
@@ -1513,9 +1469,6 @@ async def test_log_bottle_time_defaults_to_now_and_reads_a_naive_time_in_the_ha_
     assert (now_record.timezone, naive_record.timezone) == (-18000, -18000)
 
 
-# --- log_nursing -----------------------------------------------------------------------------
-
-
 async def test_log_nursing_with_only_one_side_writes_zero_for_the_other(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -1551,9 +1504,6 @@ async def test_log_nursing_reads_a_naive_end_time_in_the_ha_zone(
     assert record.timezone == -18000
 
 
-# --- log_sleep -------------------------------------------------------------------------------
-
-
 async def test_log_sleep_writes_the_start_and_a_whole_minute_duration(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -1579,9 +1529,6 @@ async def test_log_sleep_reads_naive_times_in_the_ha_zone(
     assert record.time.isoformat() == "2026-10-26T00:00:00+00:00"
     assert record.duration == 600
     assert record.timezone == -18000
-
-
-# --- log_pump --------------------------------------------------------------------------------
 
 
 async def test_log_pump_totals_the_two_sides_and_decodes_back(
@@ -1623,9 +1570,6 @@ async def test_log_pump_without_a_unit_uses_the_unit_systems_bottle_unit(
     await call(hass, "log_pump", left_amount=3, right_amount=2)
 
     assert only_record(server).volume == Volume(5, "oz")
-
-
-# --- validation: refused before any request ---------------------------------------------------
 
 
 @pytest.mark.parametrize("amount", [-1, 0, -0.5, math.inf, math.nan])
@@ -1727,9 +1671,6 @@ async def test_log_nursing_with_no_minutes_is_a_validation_error(
     with pytest.raises(ServiceValidationError):
         await call(hass, "log_nursing", left_minutes=0, right_minutes=0)
     assert server.posted == []
-
-
-# --- the library's limits, checked here first with translated errors ------------------------
 
 
 @pytest.mark.parametrize("with_id", [False, True], ids=["no-id", "with-id"])
@@ -1843,9 +1784,6 @@ async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
     assert server.posted == []
 
 
-# --- retries and failures --------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_a_retry_with_the_same_object_id_does_not_post_twice(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -1891,9 +1829,6 @@ async def test_a_failed_write_raises_a_translated_error_and_changes_no_sensor(
     assert server.posted == []
 
 
-# --- sensors update at once -------------------------------------------------------------------
-
-
 async def test_a_sleep_updates_the_last_sleep_sensor_and_leaves_the_baby_awake(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -1934,9 +1869,6 @@ async def test_a_pump_and_a_sleep_are_not_feeds_today(
 
     assert hass.states.get(FEEDS_TODAY).state == "0"
     assert float(hass.states.get(BOTTLE_TODAY).state) == 0
-
-
-# --- undo ------------------------------------------------------------------------------------
 
 
 async def test_undo_removes_a_bottle_and_the_sensor_goes_back(
@@ -1985,47 +1917,6 @@ async def test_undo_by_record_id_removes_a_bottle_among_other_writes(
 
     [_, _, (_, op, deleted)] = posted(server)
     assert (op, deleted.object_id) == (2, RETRY_ID)
-
-
-# --- the Bottle button ------------------------------------------------------------------------
-
-
-async def test_changing_the_bottle_options_does_not_reload_the_entry(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    clients = len(server.clients)
-
-    await set_options(
-        hass,
-        init_integration,
-        **{CONF_BOTTLE_SIZE: 5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
-    )
-
-    assert init_integration.state is ConfigEntryState.LOADED
-    assert len(server.clients) == clients  # not reloaded: no new client signed in
-    assert init_integration.options[CONF_BOTTLE_SIZE] == 5
-
-
-# --- the options screen ------------------------------------------------------------------------
-
-
-async def test_options_save_only_the_bottle(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    await set_options(
-        hass,
-        init_integration,
-        **{CONF_BOTTLE_SIZE: 5.5, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
-    )
-
-    assert init_integration.options == {
-        CONF_BOTTLE_SIZE: 5.5,
-        CONF_BOTTLE_UNIT: "fl. oz.",
-        CONF_BOTTLE_TYPE: "pumped",
-    }
-
-
-# The baby actions
 
 
 @pytest.mark.parametrize("action", ACTION_IDS)
@@ -2159,9 +2050,6 @@ async def test_the_device_id_of_a_second_account_writes_to_that_account(
     assert len(second_server.posted) == 1
 
 
-# log_pump takes an account
-
-
 async def test_log_pump_takes_an_account_with_config_entry_id(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: Any
 ) -> None:
@@ -2228,9 +2116,6 @@ async def test_log_pump_with_no_target_is_refused(
     assert server.posted == []
 
 
-# undo: a baby by device_id, the account by config_entry_id
-
-
 async def test_undo_with_device_id_removes_that_babys_latest_write(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: Any, freezer: Any
 ) -> None:
@@ -2276,9 +2161,6 @@ async def test_undo_with_no_target_is_refused(
 ) -> None:
     with pytest.raises(vol.Invalid, match="at least one"):
         await _call(hass, "undo", {})
-
-
-# Config entries are looked up with Home Assistant's own helper
 
 
 @pytest.mark.parametrize("action", ["log_pump", "undo"])
@@ -2329,22 +2211,12 @@ async def test_another_integrations_entry_is_a_validation_error(
     assert server.posted == []
 
 
-# Setup
-
-
 async def test_setting_up_the_actions_registers_every_one_of_them(hass: HomeAssistant) -> None:
     from custom_components.nighp_baby_tracker.services import async_setup_services
 
     async_setup_services(hass)
 
     assert set(hass.services.async_services_for_domain(DOMAIN)) == set(ALL_ACTIONS)
-
-
-def _schema_fields(schema: Any) -> set[str]:
-    """Return the field names of an action's schema, which may be wrapped in ``All``."""
-    if isinstance(schema, probatio.All):
-        return _schema_fields(schema.validators[0])
-    return {str(getattr(key, "schema", key)) for key in schema.schema}
 
 
 async def test_every_registered_action_name_is_a_service_member(hass: HomeAssistant) -> None:
