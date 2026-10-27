@@ -146,9 +146,13 @@ def account_device(hass: HomeAssistant, entry: MockConfigEntry) -> dr.DeviceEntr
     return device
 
 
+# The actions that name the account (a pump belongs to it), not a baby.
+ACCOUNT_ACTIONS = ("log_pump", "start_pump", "stop_pump")
+
+
 async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
     """Call one of the integration's actions for a baby (a pump names its account instead)."""
-    if action == "log_pump":
+    if action in ACCOUNT_ACTIONS:
         # A pump belongs to the account: it names the account, not a baby.
         [entry, *_] = hass.config_entries.async_entries(DOMAIN)
         data = {"config_entry_id": entry.entry_id, **data}
@@ -289,6 +293,10 @@ LAST_FEED = "sensor.baby_one_last_feed"
 
 LAST_PUMP = "sensor.baby_tracker_account_last_pump"  # the account's
 
+PUMP_SWITCH = "switch.baby_tracker_account_pump_timer"
+
+PUMP_TIMER = "sensor.baby_tracker_account_pump_timer"
+
 LAST_SLEEP = "sensor.baby_one_last_sleep"
 
 FEEDS_TODAY = "sensor.baby_one_feeds_today"
@@ -326,7 +334,7 @@ BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {
 
 ACTION_IDS = list(BABY_ACTIONS)
 
-ALL_ACTIONS = [*BABY_ACTIONS, "log_pump", "undo"]
+ALL_ACTIONS = [*BABY_ACTIONS, "log_pump", "start_pump", "stop_pump", "undo"]
 
 DIAPER = "sensor.baby_one_last_diaper"
 
