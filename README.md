@@ -21,11 +21,11 @@ timers. See
 
   Every attribute is always present. One with no value, such as the `note` of a record without one,
   or `amount` on a nursing feed, is `null`, so a template can read it without checking that the key
-  exists. Before this change those keys were left out. The same goes for Last pump.
+  exists. Last pump below works the same way.
 - **Last pump**, on the account device: the newest pump on the account, whoever logged it. Pumps
   belong to the account, not a baby (the app stores no baby with them), so this isn't on a baby's
-  device. Attributes: `amount`, `unit`, `left_amount` and `right_amount` (only when the sides were
-  entered), durations in minutes, `sides`, and `note`. Upgrading removes the old per-baby last-pump
+  device. Attributes: `amount`, `unit`, `left_amount` and `right_amount` (`null` unless the sides
+  were entered), durations in minutes, `sides`, and `note`. Upgrading removes the old per-baby last-pump
   sensors from the entity registry; update any dashboard or automation that used one.
 - **Pump timer**, also on the account device: a switch that is on while Home Assistant's pump timer
   runs, and a timestamp sensor with the same name (`sensor.baby_tracker_account_pump_timer`) that
