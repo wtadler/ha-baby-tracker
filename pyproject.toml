@@ -6,12 +6,14 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.coverage.run]
 source = ["custom_components.nighp_baby_tracker"]
 branch = true
+# The vendored library is tested in its own repo.
+omit = ["custom_components/nighp_baby_tracker/pybabytracker/*"]
 
 [tool.coverage.report]
 show_missing = true
-# The floor for the whole package, vendored library included: the total when it was set.
-# config_flow.py is held to 100% separately, in CI.
-fail_under = 78
+# The floor for the integration alone (the vendored library is omitted): the total when it was
+# set, rounded down. config_flow.py is held to 100% separately, in CI.
+fail_under = 97
 
 [tool.ruff]
 target-version = "py314"
