@@ -9,10 +9,11 @@ from typing import Any
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.event import async_track_point_in_utc_time, async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -20,9 +21,11 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_DEVICE_UUID,
     DOMAIN,
+    NURSING_TIMER_GUARD_AFTER,
     SCAN_INTERVAL,
     STORAGE_VERSION,
     is_account_identifier,
+    nursing_guard_issue_id,
 )
 from .pybabytracker import (
     AuthenticationError,
@@ -135,12 +138,17 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self._nursing_store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)
         )
+        # The guard on a forgotten nursing timer (see ``_guard_nursing_timers``): the babies whose
+        # repair is raised, and the callback waiting for each other timer's hour to end.
+        self._guard_raised: set[str] = set()
+        self._guard_waiting: dict[str, tuple[datetime, CALLBACK_TYPE]] = {}
 
     async def _async_setup(self) -> None:
         """Load the saved sync state and any running nursing timers.
 
         A restart then fetches only what's newer.
         """
+        self.config_entry.async_on_unload(self._async_stop_guarding)
         # Today's counts change at local midnight even when nothing syncs.
         self.config_entry.async_on_unload(
             async_track_time_change(self.hass, self._async_midnight, hour=0, minute=0, second=0)
@@ -232,13 +240,17 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     def wanted_interval(self, data: BabyTrackerData | None = None) -> timedelta:
         """Return the sync interval: one minute while a timer runs, else five.
 
-        A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running.
+        A sleep timer (synced) or a nursing timer (Home Assistant's) counts as running. A nursing
+        timer that has run past ``NURSING_TIMER_GUARD_AFTER`` is probably forgotten, so it no
+        longer counts. A synced sleep always does: every phone shows it, and any can end it.
         """
         current = data if data is not None else self.data
         babies = current.babies if current is not None else {}
-        if any(baby_id in babies for baby_id in self.nursing) or any(
-            baby.running_sleep is not None for baby in babies.values()
-        ):
+        now = dt_util.utcnow()
+        if any(
+            baby_id in babies and not timer.is_overdue(now, NURSING_TIMER_GUARD_AFTER)
+            for baby_id, timer in self.nursing.items()
+        ) or any(baby.running_sleep is not None for baby in babies.values()):
             return TIMER_INTERVAL
         return SCAN_INTERVAL
 
@@ -327,9 +339,74 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 _LOGGER.warning("Dropping the nursing timer of baby %s, no longer known", baby_id)
                 del self.nursing[baby_id]
             self.config_entry.async_create_task(self.hass, self._async_save_nursing())
+        self._guard_nursing_timers(data)
         # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
         self.update_interval = self.wanted_interval(data)
         return data
+
+    def _guard_nursing_timers(self, data: BabyTrackerData) -> None:
+        """Raise a repair for each nursing timer past its hour, and clear the ones that are done.
+
+        A nursing timer lives only in Home Assistant, so a forgotten one can't be seen or ended
+        anywhere else. A timer not yet an hour old gets a callback for the moment it turns one, so
+        the repair doesn't wait for a sync. Nothing here touches the network.
+        """
+        now = dt_util.utcnow()
+        for baby_id, timer in self.nursing.items():
+            due = timer.started + NURSING_TIMER_GUARD_AFTER
+            if now >= due:
+                self._cancel_guard_wait(baby_id)
+                if baby_id not in self._guard_raised:
+                    self._guard_raised.add(baby_id)
+                    name = data.babies[baby_id].name or "a baby"
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        nursing_guard_issue_id(self.config_entry.entry_id, baby_id),
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="nursing_timer_long",
+                        translation_placeholders={"baby": name},
+                    )
+            else:
+                self._clear_guard_issue(baby_id)
+                waiting = self._guard_waiting.get(baby_id)
+                if waiting is None or waiting[0] != due:
+                    self._cancel_guard_wait(baby_id)
+                    self._guard_waiting[baby_id] = (
+                        due,
+                        async_track_point_in_utc_time(self.hass, self._async_guard_due, due),
+                    )
+        for baby_id in [*self._guard_raised, *self._guard_waiting]:
+            if baby_id not in self.nursing:
+                self._clear_guard_issue(baby_id)
+                self._cancel_guard_wait(baby_id)
+
+    def _clear_guard_issue(self, baby_id: str) -> None:
+        if baby_id in self._guard_raised:
+            self._guard_raised.discard(baby_id)
+            ir.async_delete_issue(
+                self.hass, DOMAIN, nursing_guard_issue_id(self.config_entry.entry_id, baby_id)
+            )
+
+    def _cancel_guard_wait(self, baby_id: str) -> None:
+        if (waiting := self._guard_waiting.pop(baby_id, None)) is not None:
+            waiting[1]()
+
+    @callback
+    def _async_guard_due(self, now: datetime) -> None:
+        """Publish when a nursing timer reaches its hour: raise its repair and ease polling."""
+        for baby_id, (due, _) in list(self._guard_waiting.items()):
+            if due <= now:
+                del self._guard_waiting[baby_id]
+        self.async_set_updated_data(self._rebuild())
+
+    @callback
+    def _async_stop_guarding(self) -> None:
+        """On unload or removal, drop the repairs and callbacks, which only a loaded entry owns."""
+        for baby_id in [*self._guard_raised, *self._guard_waiting]:
+            self._clear_guard_issue(baby_id)
+            self._cancel_guard_wait(baby_id)
 
     def _remove_deleted_devices(self, data: BabyTrackerData) -> None:
         """Remove the device, and with it the entities, of every baby the sync shows as deleted.

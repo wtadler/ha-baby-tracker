@@ -403,6 +403,16 @@
           "description": "An optional note to save with the nursing record."
         }
       }
+    },
+    "discard_nursing": {
+      "name": "Discard nursing",
+      "description": "Throws away a nursing timer that is running in Home Assistant, without saving anything. Use it for a timer that was started or left running by mistake.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        }
+      }
     }
   },
   "selector": {
@@ -528,6 +538,10 @@
     "own_log_gap": {
       "title": "Baby Tracker can't write for {account}",
       "description": "For more than an hour, every attempt to write to {account} has failed. The service says Home Assistant's own log for this account is longer than what Home Assistant can read back, so writing is paused to avoid skipping or overwriting entries.\n\nTo fix it:\n\n1. Go to Settings, then Devices & services, and open Baby Tracker (Nighp).\n2. Open the menu next to {account} and choose Delete, then confirm.\n3. Add Baby Tracker (Nighp) again with the same email and password.\n\nAdding it again reloads the account's history, and Home Assistant appears as a new device in the Baby Tracker app. The old Home Assistant device stays in the app's device list."
+    },
+    "nursing_timer_long": {
+      "title": "The nursing timer for {baby} has run for over an hour",
+      "description": "Home Assistant's nursing timer for {baby} has been running for more than an hour. The Baby Tracker app doesn't show a running nursing timer, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, either:\n\n1. Stop the timer (press the Nurse button for the side it is on, or call the Stop nursing action) to save one nursing record. A side is saved as at most 240 minutes.\n2. Discard the timer with the Discard nursing action to throw it away without saving anything.\n\nThis notice goes away when the timer stops or is discarded."
     },
     "deprecated_action_field": {
       "title": "An automation uses an old field of {action}",
