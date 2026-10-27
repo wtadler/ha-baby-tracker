@@ -451,7 +451,7 @@
     },
     "stop_pump": {
       "name": "Stop pump",
-      "description": "Stops Home Assistant's pump timer and saves one pumping session. The minutes are the time since the start, rounded to whole minutes. Give the amount to save the total with it; without one, the session has no amount.",
+      "description": "Stops Home Assistant's pump timer and saves one pumping session. The minutes are the time since the start, rounded to whole minutes. Give the amount to save the total with it; without one, the session is saved with an amount of 0 (no volume).",
       "fields": {
         "config_entry_id": {
           "name": "Account",
@@ -459,7 +459,7 @@
         },
         "amount": {
           "name": "Amount",
-          "description": "The total pumped. Leave it out to save the session with no amount."
+          "description": "The total pumped. Leave it out to save the session with no volume."
         },
         "unit": {
           "name": "Unit",

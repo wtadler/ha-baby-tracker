@@ -49,7 +49,7 @@ Captured on the test account on 2026-10-26, with the sync screen opened while ea
 
 - **Sleep timers sync while running.** Starting a sleep posts an **add** right away with `duration` 0 and `time` set to the start. Stopping it posts an **update** to the same `objectID` with the final `duration`. Each later edit, such as adding a note, posts another update. A sleep with `duration` 0 is therefore a sleep in progress.
 - **Nursing timers don't sync while running.** Nothing was posted when the timer started, when it switched from left to right, or while the sync screen was open. When the timer stopped, one **add** arrived with `leftDuration`, `rightDuration`, `finishSide` (the side last nursed, 1 = right), `isDetailed` "true", and `state` 5. That fits the absence of a "last synced" update during nursing. HA can't see a nursing timer running on a phone. It can only keep its own timer and write the finished entry at the stop.
-- **Pump timers (assumed, not captured).** The app's pump timer wasn't captured. Real timed pumps carry equal `leftDuration` and `rightDuration` with `sides` 0, so Home Assistant keeps its own pump timer like the nursing one and writes the finished pump at the stop. A stop with no amount writes the durations and no `amount` key. That shape hasn't been checked against the app's own screens, and is the first thing to try on the test iPad.
+- **Pump timers (assumed, not captured).** The app's pump timer wasn't captured. Real timed pumps carry equal `leftDuration` and `rightDuration` with `sides` 0, so Home Assistant keeps its own pump timer like the nursing one and writes the finished pump at the stop. A stop with no amount writes the durations and an `amount` of 0 (checked against the app's own database: every timed pump it saved without a volume has amount 0, never a missing value).
 - Durations are whole minutes. About 30 seconds per side was stored as 1.
 
 ## Payloads by type
@@ -60,7 +60,7 @@ Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `tim
 |---|---|
 | `Formula` | `amount` |
 | `Pumped` (a bottle of pumped milk) | `amount` |
-| `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` (no `baby`: a pump belongs to the account, and `leftAmount` and `rightAmount` appear only when per-side amounts were entered) |
+| `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` (a timed pump with no volume carries `amount` 0; no `baby`: a pump belongs to the account, and `leftAmount` and `rightAmount` appear only when per-side amounts were entered) |
 | `Nursing` | `leftDuration`, `rightDuration`, `bothDuration`, `finishSide`, `isDetailed`, `pairSessionState`, `state` |
 | `Sleep` | `duration` (minutes; 0 while running) |
 | `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |

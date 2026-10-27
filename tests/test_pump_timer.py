@@ -172,7 +172,12 @@ async def test_turning_the_switch_on_then_off_posts_one_pump_with_equal_rounded_
     assert (payload["leftDuration"], payload["rightDuration"]) == (12, 12)
     assert record.time == NOW  # the session's start
     assert "baby" not in payload
-    assert "amount" not in payload  # no amount: the volume wasn't given at the stop
+    # No volume was given at the stop: the app writes 0 for that, never a missing key.
+    assert payload["amount"] == {
+        "BCObjectType": "VolumeMeasure",
+        "englishMeasure": "true",
+        "value": 0,
+    }
     assert "leftAmount" not in payload
     assert "rightAmount" not in payload
     assert payload["sides"] == 0
@@ -279,7 +284,8 @@ async def test_the_stopped_pump_is_the_last_pump_and_can_be_undone(
     assert last.state == NOW.isoformat()
     assert last.attributes["left_duration_minutes"] == 8
     assert last.attributes["right_duration_minutes"] == 8
-    assert "amount" not in last.attributes
+    assert "amount" not in last.attributes  # an amount of 0 is no volume, not a 0 fl. oz. pump
+    assert "unit" not in last.attributes
 
     await undo(hass, config_entry_id=init_integration.entry_id)
 
@@ -331,7 +337,7 @@ async def test_the_switch_on_then_start_pump_is_the_same_error(
     )
 
 
-async def test_stop_pump_without_an_amount_logs_the_minutes_with_no_amount(
+async def test_stop_pump_without_an_amount_logs_the_minutes_with_an_amount_of_zero(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
     await start(hass, init_integration)
@@ -342,7 +348,10 @@ async def test_stop_pump_without_an_amount_logs_the_minutes_with_no_amount(
     record = only_pump(server)
     payload = record.to_payload()
     assert (payload["leftDuration"], payload["rightDuration"]) == (7, 7)
-    assert "amount" not in payload
+    assert payload["amount"]["value"] == 0
+    assert "leftAmount" not in payload
+    assert "rightAmount" not in payload
+    assert record.volume == Volume(0, "oz")
     assert "baby" not in payload
     assert state(hass, PUMP_SWITCH).state == "off"
 
@@ -858,3 +867,47 @@ async def test_a_saved_timer_that_cannot_be_loaded_at_all_starts_with_none_and_s
     assert mock_config_entry.state is ConfigEntryState.LOADED
     assert state(hass, PUMP_SWITCH).state == "off"
     assert "saved pump timer couldn't be read" in caplog.text
+
+
+async def test_a_zero_amount_pump_from_the_app_shows_no_volume_and_adds_to_no_total(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    from .factories import DEVICE_A, at, volume
+
+    server.add_pump(
+        DEVICE_A,
+        "F0000000-0000-4000-8000-0000000000A9",
+        when=at(30),
+        amount=volume(0),
+        leftDuration=9,
+        rightDuration=9,
+        sides=0,
+    )
+    from .helpers import sync
+
+    await sync(hass, init_integration)
+
+    last = state(hass, LAST_PUMP)
+    assert last.state != "unknown"
+    assert last.attributes["left_duration_minutes"] == 9
+    assert "amount" not in last.attributes
+    assert "unit" not in last.attributes
+    assert state(hass, "sensor.baby_one_bottle_volume_today").state == "0.0"
+    assert state(hass, "sensor.baby_one_feeds_today").state == "0"
+
+
+async def test_a_pump_with_a_real_amount_still_shows_it(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    from .factories import DEVICE_A, at, volume
+    from .helpers import sync
+
+    server.add_pump(
+        DEVICE_A,
+        "F0000000-0000-4000-8000-0000000000AA",
+        when=at(30),
+        amount=volume(120, english=False),
+    )
+    await sync(hass, init_integration)
+
+    assert state(hass, LAST_PUMP).attributes["amount"] == 120

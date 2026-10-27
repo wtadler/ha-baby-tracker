@@ -643,7 +643,8 @@ async def async_stop_pump(
     """Stop the pump timer and write one finished pump.
 
     The record starts when the timer did and has equal whole minutes on both sides. ``amount``
-    (fl. oz. unless ``unit`` says mL) is the total; without it the record has no amount. A bad
+    (fl. oz. unless ``unit`` says mL) is the total; without it the record's amount is 0, as the
+    app writes a timed pump with no volume. A bad
     amount is refused and the timer keeps running. The timer is cleared only once the write
     succeeds, and the record's ID was fixed at the start, so stopping again after an error can't
     write twice.

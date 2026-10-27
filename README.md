@@ -128,8 +128,8 @@ any dashboard or automation that used one.
 - **Pump timer**, on the account device, runs Home Assistant's own pump timer. A pump belongs to
   the account, not a baby. Turn it on to start, and off to stop and log the session: one pump
   record starting when the timer did, with the same whole minutes (rounded half up, at least 1, at
-  most 240) on both sides, as the app writes a timed pump with both sides together, and **no
-  amount**. In the app, the timer and the amount are one step; here, use `stop_pump` with an
+  most 240) on both sides, as the app writes a timed pump with both sides together, and an
+  **amount of 0**, as the app does for a timed pump with no volume. In the app, the timer and the amount are one step; here, use `stop_pump` with an
   `amount` (a dashboard card or script can offer both) to save the total with the minutes. There is
   deliberately no separate amount entity.
   - Turning it on while it runs, or off when it doesn't, shows an error and writes nothing.
@@ -367,8 +367,8 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
   sleep has no such limit. A forgotten pump timer is stopped with the **Pump timer** switch or
   `stop_pump`, which saves up to 240 minutes; `undo` then deletes that record if it wasn't real.
 - **A pump timer's stop has no amount by default.** The switch can't ask for one, so use
-  `stop_pump` with an `amount` when you want it saved with the minutes. A pump with minutes and no
-  amount hasn't been checked in the app's own screens yet.
+  `stop_pump` with an `amount` when you want it saved with the minutes. Without one the record's
+  amount is 0, as the app writes it, and **Last pump** shows no amount for it.
 - **Records arrive on a schedule, not instantly.** Home Assistant checks for new records every 5
   minutes, and every minute while a sleep timer, or a nursing or pump timer under an hour old, runs. No option
   changes this. Records

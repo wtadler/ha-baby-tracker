@@ -67,6 +67,9 @@ def _feed_attributes(record: Record) -> dict[str, Any]:
 
 def _pump_attributes(record: Record) -> dict[str, Any]:
     amount, unit = volume_parts(getattr(record, "volume", None))
+    if amount == 0:
+        # A timed pump saved with no volume carries an amount of 0: that is no volume, not 0 fl. oz.
+        amount = unit = None
     return _present(
         {
             "amount": amount,
