@@ -1,9 +1,15 @@
-"""Invented sync-format payloads for tests. Nothing here comes from a real account."""
+"""Builders for the invented sync-format payloads in ``fixtures/``.
+
+The JSON files hold each payload's shape. A builder fills in the fields a test varies.
+Nothing here comes from a real account.
+"""
 
 import base64
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
+
+from pytest_homeassistant_custom_component.common import load_json_object_fixture
 
 BABY_ONE_ID = "11111111-AAAA-4AAA-8AAA-000000000001"
 BABY_TWO_ID = "22222222-BBBB-4BBB-8BBB-000000000002"
@@ -30,24 +36,17 @@ def fmt(moment: datetime) -> str:
 
 def volume(value: float, *, english: bool = True) -> dict[str, Any]:
     """A sync-format volume, as the app writes it."""
-    return {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "true" if english else "false",
-        "value": value,
-    }
+    payload = dict(load_json_object_fixture("volume.json"))
+    payload["englishMeasure"] = "true" if english else "false"
+    payload["value"] = value
+    return payload
 
 
 def baby_payload(name: str, object_id: str) -> dict[str, Any]:
-    return {
-        "BCObjectType": "Baby",
-        "objectID": object_id,
-        "name": name,
-        "dob": "2026-09-01 00:00:00 +0000",
-        "gender": "true",
-        "pictureName": "",
-        "newFlage": "false",
-        "timestamp": "1970-01-01 00:00:00 +0000",
-    }
+    payload = dict(load_json_object_fixture("baby.json"))
+    payload["name"] = name
+    payload["objectID"] = object_id
+    return payload
 
 
 def record_payload(
@@ -62,24 +61,23 @@ def record_payload(
 ) -> dict[str, Any]:
     """A record payload. ``baby=None`` leaves the ``baby`` key out, as the live service does for a
     pump."""
-    payload = {
-        "BCObjectType": type_name,
-        "objectID": object_id,
-        "time": fmt(when),
-        "timestamp": fmt(changed or when),
-        "timezone": -18000,
-        "note": note,
-        "pictureNote": [],
-        "newFlage": "true",
-        "pictureLoaded": "true",
-        **fields,
-    }
+    payload = dict(load_json_object_fixture("record.json"))
+    payload["BCObjectType"] = type_name
+    payload["objectID"] = object_id
+    payload["time"] = fmt(when)
+    payload["timestamp"] = fmt(changed or when)
+    payload["note"] = note
+    payload.update(fields)
     if baby is not None:
         payload["baby"] = baby
     return payload
 
 
-def wire(sync_id: int, op_code: int, payload: Any) -> dict[str, Any]:
+def wire(sync_id: int, op_code: int, payload: dict[str, Any]) -> dict[str, Any]:
     """One entry as the service returns it from a device's log."""
     text = json.dumps(payload).encode("utf-8")
-    return {"SyncID": sync_id, "OPCode": op_code, "Transaction": base64.b64encode(text).decode()}
+    entry = dict(load_json_object_fixture("wire.json"))
+    entry["SyncID"] = sync_id
+    entry["OPCode"] = op_code
+    entry["Transaction"] = base64.b64encode(text).decode()
+    return entry

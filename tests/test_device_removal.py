@@ -1,4 +1,4 @@
-"""Removing a baby's device: only once a sync shows the baby has left the account.
+"""Core PR 6: removing a baby's device, only once a sync shows the baby has left the account.
 
 A deleted baby shows up in the sync data as a ``Baby`` record deleted (opcode 2), usually with
 the baby's older records still in the logs and still embedding it. These tests drive that
@@ -371,6 +371,7 @@ async def test_removing_a_deleted_baby_logs_no_warning_or_error(
     assert noisy == []
 
 
+@pytest.mark.engine
 async def test_a_corrupt_store_removes_no_device_until_a_real_delete_syncs(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

@@ -1,4 +1,5 @@
-"""The pump timer: a switch and a timestamp sensor on the account, and start_pump and stop_pump.
+"""Core PR 21: the pump timer. A switch and a timestamp sensor on the account, and start_pump
+and stop_pump.
 
 A pump belongs to the account, not a baby. Like the nursing timer, this one lives only in Home
 Assistant until it stops (the app doesn't sync a running pump), is saved with a ``Store``, and
@@ -13,6 +14,7 @@ from typing import Any
 
 import probatio
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -34,6 +36,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
     Volume,
 )
 
+from .factories import volume
 from .fake_server import FakeServer
 from .helpers import (
     LAST_PUMP,
@@ -54,7 +57,7 @@ from .helpers import (
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up."""
     freezer.move_to(NOW)
 
@@ -72,7 +75,7 @@ def issue(hass: HomeAssistant, entry: MockConfigEntry) -> Any:
     return ir.async_get(hass).async_get_issue(DOMAIN, f"pump_timer_long_{entry.entry_id}")
 
 
-async def at(hass: HomeAssistant, freezer: Any, minute: float) -> None:
+async def at(hass: HomeAssistant, freezer: FrozenDateTimeFactory, minute: float) -> None:
     """Move the clock to ``minute`` after NOW and let what was scheduled for then run."""
     freezer.move_to(minutes(minute))
     async_fire_time_changed(hass, minutes(minute))
@@ -161,7 +164,10 @@ async def test_turning_the_switch_on_posts_nothing_and_shows_the_start_time(
 
 
 async def test_turning_the_switch_on_then_off_posts_one_pump_with_equal_rounded_durations(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     hass.config.units = US_CUSTOMARY_SYSTEM  # the zero follows the unit system
     await turn_on(hass, PUMP_SWITCH)
@@ -175,11 +181,7 @@ async def test_turning_the_switch_on_then_off_posts_one_pump_with_equal_rounded_
     assert record.time == NOW  # the session's start
     assert "baby" not in payload
     # No volume was given at the stop: the app writes 0 for that, never a missing key.
-    assert payload["amount"] == {
-        "BCObjectType": "VolumeMeasure",
-        "englishMeasure": "true",
-        "value": 0,
-    }
+    assert payload["amount"] == volume(0)
     assert "leftAmount" not in payload
     assert "rightAmount" not in payload
     assert payload["sides"] == 0
@@ -208,7 +210,7 @@ async def test_the_minutes_are_rounded_half_up_with_a_floor_of_one_and_a_cap_of_
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(NOW + timedelta(seconds=seconds))
@@ -220,7 +222,10 @@ async def test_the_minutes_are_rounded_half_up_with_a_floor_of_one_and_a_cap_of_
 
 
 async def test_turning_the_switch_on_twice_is_a_clear_error_and_keeps_the_first_start(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(minutes(5))
@@ -259,7 +264,10 @@ async def test_turning_the_switch_off_when_idle_is_a_clear_error_and_posts_nothi
 
 
 async def test_the_switch_can_start_again_after_a_stop(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await toggle(hass, PUMP_SWITCH)
     freezer.move_to(minutes(10))
@@ -276,7 +284,10 @@ async def test_the_switch_can_start_again_after_a_stop(
 
 
 async def test_the_stopped_pump_is_the_last_pump_and_can_be_undone(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(minutes(8))
@@ -308,7 +319,10 @@ async def test_start_pump_starts_the_timer_the_switch_shows(
 
 
 async def test_start_pump_while_running_is_a_clear_error_and_posts_nothing(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(3))
@@ -340,7 +354,10 @@ async def test_the_switch_on_then_start_pump_is_the_same_error(
 
 
 async def test_stop_pump_without_an_amount_logs_the_minutes_with_an_amount_of_zero(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     hass.config.units = US_CUSTOMARY_SYSTEM  # the zero follows the unit system
     await start(hass, init_integration)
@@ -373,7 +390,7 @@ async def test_stop_pump_with_an_amount_writes_the_total_and_no_side_amounts(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(14))
@@ -394,7 +411,10 @@ async def test_stop_pump_with_an_amount_writes_the_total_and_no_side_amounts(
 
 
 async def test_stop_pump_saves_a_note(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(5))
@@ -437,7 +457,7 @@ async def test_a_bad_amount_at_the_stop_is_refused_and_keeps_the_timer_running(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(6))
@@ -465,7 +485,10 @@ async def test_an_unknown_unit_at_the_stop_is_refused_by_the_action_and_keeps_th
 
 
 async def test_a_failed_stop_keeps_the_timer_and_the_retry_lands_once_with_the_same_amount(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     server.post_errors.append((BabyTrackerConnectionError("down"), False))
@@ -483,7 +506,10 @@ async def test_a_failed_stop_keeps_the_timer_and_the_retry_lands_once_with_the_s
 
 
 async def test_stopping_during_a_failing_sync_says_so_and_keeps_the_timer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(minutes(5))
@@ -510,7 +536,7 @@ async def test_a_timer_that_cannot_be_saved_still_turns_the_switch_on_and_says_s
 ) -> None:
     real_save = Store.async_save
 
-    async def save(self: Store[Any], data: Any) -> None:
+    async def save(self: Store[dict[str, Any]], data: dict[str, Any]) -> None:
         if self.key.endswith(".pump"):
             raise OSError("disk full")
         await real_save(self, data)
@@ -530,7 +556,7 @@ async def test_a_running_timer_is_saved_and_clearing_it_is_saved_too(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     key = f"{DOMAIN}.{init_integration.entry_id}.pump"
 
@@ -548,7 +574,7 @@ async def test_a_running_timer_survives_a_reload_and_keeps_one_minute_polling(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(minutes(4))
@@ -573,7 +599,7 @@ async def test_a_reload_after_a_failed_stop_keeps_the_record_id_the_retry_writes
     init_integration: MockConfigEntry,
     server: FakeServer,
     hass_storage: dict[str, Any],
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     key = f"{DOMAIN}.{init_integration.entry_id}.pump"
     await turn_on(hass, PUMP_SWITCH)
@@ -615,7 +641,7 @@ async def test_an_idle_timer_stays_idle_after_a_reload(
     ],
 )
 async def test_a_saved_timer_that_cannot_be_read_is_dropped_with_a_warning(
-    saved: Any,
+    saved: object,
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
@@ -639,7 +665,7 @@ async def test_a_saved_timer_is_picked_up_at_setup(
     mock_config_entry: MockConfigEntry,
     hass_storage: dict[str, Any],
     server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     key = f"{DOMAIN}.{mock_config_entry.entry_id}.pump"
     started = NOW - timedelta(minutes=20)
@@ -681,7 +707,10 @@ async def test_an_idle_account_polls_every_five_minutes(
 
 
 async def test_a_running_pump_timer_polls_every_minute_and_five_again_after_the_stop(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     assert await sync_interval(hass, server) == timedelta(minutes=1)
@@ -692,7 +721,10 @@ async def test_a_running_pump_timer_polls_every_minute_and_five_again_after_the_
 
 
 async def test_past_an_hour_polling_falls_back_to_five_minutes(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     assert state(hass, PUMP_SWITCH).state == "on"
@@ -706,7 +738,7 @@ async def test_past_an_hour_polling_falls_back_to_five_minutes(
 
 
 async def test_no_repair_before_an_hour_and_one_at_exactly_an_hour(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
 
@@ -720,7 +752,7 @@ async def test_no_repair_before_an_hour_and_one_at_exactly_an_hour(
 
 
 async def test_the_repair_is_a_translated_not_fixable_warning(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
 
@@ -733,7 +765,7 @@ async def test_the_repair_is_a_translated_not_fixable_warning(
 
 
 async def test_the_repair_clears_when_the_timer_stops(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     await at(hass, freezer, 61)
@@ -745,7 +777,7 @@ async def test_the_repair_clears_when_the_timer_stops(
 
 
 async def test_the_repair_is_raised_once_and_a_dismissal_stays(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     await at(hass, freezer, 61)
@@ -757,7 +789,7 @@ async def test_the_repair_is_raised_once_and_a_dismissal_stays(
 
 
 async def test_a_reload_with_an_overdue_timer_raises_the_repair_again_and_unload_clears_it(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     await at(hass, freezer, 61)
@@ -771,7 +803,7 @@ async def test_a_reload_with_an_overdue_timer_raises_the_repair_again_and_unload
 
 
 async def test_the_pump_repair_is_independent_of_a_nursing_timers(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: Any
+    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     await turn_on(hass, PUMP_SWITCH)
     freezer.move_to(minutes(30))
@@ -795,7 +827,10 @@ def _baby_one() -> str:
 
 
 async def test_a_nursing_timer_stop_does_not_clear_or_start_the_pump_timer(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await turn_on(hass, "switch.baby_one_nursing_left")
     freezer.move_to(minutes(5))
@@ -814,7 +849,7 @@ async def test_each_account_has_its_own_pump_timer(
     second_entry: MockConfigEntry,
     server: FakeServer,
     second_server: FakeServer,
-    freezer: Any,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     second_switch = er.async_get(hass).async_get_entity_id(
         "switch", DOMAIN, f"{second_entry.entry_id}_pump"
@@ -837,7 +872,10 @@ async def test_each_account_has_its_own_pump_timer(
 
 
 async def test_the_account_helper_reaches_start_and_stop(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await call(hass, "start_pump")
     freezer.move_to(minutes(3))
@@ -917,7 +955,10 @@ async def test_a_pump_with_a_real_amount_still_shows_it(
 
 
 async def test_stop_pump_with_no_amount_and_an_explicit_ml_writes_a_zero_in_ml(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(5))
@@ -930,7 +971,10 @@ async def test_stop_pump_with_no_amount_and_an_explicit_ml_writes_a_zero_in_ml(
 
 
 async def test_stop_pump_with_no_amount_and_an_explicit_fl_oz_writes_a_zero_in_ounces(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     await start(hass, init_integration)
     freezer.move_to(minutes(5))
@@ -941,7 +985,10 @@ async def test_stop_pump_with_no_amount_and_an_explicit_fl_oz_writes_a_zero_in_o
 
 
 async def test_with_no_amount_and_no_unit_the_zero_follows_the_bottle_unit_the_account_uses(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     from .helpers import set_options
 

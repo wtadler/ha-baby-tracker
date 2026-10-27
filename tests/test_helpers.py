@@ -1,4 +1,4 @@
-"""Turning the library's volumes into attribute values."""
+"""Core PR 4: turning the library's volumes into attribute values."""
 
 from typing import Any
 

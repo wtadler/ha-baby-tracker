@@ -70,7 +70,7 @@ class FakeServer:
         """A pump as the live service shapes it: no ``baby`` key."""
         return self.add_record(device, "Pump", object_id, when=when, baby=None, **fields)
 
-    def add_payload(self, device: str, payload: Any, *, op: int = OP_ADD) -> int:
+    def add_payload(self, device: str, payload: dict[str, Any], *, op: int = OP_ADD) -> int:
         log = self.logs.setdefault(device, [])
         sync_id = len(log) + 1
         log.append(wire(sync_id, op, payload))

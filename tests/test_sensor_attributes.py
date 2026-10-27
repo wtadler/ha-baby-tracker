@@ -1,7 +1,9 @@
-"""The last-activity sensors keep the same attribute keys whether or not a value is set."""
+"""Core PRs 4 and 5: the last-activity sensors keep the same attribute keys whether or not a
+value is set. The pump cases belong to PR 5."""
 
 from typing import Any
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -185,6 +187,7 @@ async def test_a_nursing_feed_with_no_amounts_and_no_note_still_has_every_feed_k
     assert attributes["note"] is None
 
 
+@pytest.mark.engine
 async def test_a_feed_with_a_volume_in_an_unexpected_shape_still_has_every_feed_key(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

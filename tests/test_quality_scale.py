@@ -1,4 +1,5 @@
-"""quality_scale.yaml lists exactly the current rules, and the manifest claims only what holds."""
+"""HACS only: quality_scale.yaml lists exactly the current rules, and the manifest claims only
+what holds. Core checks this with hassfest."""
 
 import importlib
 import json
@@ -126,7 +127,7 @@ def _rules() -> dict[str, Any]:
     return rules
 
 
-def _status(entry: Any) -> str:
+def _status(entry: str | dict[str, Any]) -> str:
     return entry["status"] if isinstance(entry, dict) else entry
 
 

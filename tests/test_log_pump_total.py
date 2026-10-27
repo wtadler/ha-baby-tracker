@@ -1,13 +1,13 @@
-"""log_pump with a total: ``amount`` (with ``unit``) and ``minutes``, the way most pumps are logged.
+"""Core PR 12: log_pump with a total, ``amount`` (with ``unit``) and ``minutes``, the way most
+pumps are logged.
 
 The app writes most pumps with only a total ``amount`` and no per-side keys, and a timed one with
 equal ``leftDuration`` and ``rightDuration``. Everything here is invented fixture data.
 """
 
-from typing import Any
-
 import probatio
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -37,7 +37,7 @@ TOTAL_ONLY_KEYS = {
 
 
 @pytest.fixture(autouse=True)
-def _start_at_now(freezer: Any) -> None:
+def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
@@ -288,7 +288,7 @@ async def test_a_bad_total_is_refused_and_posts_nothing(
 
 @pytest.mark.parametrize("minutes", [-1, 2.5, "ten"])
 async def test_bad_minutes_are_refused_by_the_schema(
-    minutes: Any, hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+    minutes: float | str, hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(probatio.MultipleInvalid):
         await log_pump(hass, config_entry_id=init_integration.entry_id, amount=3, minutes=minutes)

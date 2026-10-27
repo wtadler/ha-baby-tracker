@@ -1,4 +1,5 @@
-"""The live activity blueprint: its schema, and its behavior driven through a real automation.
+"""HACS only: the live activity blueprint, its schema, and its behavior driven through a real
+automation. Blueprints do not go to core.
 
 The sensors are plain states (the timer sensors' own tests live in ``test_timers``), and the
 Companion app's notify service is a recorder, so the assertions are on the payloads the

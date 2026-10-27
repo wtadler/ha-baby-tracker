@@ -2,6 +2,9 @@
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "engine: exercises the library's sync engine (paging, delete and edit merging, payloads it cannot decode, the old saved-state format), so it is a candidate to move to the library's repository",
+]
 
 [tool.coverage.run]
 source = ["custom_components.nighp_baby_tracker"]
