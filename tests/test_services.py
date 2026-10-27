@@ -2376,3 +2376,23 @@ async def test_a_backdated_write_uses_the_standard_offset_not_the_offset_now(
     await call(hass, "log_sleep", start="2026-01-19T20:00:00", end="2026-01-19T22:00:00")
 
     assert [r.timezone for _, _, r in posted(server)] == [-18000, -18000]
+
+
+@pytest.mark.parametrize(
+    "time",
+    [
+        "2026-03-08T06:59:59+00:00",
+        "2026-03-08T07:00:00+00:00",
+        "2026-11-01T05:59:59+00:00",
+        "2026-11-01T06:00:00+00:00",
+    ],
+    ids=["spring-before", "spring-after", "fall-before", "fall-after"],
+)
+async def test_a_write_at_the_exact_dst_transition_sends_the_same_offset_on_both_sides(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, time: str
+) -> None:
+    await hass.config.async_set_time_zone("America/New_York")
+
+    await log_diaper(hass, BABY_ONE_ID, "wet", time=time)
+
+    assert only_record(server).timezone == -18000

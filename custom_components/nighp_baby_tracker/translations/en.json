@@ -36,6 +36,9 @@
     }
   },
   "options": {
+    "error": {
+      "bottle_too_large": "That's more than any bottle: use at most 32 fl. oz. or 1000 mL."
+    },
     "step": {
       "init": {
         "title": "Baby Tracker options",

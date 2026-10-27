@@ -46,7 +46,8 @@ from .writes import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle
 
 _LOGGER = logging.getLogger(__name__)
 
-MAX_BOTTLE_SIZE = 1000  # milliliters (about 34 fl. oz.): more than any bottle
+MAX_BOTTLE_SIZE = 1000  # the form's outer bound, in the larger number of the two units
+MAX_BOTTLE_SIZES = {OUNCES: 32, MILLILITERS: 1000}  # per unit: more than any bottle
 
 CREDENTIALS_SCHEMA = probatio.Schema(
     {
@@ -170,15 +171,19 @@ class BabyTrackerOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Show and save the options."""
-        if user_input is not None:
-            return self.async_create_entry(
-                data={
-                    CONF_BOTTLE_SIZE: float(user_input[CONF_BOTTLE_SIZE]),
-                    CONF_BOTTLE_UNIT: user_input[CONF_BOTTLE_UNIT],
-                    CONF_BOTTLE_TYPE: user_input[CONF_BOTTLE_TYPE],
-                }
-            )
-        size, unit, kind = configured_bottle(self.hass, self.config_entry.options)
+        errors: dict[str, str] = {}
+        if user_input is None:
+            size, unit, kind = configured_bottle(self.hass, self.config_entry.options)
+        else:
+            size = float(user_input[CONF_BOTTLE_SIZE])
+            unit = user_input[CONF_BOTTLE_UNIT]
+            kind = user_input[CONF_BOTTLE_TYPE]
+            if size > MAX_BOTTLE_SIZES[unit]:
+                errors[CONF_BOTTLE_SIZE] = "bottle_too_large"
+            else:
+                return self.async_create_entry(
+                    data={CONF_BOTTLE_SIZE: size, CONF_BOTTLE_UNIT: unit, CONF_BOTTLE_TYPE: kind}
+                )
         schema = probatio.Schema(
             {
                 probatio.Required(CONF_BOTTLE_SIZE, default=size): NumberSelector(
@@ -200,4 +205,4 @@ class BabyTrackerOptionsFlow(OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
