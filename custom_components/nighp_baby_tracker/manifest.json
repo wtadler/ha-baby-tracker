@@ -1,7 +1,6 @@
 {
   "domain": "nighp_baby_tracker",
   "name": "Baby Tracker (Nighp)",
-  "categories": ["health_wellbeing"],
   "codeowners": ["@wtadler"],
   "config_flow": true,
   "documentation": "https://github.com/wtadler/ha-baby-tracker/blob/main/README.md",

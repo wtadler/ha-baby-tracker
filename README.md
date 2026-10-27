@@ -226,6 +226,8 @@ differently. At core submission:
 
 - `documentation` points at the page on home-assistant.io.
 - `issue_tracker` and `version` are removed: core leaves them out.
+- `categories` is added as `["health_wellbeing"]`. The hassfest image CI runs doesn't accept the key
+  yet, so it waits.
 - `loggers` becomes `["pybabytracker"]`, the library's own logger, once the library is a PyPI
   package (#12). The bundled copy logs under its path inside this integration.
 - `requirements` pins that package, which is also what lets `dependency-transparency` be marked

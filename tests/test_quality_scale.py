@@ -214,10 +214,15 @@ def test_exempt_rules_are_ones_the_rule_text_allows() -> None:
 # --- the manifest --------------------------------------------------------------------------------
 
 
-def test_the_manifest_has_a_core_category() -> None:
-    categories = _manifest()["categories"]
-    assert categories == ["health_wellbeing"]
-    assert set(categories) <= CORE_CATEGORIES
+def test_the_manifest_leaves_out_categories_until_the_published_hassfest_accepts_them() -> None:
+    # The hassfest image the CI action runs (ghcr.io/home-assistant/hassfest) still rejects the
+    # key: "not a valid option at 'categories'", seen on pull request 55. Core's dev branch accepts
+    # it, and requires it for a core integration, so the README lists it for core submission.
+    assert "categories" not in _manifest()
+
+
+def test_the_category_for_core_submission_is_one_core_lists() -> None:
+    assert "health_wellbeing" in CORE_CATEGORIES
 
 
 def test_the_manifest_names_the_bundled_librarys_loggers() -> None:
@@ -259,5 +264,12 @@ def test_the_readme_lists_what_changes_in_the_manifest_at_core_submission() -> N
 
     readme = (ROOT / "README.md").read_text()
     section = readme.split("## Core submission", 1)[1].split("\n## ", 1)[0]
-    for key in ("documentation", "issue_tracker", "version", "quality_scale", "loggers"):
+    for key in (
+        "documentation",
+        "issue_tracker",
+        "version",
+        "categories",
+        "quality_scale",
+        "loggers",
+    ):
         assert f"`{key}`" in section, key
