@@ -1,12 +1,14 @@
 """The integration's actions: the log_* actions, the timer actions, and undo."""
 
 import uuid
+from typing import Any
 
 import probatio
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import service
 
 from .const import (
     DOMAIN,
@@ -23,7 +25,7 @@ from .const import (
     SERVICE_UNDO,
     is_account_identifier,
 )
-from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
+from .coordinator import BabyTrackerCoordinator
 from .writes import (
     BOTTLE_KINDS,
     DIAPER_STATUS,
@@ -44,12 +46,14 @@ from .writes import (
     validation_error,
 )
 
+ATTR_DEVICE_ID = "device_id"
+# Deprecated aliases, kept for one release so existing automations keep working.
 ATTR_BABY = "baby"
+ATTR_DEVICE = "device"
 ATTR_TYPE = "type"
 ATTR_TIME = "time"
 ATTR_NOTE = "note"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
-ATTR_DEVICE = "device"
 ATTR_OBJECT_ID = "object_id"
 ATTR_KIND = "kind"
 ATTR_AMOUNT = "amount"
@@ -73,9 +77,24 @@ def _uuid_upper(value: object) -> str:
         raise probatio.Invalid("must be a UUID") from err
 
 
-LOG_DIAPER_SCHEMA = probatio.Schema(
+# Every baby action names its baby with ``device_id``. ``baby`` is the deprecated alias.
+_BABY_TARGET = {
+    probatio.Optional(ATTR_DEVICE_ID): cv.string,
+    probatio.Optional(ATTR_BABY): cv.string,
+}
+
+
+def _baby_schema(fields: dict[Any, Any]) -> probatio.All[Any]:
+    """Return the schema of an action that targets one baby."""
+    return probatio.All(
+        probatio.Schema({**_BABY_TARGET, **fields}),
+        cv.has_at_least_one_key(ATTR_DEVICE_ID, ATTR_BABY),
+        cv.has_at_most_one_key(ATTR_DEVICE_ID, ATTR_BABY),
+    )
+
+
+LOG_DIAPER_SCHEMA = _baby_schema(
     {
-        probatio.Required(ATTR_BABY): cv.string,
         probatio.Required(ATTR_TYPE): probatio.In(list(DIAPER_STATUS)),
         probatio.Optional(ATTR_TIME): cv.datetime,
         probatio.Optional(ATTR_NOTE, default=""): cv.string,
@@ -97,12 +116,11 @@ def _whole_minutes(value: object) -> int:
 
 
 _COMMON = {
-    probatio.Required(ATTR_BABY): cv.string,
     probatio.Optional(ATTR_NOTE, default=""): cv.string,
     probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
 }
 
-LOG_BOTTLE_SCHEMA = probatio.Schema(
+LOG_BOTTLE_SCHEMA = _baby_schema(
     {
         **_COMMON,
         probatio.Required(ATTR_KIND): probatio.In(list(BOTTLE_KINDS)),
@@ -112,7 +130,7 @@ LOG_BOTTLE_SCHEMA = probatio.Schema(
     }
 )
 
-LOG_NURSING_SCHEMA = probatio.Schema(
+LOG_NURSING_SCHEMA = _baby_schema(
     {
         **_COMMON,
         probatio.Optional(ATTR_LEFT_MINUTES, default=0): _whole_minutes,
@@ -122,7 +140,7 @@ LOG_NURSING_SCHEMA = probatio.Schema(
     }
 )
 
-LOG_SLEEP_SCHEMA = probatio.Schema(
+LOG_SLEEP_SCHEMA = _baby_schema(
     {
         **_COMMON,
         probatio.Required(ATTR_START): cv.datetime,
@@ -130,7 +148,8 @@ LOG_SLEEP_SCHEMA = probatio.Schema(
     }
 )
 
-# A pump belongs to the account, not a baby, so it names an account or a device in one.
+# A pump belongs to the account, not a baby, so it names an account. ``device`` and ``baby``
+# (an account's or a baby's device) are the deprecated ways to name one.
 _PUMP_COMMON = {
     probatio.Optional(ATTR_NOTE, default=""): cv.string,
     probatio.Optional(ATTR_OBJECT_ID): _uuid_upper,
@@ -142,7 +161,6 @@ LOG_PUMP_SCHEMA = probatio.All(
             **_PUMP_COMMON,
             probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
             probatio.Optional(ATTR_DEVICE): cv.string,
-            # Kept as an alias of ``device``, so a caller that used ``baby`` still works.
             probatio.Optional(ATTR_BABY): cv.string,
             probatio.Optional(ATTR_LEFT_AMOUNT): probatio.Coerce(float),
             probatio.Optional(ATTR_RIGHT_AMOUNT): probatio.Coerce(float),
@@ -157,54 +175,58 @@ LOG_PUMP_SCHEMA = probatio.All(
     cv.has_at_most_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE, ATTR_BABY),
 )
 
-START_SLEEP_SCHEMA = probatio.Schema(
+START_SLEEP_SCHEMA = _baby_schema(
     {
         **_COMMON,
         probatio.Optional(ATTR_START): cv.datetime,
     }
 )
 
-STOP_SLEEP_SCHEMA = probatio.Schema(
-    {
-        probatio.Required(ATTR_BABY): cv.string,
-        probatio.Optional(ATTR_END): cv.datetime,
-    }
-)
+STOP_SLEEP_SCHEMA = _baby_schema({probatio.Optional(ATTR_END): cv.datetime})
 
-START_NURSING_SCHEMA = probatio.Schema(
-    {
-        probatio.Required(ATTR_BABY): cv.string,
-        probatio.Required(ATTR_SIDE): probatio.In(list(FINISH_SIDES)),
-    }
-)
+START_NURSING_SCHEMA = _baby_schema({probatio.Required(ATTR_SIDE): probatio.In(list(FINISH_SIDES))})
 
-BABY_ONLY_SCHEMA = probatio.Schema({probatio.Required(ATTR_BABY): cv.string})
+BABY_ONLY_SCHEMA = _baby_schema({})
 
-STOP_NURSING_SCHEMA = probatio.Schema(
-    {
-        probatio.Required(ATTR_BABY): cv.string,
-        probatio.Optional(ATTR_NOTE, default=""): cv.string,
-    }
-)
+STOP_NURSING_SCHEMA = _baby_schema({probatio.Optional(ATTR_NOTE, default=""): cv.string})
 
+# A baby's undo takes its device. An account's undo takes its config entry.
 UNDO_SCHEMA = probatio.All(
     probatio.Schema(
         {
             probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
+            probatio.Optional(ATTR_DEVICE_ID): cv.string,
             probatio.Optional(ATTR_BABY): cv.string,
             probatio.Optional(ATTR_OBJECT_ID): cv.string,
         }
     ),
-    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_BABY),
+    cv.has_at_least_one_key(ATTR_CONFIG_ENTRY_ID, ATTR_DEVICE_ID, ATTR_BABY),
 )
 
 
-def _loaded(entry: BabyTrackerConfigEntry | None) -> BabyTrackerCoordinator:
-    if entry is None or entry.domain != DOMAIN:
-        raise validation_error("entry_not_found")
-    if entry.state is not ConfigEntryState.LOADED:
-        raise validation_error("entry_not_loaded")
-    return entry.runtime_data
+def _warn_deprecated(call: ServiceCall, field: str, replacement: str) -> None:
+    """Raise a repair issue that says an old automation should use ``replacement`` instead."""
+    ir.async_create_issue(
+        call.hass,
+        DOMAIN,
+        f"deprecated_{call.service}_{field}",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="deprecated_action_field",
+        translation_placeholders={
+            "action": call.service,
+            "field": field,
+            "replacement": replacement,
+        },
+    )
+
+
+def _entry_coordinator(hass: HomeAssistant, entry_id: str) -> BabyTrackerCoordinator:
+    """Return the coordinator of a loaded Baby Tracker config entry."""
+    coordinator: BabyTrackerCoordinator = service.async_get_config_entry(
+        hass, DOMAIN, entry_id
+    ).runtime_data
+    return coordinator
 
 
 def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str, bool]:
@@ -222,9 +244,7 @@ def _from_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordi
     entry = hass.config_entries.async_get_entry(device.config_entry_id)
     if entry is None or entry.domain != DOMAIN:
         raise validation_error("baby_not_found")
-    if entry.state is not ConfigEntryState.LOADED:
-        raise validation_error("entry_not_loaded")
-    return entry.runtime_data, identifier, is_account_identifier(identifier)
+    return _entry_coordinator(hass, entry.entry_id), identifier, is_account_identifier(identifier)
 
 
 def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerCoordinator, str]:
@@ -238,19 +258,29 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
     return coordinator, baby_id
 
 
+def _baby(call: ServiceCall) -> tuple[BabyTrackerCoordinator, str]:
+    """Return the coordinator and ID of the baby an action names, by ``device_id`` or ``baby``."""
+    if ATTR_DEVICE_ID in call.data:
+        return _from_baby_device(call.hass, call.data[ATTR_DEVICE_ID])
+    _warn_deprecated(call, ATTR_BABY, ATTR_DEVICE_ID)
+    return _from_baby_device(call.hass, call.data[ATTR_BABY])
+
+
 def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
     """Return the account a pump goes to.
 
-    That is the named config entry, or the entry that owns the named device (a baby's or the
-    account's).
+    That is the named config entry. The deprecated ``device`` and ``baby`` name the entry that
+    owns a device (a baby's or the account's).
     """
     if ATTR_CONFIG_ENTRY_ID in call.data:
-        return _loaded(call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID]))
-    return _from_device(call.hass, call.data.get(ATTR_DEVICE) or call.data[ATTR_BABY])[0]
+        return _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
+    field = ATTR_DEVICE if ATTR_DEVICE in call.data else ATTR_BABY
+    _warn_deprecated(call, field, ATTR_CONFIG_ENTRY_ID)
+    return _from_device(call.hass, call.data[field])[0]
 
 
 async def _log_diaper(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_log_diaper(
         coordinator,
         baby_id,
@@ -262,7 +292,7 @@ async def _log_diaper(call: ServiceCall) -> None:
 
 
 async def _log_bottle(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_log_bottle(
         coordinator,
         baby_id,
@@ -276,7 +306,7 @@ async def _log_bottle(call: ServiceCall) -> None:
 
 
 async def _log_nursing(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_log_nursing(
         coordinator,
         baby_id,
@@ -290,7 +320,7 @@ async def _log_nursing(call: ServiceCall) -> None:
 
 
 async def _log_sleep(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_log_sleep(
         coordinator,
         baby_id,
@@ -317,7 +347,7 @@ async def _log_pump(call: ServiceCall) -> None:
 
 
 async def _start_sleep(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_start_sleep(
         coordinator,
         baby_id,
@@ -328,36 +358,36 @@ async def _start_sleep(call: ServiceCall) -> None:
 
 
 async def _stop_sleep(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_stop_sleep(coordinator, baby_id, end=call.data.get(ATTR_END))
 
 
 async def _start_nursing(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_start_nursing(coordinator, baby_id, call.data[ATTR_SIDE])
 
 
 async def _switch_nursing_side(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_switch_nursing_side(coordinator, baby_id)
 
 
 async def _stop_nursing(call: ServiceCall) -> None:
-    coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    coordinator, baby_id = _baby(call)
     await async_stop_nursing(coordinator, baby_id, note=call.data[ATTR_NOTE])
 
 
 async def _undo(call: ServiceCall) -> None:
     baby_id: str | None = None
-    if ATTR_BABY in call.data:
-        coordinator, baby_id = _from_baby_device(call.hass, call.data[ATTR_BABY])
+    if ATTR_DEVICE_ID in call.data or ATTR_BABY in call.data:
+        coordinator, baby_id = _baby(call)
     else:
-        entry = call.hass.config_entries.async_get_entry(call.data[ATTR_CONFIG_ENTRY_ID])
-        coordinator = _loaded(entry)
+        coordinator = _entry_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
     await async_undo(coordinator, object_id=call.data.get(ATTR_OBJECT_ID), baby_id=baby_id)
 
 
-def async_register_services(hass: HomeAssistant) -> None:
+@callback
+def async_setup_services(hass: HomeAssistant) -> None:
     """Register the actions once for the integration, whatever entries are set up."""
     hass.services.async_register(DOMAIN, SERVICE_LOG_DIAPER, _log_diaper, schema=LOG_DIAPER_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_LOG_BOTTLE, _log_bottle, schema=LOG_BOTTLE_SCHEMA)

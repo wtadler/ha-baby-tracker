@@ -1,15 +1,17 @@
 """Constants for Baby Tracker (Nighp)."""
 
+from datetime import timedelta
+
 DOMAIN = "nighp_baby_tracker"
 
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_DEVICE_UUID = "device_uuid"
-CONF_SCAN_INTERVAL = "scan_interval"
 
-DEFAULT_SCAN_INTERVAL_MINUTES = 5
-MIN_SCAN_INTERVAL_MINUTES = 1
-MAX_SCAN_INTERVAL_MINUTES = 1440
+# How often the account syncs. Fixed: Home Assistant's polling rules leave it to the user to
+# poll faster with ``homeassistant.update_entity``. An earlier version saved a ``scan_interval``
+# option; it is ignored, and the next options save drops it.
+SCAN_INTERVAL = timedelta(minutes=5)
 
 # How Home Assistant names itself in the account's device list.
 DEVICE_NAME = "Home Assistant"

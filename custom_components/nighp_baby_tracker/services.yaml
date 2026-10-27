@@ -1,6 +1,6 @@
 log_diaper:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -33,7 +33,7 @@ log_diaper:
 
 log_bottle:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -81,7 +81,7 @@ log_bottle:
 
 log_nursing:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -131,7 +131,7 @@ log_nursing:
 
 log_sleep:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -159,16 +159,10 @@ log_sleep:
 log_pump:
   fields:
     config_entry_id:
-      required: false
+      required: true
       selector:
         config_entry:
           integration: nighp_baby_tracker
-    device:
-      required: false
-      selector:
-        device:
-          filter:
-            - integration: nighp_baby_tracker
     left_amount:
       required: false
       example: 2
@@ -242,7 +236,7 @@ undo:
       selector:
         config_entry:
           integration: nighp_baby_tracker
-    baby:
+    device_id:
       required: false
       selector:
         device:
@@ -256,7 +250,7 @@ undo:
 
 start_sleep:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -279,7 +273,7 @@ start_sleep:
 
 stop_sleep:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -292,7 +286,7 @@ stop_sleep:
 
 start_nursing:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -310,7 +304,7 @@ start_nursing:
 
 switch_nursing_side:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:
@@ -319,7 +313,7 @@ switch_nursing_side:
 
 stop_nursing:
   fields:
-    baby:
+    device_id:
       required: true
       selector:
         device:

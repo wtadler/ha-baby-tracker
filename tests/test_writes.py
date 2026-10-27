@@ -3,7 +3,7 @@
 import asyncio
 import json
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -121,7 +121,7 @@ def device_id(hass: HomeAssistant, baby_id: str) -> str:
 
 
 async def log_diaper(hass: HomeAssistant, baby_id: str, kind: str = "wet", **extra: Any) -> None:
-    data = {"baby": device_id(hass, baby_id), "type": kind, **extra}
+    data = {"device_id": device_id(hass, baby_id), "type": kind, **extra}
     await hass.services.async_call(DOMAIN, "log_diaper", data, blocking=True)
 
 
@@ -262,7 +262,7 @@ async def test_log_diaper_for_an_unknown_baby_device_is_a_validation_error(
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
-            DOMAIN, "log_diaper", {"baby": "0" * 32, "type": "wet"}, blocking=True
+            DOMAIN, "log_diaper", {"device_id": "0" * 32, "type": "wet"}, blocking=True
         )
     assert raised.value.translation_domain == DOMAIN
     assert raised.value.translation_key == "baby_not_found"
@@ -279,7 +279,7 @@ async def test_log_diaper_for_another_integrations_device_is_a_validation_error(
     )
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
-            DOMAIN, "log_diaper", {"baby": device.id, "type": "wet"}, blocking=True
+            DOMAIN, "log_diaper", {"device_id": device.id, "type": "wet"}, blocking=True
         )
     assert raised.value.translation_key == "baby_not_found"
     assert server.posted == []
@@ -361,9 +361,9 @@ async def test_log_diaper_for_a_baby_whose_entry_is_not_loaded_is_a_validation_e
     await hass.config_entries.async_unload(setup_entry.entry_id)
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
-            DOMAIN, "log_diaper", {"baby": baby_device, "type": "wet"}, blocking=True
+            DOMAIN, "log_diaper", {"device_id": baby_device, "type": "wet"}, blocking=True
         )
-    assert raised.value.translation_key == "entry_not_loaded"
+    assert raised.value.translation_key == "service_config_entry_not_loaded"
 
 
 async def test_the_actions_exist_even_before_any_entry_is_set_up(hass: HomeAssistant) -> None:
@@ -559,18 +559,43 @@ async def test_a_successful_write_saves_the_new_record(
     assert saved["pending"] is None
 
 
-async def test_a_gap_in_this_devices_own_log_creates_a_repair_issue_and_raises(
+GAP_ISSUE = "own_log_gap_{}"
+
+
+async def _fail_to_write(hass: HomeAssistant) -> None:
+    """Press a button while the gap is on, and check the error it raises."""
+    with pytest.raises(HomeAssistantError) as raised:
+        await press(hass, button("baby_one", "wet"))
+    assert raised.value.translation_key == "own_log_gap"
+
+
+def _gap_issue(hass: HomeAssistant, entry: MockConfigEntry) -> ir.IssueEntry | None:
+    return ir.async_get(hass).async_get_issue(DOMAIN, GAP_ISSUE.format(entry.entry_id))
+
+
+async def test_a_gap_in_this_devices_own_log_raises_but_creates_no_repair_at_first(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     # The service says this device's log is at 5, but nothing can be read back.
     server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
 
-    with pytest.raises(HomeAssistantError) as raised:
-        await press(hass, button("baby_one", "wet"))
+    await _fail_to_write(hass)
 
-    assert raised.value.translation_key == "own_log_gap"
     assert server.posted == []
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, f"own_log_gap_{setup_entry.entry_id}")
+    assert _gap_issue(hass, setup_entry) is None
+
+
+async def test_a_gap_that_keeps_failing_for_an_hour_creates_a_repair_issue(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+
+    freezer.tick(timedelta(hours=1, minutes=1))
+    await _fail_to_write(hass)
+
+    issue = _gap_issue(hass, setup_entry)
     assert issue is not None
     assert issue.translation_key == "own_log_gap"
     assert issue.severity is ir.IssueSeverity.ERROR
@@ -578,25 +603,113 @@ async def test_a_gap_in_this_devices_own_log_creates_a_repair_issue_and_raises(
     assert issue.translation_placeholders == {"account": EMAIL}
 
 
-async def test_the_repair_issue_goes_away_after_a_write_succeeds(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+async def test_a_gap_still_failing_just_under_an_hour_later_creates_no_repair(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
+    freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
-    with pytest.raises(HomeAssistantError):
-        await press(hass, button("baby_one", "wet"))
+    await _fail_to_write(hass)
+
+    freezer.tick(timedelta(minutes=59))
+    await _fail_to_write(hass)
+
+    assert _gap_issue(hass, setup_entry) is None
+
+
+async def test_many_quick_failures_do_not_add_up_to_a_repair(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+
+    for _ in range(10):
+        await _fail_to_write(hass)
+        freezer.tick(timedelta(minutes=5))
+
+    assert _gap_issue(hass, setup_entry) is None  # 45 minutes in
+
+
+async def test_a_gap_that_clears_before_the_hour_starts_the_clock_over(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(minutes=30))
+    server.last_sync_override.clear()  # type: ignore[attr-defined]
+    await press(hass, button("baby_one", "wet"))  # the write works again
+
+    freezer.tick(timedelta(minutes=45))  # 75 minutes after the first failure
+    server.last_sync_override[OWN_DEVICE] = 6  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(minutes=45))  # 45 minutes after the second gap began
+    await _fail_to_write(hass)
+
+    assert _gap_issue(hass, setup_entry) is None
+
+
+async def test_a_second_gap_after_a_clean_stretch_can_still_become_a_repair(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    server.last_sync_override.clear()  # type: ignore[attr-defined]
+    await press(hass, button("baby_one", "wet"))
+
+    freezer.tick(timedelta(hours=3))
+    server.last_sync_override[OWN_DEVICE] = 9  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(hours=1, minutes=1))
+    await _fail_to_write(hass)
+
+    assert _gap_issue(hass, setup_entry) is not None
+
+
+async def test_each_account_times_its_own_gap(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    second_entry: MockConfigEntry,
+    server: FakeServer,
+    freezer: Any,
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(hours=1, minutes=30))
+
+    # The first account's gap has lasted long enough, the second account's just began.
+    await _fail_to_write(hass)
+    await press(hass, "button.baby_three_wet_diaper")
+
+    assert _gap_issue(hass, setup_entry) is not None
+    assert _gap_issue(hass, second_entry) is None
+
+
+async def test_the_repair_issue_goes_away_after_a_write_succeeds(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(hours=2))
+    await _fail_to_write(hass)
+    assert _gap_issue(hass, setup_entry) is not None
     server.last_sync_override.clear()  # type: ignore[attr-defined]
 
     await press(hass, button("baby_one", "wet"))
 
-    assert ir.async_get(hass).async_get_issue(DOMAIN, f"own_log_gap_{setup_entry.entry_id}") is None
+    assert _gap_issue(hass, setup_entry) is None
 
 
 async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
 ) -> None:
+    freezer.move_to(NOW)
     server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
-    with pytest.raises(HomeAssistantError):
-        await press(hass, button("baby_one", "wet"))
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(hours=2))
+    await _fail_to_write(hass)
     issue_id = f"own_log_gap_{setup_entry.entry_id}"
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
 
@@ -605,12 +718,34 @@ async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
-def test_the_repair_text_says_it_may_be_temporary_and_names_the_cost() -> None:
+def test_the_repair_text_has_numbered_steps_and_names_the_cost() -> None:
     issue = json.loads((INTEGRATION / "strings.json").read_text())["issues"]["own_log_gap"]
     text = issue["description"]
     assert "more than an hour" in text
+    for step in ("1. ", "2. ", "3. "):
+        assert step in text
     assert "history" in text
     assert "new device" in text
+    assert "{account}" in text
+    assert "short delay" not in text  # it has already lasted an hour: don't say it may clear itself
+
+
+async def test_a_removed_entry_forgets_its_gap_clock(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    freezer.move_to(NOW)
+    server.last_sync_override[OWN_DEVICE] = 5  # type: ignore[attr-defined]
+    await _fail_to_write(hass)
+    freezer.tick(timedelta(hours=2))
+    await hass.config_entries.async_remove(setup_entry.entry_id)
+    await hass.async_block_till_done()
+    setup_entry.add_to_hass(hass)  # the same entry ID comes back, as a fresh account
+    await hass.config_entries.async_setup(setup_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await _fail_to_write(hass)
+
+    assert _gap_issue(hass, setup_entry) is None
 
 
 def test_writes_use_the_coordinators_public_write_method_not_its_private_members() -> None:
@@ -685,7 +820,7 @@ async def test_undo_deletes_the_record_a_button_press_created(
     [(_, _, created)] = posted(server)
     assert hass.states.get(LAST_DIAPER).state == NOW.isoformat()
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     deleted = posted(server)[1]
     assert deleted[1] == OP_DELETE
@@ -714,7 +849,7 @@ async def test_undo_without_an_object_id_removes_the_most_recent_record_ha_creat
     await press(hass, button("baby_one", "dirty"))
     newest = posted(server)[1][2].object_id
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     assert posted(server)[2][2].object_id == newest
 
@@ -728,7 +863,7 @@ async def test_undo_with_a_baby_only_considers_that_babys_records(
     freezer.move_to(datetime(2026, 10, 26, 15, 0, 30, tzinfo=UTC))
     await press(hass, button("baby_two", "wet"))
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert posted(server)[2][2].object_id == first
 
     await undo(hass, config_entry_id=setup_entry.entry_id)  # any baby: baby two's is left
@@ -743,7 +878,7 @@ async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
         await press(hass, button("baby_one", "wet"))
     ids = [record.object_id for _, _, record in posted(server)]
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     await undo(hass, config_entry_id=setup_entry.entry_id)
 
     deleted = [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
@@ -775,7 +910,7 @@ async def test_undo_deletes_the_newest_ha_write_even_after_a_phone_edited_it(
     )
 
     target = (
-        {"baby": device_id(hass, BABY_ONE_ID)}
+        {"device_id": device_id(hass, BABY_ONE_ID)}
         if scope == "baby"
         else {"config_entry_id": setup_entry.entry_id}
     )
@@ -795,7 +930,7 @@ async def test_undo_follows_write_order_not_the_time_of_the_diaper(
     await log_diaper(hass, BABY_ONE_ID, "dirty", time="2026-10-22T08:00:00+00:00")
     written_last = posted(server)[1][2].object_id
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     assert posted(server)[2][2].object_id == written_last
 
@@ -818,7 +953,7 @@ async def test_a_wet_press_bumps_todays_count_with_no_poll(
     assert (state.attributes["wet"], state.attributes["dirty"]) == (1, 1)
     assert hass.states.get("sensor.baby_two_diapers_today").state == "0"
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert hass.states.get("sensor.baby_one_diapers_today").state == "1"
 
 
@@ -828,7 +963,7 @@ async def test_undo_accepts_an_object_id_in_any_case(
     await press(hass, button("baby_one", "wet"))
     created = posted(server)[0][2].object_id
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=created.lower())
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=created.lower())
 
     assert posted(server)[1][1] == OP_DELETE
     assert posted(server)[1][2].object_id == created
@@ -841,7 +976,7 @@ async def test_undo_with_a_baby_and_another_babys_record_id_is_a_validation_erro
     babys_two = posted(server)[0][2].object_id
 
     with pytest.raises(ServiceValidationError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=babys_two)
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=babys_two)
 
     assert raised.value.translation_key == "record_not_for_baby"
     assert len(posted(server)) == 1  # nothing deleted
@@ -861,9 +996,9 @@ async def test_a_baby_device_of_an_unloaded_entry_is_not_loaded_even_when_anothe
 
     with pytest.raises(ServiceValidationError) as raised:
         await hass.services.async_call(
-            DOMAIN, "log_diaper", {"baby": baby_device, "type": "wet"}, blocking=True
+            DOMAIN, "log_diaper", {"device_id": baby_device, "type": "wet"}, blocking=True
         )
-    assert raised.value.translation_key == "entry_not_loaded"
+    assert raised.value.translation_key == "service_config_entry_not_loaded"
 
 
 async def test_undo_with_an_object_id_removes_that_record(
@@ -875,7 +1010,7 @@ async def test_undo_with_an_object_id_removes_that_record(
     freezer.move_to(datetime(2026, 10, 26, 15, 0, 30, tzinfo=UTC))
     await press(hass, button("baby_one", "dirty"))
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=first)
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=first)
 
     assert posted(server)[2][2].object_id == first
 
@@ -884,7 +1019,7 @@ async def test_undo_with_nothing_to_undo_is_a_validation_error(
     hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     assert raised.value.translation_domain == DOMAIN
     assert raised.value.translation_key == "nothing_to_undo"
@@ -897,7 +1032,7 @@ async def test_undo_of_a_record_another_device_created_is_refused(
     before = snapshot(hass)
 
     with pytest.raises(ServiceValidationError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=OTHER_DEVICES_RECORD)
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=OTHER_DEVICES_RECORD)
 
     assert raised.value.translation_key == "not_own_record"
     assert server.posted == []
@@ -918,12 +1053,12 @@ async def test_undo_twice_deletes_once_and_then_refuses(
 ) -> None:
     await press(hass, button("baby_one", "wet"))
     created = posted(server)[0][2].object_id
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     with pytest.raises(ServiceValidationError) as no_id:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     with pytest.raises(ServiceValidationError) as by_id:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID), object_id=created)
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=created)
 
     assert no_id.value.translation_key == "nothing_to_undo"
     assert by_id.value.translation_key == "record_not_found"
@@ -942,7 +1077,7 @@ async def test_undo_with_an_unknown_config_entry_is_a_validation_error(
 ) -> None:
     with pytest.raises(ServiceValidationError) as raised:
         await undo(hass, config_entry_id="no-such-entry")
-    assert raised.value.translation_key == "entry_not_found"
+    assert raised.value.translation_key == "service_config_entry_not_found"
 
 
 async def test_a_failed_undo_raises_a_translated_error_and_keeps_the_record(
@@ -953,7 +1088,7 @@ async def test_a_failed_undo_raises_a_translated_error_and_keeps_the_record(
     server.post_errors.append((BabyTrackerConnectionError("HTTP 500"), False))  # type: ignore[attr-defined]
 
     with pytest.raises(HomeAssistantError) as raised:
-        await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+        await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     assert raised.value.translation_key == "write_failed"
     assert snapshot(hass) == before
@@ -1014,7 +1149,7 @@ async def test_undo_with_two_config_entries_only_touches_the_named_one(
 
     assert [op for _, op, _ in posted(server)] == [OP_ADD]
     assert [op for _, op, _ in posted(second_server)] == [OP_ADD, OP_DELETE]
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert [op for _, op, _ in posted(server)] == [OP_ADD, OP_DELETE]
 
 
@@ -1050,9 +1185,15 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "switch_nursing_side",
         "stop_nursing",
     }
-    assert set(services["log_diaper"]["fields"]) == {"baby", "type", "time", "note", "object_id"}
-    assert set(services["undo"]["fields"]) == {"config_entry_id", "baby", "object_id"}
-    baby = services["log_diaper"]["fields"]["baby"]
+    assert set(services["log_diaper"]["fields"]) == {
+        "device_id",
+        "type",
+        "time",
+        "note",
+        "object_id",
+    }
+    assert set(services["undo"]["fields"]) == {"config_entry_id", "device_id", "object_id"}
+    baby = services["log_diaper"]["fields"]["device_id"]
     assert baby["required"] is True
     assert baby["selector"]["device"]["filter"] == [{"integration": DOMAIN}]
     assert services["log_diaper"]["fields"]["type"]["selector"]["select"]["options"] == [
@@ -1079,8 +1220,6 @@ def test_every_error_and_issue_the_integration_raises_has_a_translation() -> Non
     strings = json.loads((INTEGRATION / "strings.json").read_text())
     assert set(strings["exceptions"]) >= {
         "baby_not_found",
-        "entry_not_found",
-        "entry_not_loaded",
         "nothing_to_undo",
         "record_not_for_baby",
         "not_own_record",

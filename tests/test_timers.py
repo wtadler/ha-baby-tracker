@@ -21,7 +21,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import CONF_SCAN_INTERVAL, DOMAIN
+from custom_components.nighp_baby_tracker.const import DOMAIN
 from custom_components.nighp_baby_tracker.pybabytracker import (
     OP_ADD,
     OP_DELETE,
@@ -97,7 +97,7 @@ async def sync(hass: HomeAssistant, entry: MockConfigEntry) -> None:
 
 async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
     await hass.services.async_call(
-        DOMAIN, action, {"baby": device_id(hass, baby_id), **data}, blocking=True
+        DOMAIN, action, {"device_id": device_id(hass, baby_id), **data}, blocking=True
     )
 
 
@@ -322,7 +322,7 @@ async def test_undo_of_a_sleep_home_assistant_started_deletes_it(
     freezer.move_to(NOW)
     await press(hass, SLEEP_BUTTON)
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     [(_, op1, started), (_, op2, deleted)] = posted(server)
     assert (op1, op2) == (OP_ADD, OP_DELETE)
@@ -666,7 +666,7 @@ async def test_undo_of_a_nursing_record_home_assistant_wrote_deletes_it(
 ) -> None:
     await nurse(hass, freezer, (0, "left"), (5, "left"))
 
-    await undo(hass, baby=device_id(hass, BABY_ONE_ID))
+    await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
     [(_, op1, added), (_, op2, deleted)] = posted(server)
     assert (op1, op2) == (OP_ADD, OP_DELETE)
@@ -837,20 +837,6 @@ async def test_a_sleep_home_assistant_starts_switches_polling_at_once(
     freezer.move_to(minutes(3))
     await press(hass, SLEEP_BUTTON)
     assert setup_entry.runtime_data.update_interval == timedelta(minutes=5)
-
-
-async def test_a_new_interval_set_while_a_timer_runs_takes_over_when_it_stops(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, freezer: Any
-) -> None:
-    from .test_feeds_sleeps_pumps import set_options
-
-    await nurse(hass, freezer, (0, "left"))
-    await set_options(hass, setup_entry, **{CONF_SCAN_INTERVAL: 15})
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=1)
-
-    await nurse(hass, freezer, (3, "left"))
-
-    assert setup_entry.runtime_data.update_interval == timedelta(minutes=15)
 
 
 async def test_a_second_account_polls_on_its_own_schedule(

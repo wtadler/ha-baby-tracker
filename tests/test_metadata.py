@@ -72,7 +72,7 @@ def test_every_config_flow_field_has_a_description() -> None:
 def test_config_flow_errors_and_aborts_have_messages() -> None:
     config = _load(INTEGRATION / "strings.json")["config"]
     assert {"invalid_auth", "cannot_connect", "unknown"} <= set(config["error"])
-    assert {"already_configured", "reauth_successful", "wrong_account"} <= set(config["abort"])
+    assert {"already_configured", "reauth_successful", "unique_id_mismatch"} <= set(config["abort"])
 
 
 def test_every_sensor_has_a_translated_name() -> None:

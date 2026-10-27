@@ -14,7 +14,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.nighp_baby_tracker.const import (
     CONF_DEVICE_UUID,
-    CONF_SCAN_INTERVAL,
     DOMAIN,
 )
 from custom_components.nighp_baby_tracker.pybabytracker import (
@@ -171,44 +170,6 @@ async def test_syncs_run_on_the_default_five_minute_interval(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     assert setup_entry.runtime_data.update_interval == timedelta(minutes=5)
-
-
-async def test_syncs_run_on_the_configured_interval(
-    hass: HomeAssistant, config_entry: MockConfigEntry
-) -> None:
-    config_entry.add_to_hass(hass)
-    hass.config_entries.async_update_entry(config_entry, options={CONF_SCAN_INTERVAL: 2})
-    await hass.config_entries.async_setup(config_entry.entry_id)
-    await hass.async_block_till_done()
-    assert config_entry.runtime_data.update_interval == timedelta(minutes=2)
-
-
-async def test_an_options_change_applies_without_a_reload(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    coordinator = setup_entry.runtime_data
-    clients = len(server.clients)
-
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
-    await hass.config_entries.options.async_configure(result["flow_id"], {CONF_SCAN_INTERVAL: 10})
-    await hass.async_block_till_done()
-
-    assert setup_entry.state is ConfigEntryState.LOADED
-    assert setup_entry.runtime_data is coordinator
-    assert coordinator.update_interval == timedelta(minutes=10)
-    assert len(server.clients) == clients
-
-
-async def test_a_shorter_interval_takes_effect_right_away(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    result = await hass.config_entries.options.async_init(setup_entry.entry_id)
-    await hass.config_entries.options.async_configure(result["flow_id"], {CONF_SCAN_INTERVAL: 1})
-    await hass.async_block_till_done()
-    calls = server.device_list_calls
-
-    await tick(hass, minutes=1)  # well before the old five-minute schedule
-    assert server.device_list_calls == calls + 1
 
 
 async def test_engine_use_is_serialized_behind_one_lock(
