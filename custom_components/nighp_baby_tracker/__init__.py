@@ -22,12 +22,11 @@ from .const import (
 from .coordinator import (
     BabyTrackerConfigEntry,
     BabyTrackerCoordinator,
-    nursing_storage_key,
-    pump_storage_key,
     storage_key,
 )
 from .pybabytracker import BabyTrackerClient
 from .services import async_setup_services
+from .timer_state import nursing_storage_key, pump_storage_key
 from .writes import forget_gap
 
 PLATFORMS: list[Platform] = [
