@@ -292,26 +292,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         if self.data is not None:
             self._async_republish()
 
-    # Timers: Home Assistant's own nursing and pump timers live in ``self.timers``.
-
-    @property
-    def nursing(self) -> dict[str, NursingTimer]:
-        """Return the nursing timers, by baby ID."""
-        return self.timers.nursing
-
-    @property
-    def pump(self) -> PumpTimer | None:
-        """Return the pump timer, which belongs to the account."""
-        return self.timers.pump
-
-    async def async_set_nursing(self, baby_id: str, timer: NursingTimer | None) -> None:
-        """Start, change, or (with ``None``) clear a baby's nursing timer (see ``TimerState``)."""
-        await self.timers.async_set_nursing(baby_id, timer)
-
-    async def async_set_pump(self, timer: PumpTimer | None) -> None:
-        """Start or (with ``None``) clear the pump timer (see ``TimerState``)."""
-        await self.timers.async_set_pump(timer)
-
     # Device removal: the devices of babies the sync shows as deleted.
 
     def _remove_deleted_devices(self, data: BabyTrackerData) -> None:

@@ -95,7 +95,7 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up one Baby Tracker account."""
 
     VERSION = CONFIG_ENTRY_VERSION
-    MINOR_VERSION = CONFIG_ENTRY_MINOR_VERSION
+    MINOR_VERSION = CONFIG_ENTRY_MINOR_VERSION  # HACS-only: core has no minor version
 
     def __init__(self) -> None:
         """Set up the flow with a fresh device ID."""

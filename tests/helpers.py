@@ -338,7 +338,7 @@ ALL_ACTIONS = [*BABY_ACTIONS, "log_pump", "start_pump", "stop_pump", "undo"]
 
 DIAPER = "sensor.baby_one_last_diaper"
 
-# The option an earlier version saved. It is no longer a setting, so these tests spell it out.
+# A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.
 LEGACY_INTERVAL = "scan_interval"
 
 SLEEP_SWITCH = "switch.baby_one_sleep"

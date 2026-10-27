@@ -2340,6 +2340,49 @@ async def test_setting_up_the_actions_registers_every_one_of_them(hass: HomeAssi
     assert set(hass.services.async_services_for_domain(DOMAIN)) == set(ALL_ACTIONS)
 
 
+def _schema_fields(schema: Any) -> set[str]:
+    """Return the field names of an action's schema, which may be wrapped in ``All``."""
+    if isinstance(schema, probatio.All):
+        return _schema_fields(schema.validators[0])
+    return {str(getattr(key, "schema", key)) for key in schema.schema}
+
+
+async def test_every_registered_action_name_is_a_service_member(hass: HomeAssistant) -> None:
+    from custom_components.nighp_baby_tracker.const import BabyTrackerService
+    from custom_components.nighp_baby_tracker.services import async_setup_services
+
+    async_setup_services(hass)
+
+    registered = set(hass.services.async_services_for_domain(DOMAIN))
+    assert registered - {member.value for member in BabyTrackerService} == set()
+    assert {member.value for member in BabyTrackerService} - registered == set()
+
+
+def test_the_coordinator_has_no_timer_forwarding_methods() -> None:
+    from custom_components.nighp_baby_tracker.coordinator import BabyTrackerCoordinator
+
+    forwarding = {"nursing", "pump", "async_set_nursing", "async_set_pump"}
+
+    assert {name for name in forwarding if hasattr(BabyTrackerCoordinator, name)} == set()
+
+
+async def test_every_schema_field_is_an_argument_member(hass: HomeAssistant) -> None:
+    from custom_components.nighp_baby_tracker.services import (
+        BabyTrackerServiceArgument,
+        async_setup_services,
+    )
+
+    async_setup_services(hass)
+
+    members = {member.value for member in BabyTrackerServiceArgument}
+    fields: set[str] = set()
+    for action, handler in hass.services.async_services_for_domain(DOMAIN).items():
+        action_fields = _schema_fields(handler.schema)
+        assert action_fields - members == set(), action
+        fields |= action_fields
+    assert members - fields == set()
+
+
 @pytest.mark.parametrize(
     ("zone", "time", "expected"),
     [
