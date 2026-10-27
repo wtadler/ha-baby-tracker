@@ -125,7 +125,7 @@ async def test_a_sleep_press_with_no_running_sleep_starts_one_now(
     assert isinstance(record, Sleep)
     assert record.duration == 0
     assert record.time == NOW
-    assert record.timezone == -14400
+    assert record.timezone == -18000
     assert record.baby.object_id == BABY_ONE_ID
     assert state(hass, ASLEEP).state == "on"
     assert state(hass, SLEEP_TIMER).state == NOW.isoformat()
@@ -543,7 +543,7 @@ async def test_a_button_press_adds_that_kind_of_diaper_for_that_baby_now(
     assert record.status == status
     assert record.baby.object_id == BABY_TWO_ID
     assert record.time == NOW
-    assert record.timezone == -14400  # New York in late October
+    assert record.timezone == -18000  # standard, though late October is daylight time
     assert not record.note
     assert server.logs[OWN_DEVICE][0]["SyncID"] == 1
 
@@ -869,10 +869,10 @@ async def test_a_bottle_press_with_a_4_oz_formula_option_logs_a_4_oz_formula_bot
 
 @pytest.mark.parametrize(
     ("units", "volume"),
-    [(US_CUSTOMARY_SYSTEM, Volume(4, "oz")), (METRIC_SYSTEM, Volume(4, "oz"))],
+    [(US_CUSTOMARY_SYSTEM, Volume(4, "oz")), (METRIC_SYSTEM, Volume(120, "ml"))],
     ids=["us-customary", "metric"],
 )
-async def test_a_bottle_press_with_no_options_logs_a_4_oz_formula_bottle_in_any_unit_system(
+async def test_a_bottle_press_with_no_options_logs_4_oz_in_us_customary_and_120_ml_in_metric(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -924,7 +924,7 @@ async def test_a_bottle_press_is_for_its_own_baby_and_counts_in_todays_totals(
     assert hass.states.get("sensor.baby_two_feeds_today").state == "1"
     assert hass.states.get(FEEDS_TODAY).state == "0"
     assert float(hass.states.get("sensor.baby_two_bottle_volume_today").state) == pytest.approx(
-        4 * 29.5735, abs=0.1
+        120, abs=0.1
     )
 
 
@@ -941,25 +941,43 @@ async def test_a_bottle_press_with_bad_saved_options_falls_back_to_the_defaults(
 
     record = only_record(server)
     assert isinstance(record, Formula)
-    assert record.volume == Volume(4, "oz")
+    assert record.volume == Volume(120, "ml")
 
 
-async def test_a_bottle_press_with_milliliter_options_is_refused_with_a_translated_error(
+async def test_a_bottle_press_with_milliliter_options_logs_a_metric_bottle(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await set_options(
         hass,
         init_integration,
-        **{CONF_BOTTLE_SIZE: 4, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
+        **{CONF_BOTTLE_SIZE: 90, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "pumped"},
     )
-    sent = len(server.calls)
 
-    with pytest.raises(ServiceValidationError) as raised:
-        await press(hass, BOTTLE_BUTTON)
+    await press(hass, BOTTLE_BUTTON)
 
-    assert raised.value.translation_key == "metric_not_supported"
-    assert server.posted == []
-    assert len(server.calls) == sent
+    record = only_record(server)
+    assert isinstance(record, Pumped)
+    assert record.volume == Volume(90, "ml")
+    assert record.to_payload()["amount"] == {
+        "BCObjectType": "VolumeMeasure",
+        "englishMeasure": "false",
+        "value": 90,
+    }
+
+
+async def test_saved_ounce_options_stay_ounces_in_a_metric_home(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    await set_options(
+        hass,
+        init_integration,
+        **{CONF_BOTTLE_SIZE: 4, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "formula"},
+    )
+
+    await press(hass, BOTTLE_BUTTON)
+
+    assert only_record(server).volume == Volume(4, "oz")
 
 
 async def test_a_failed_bottle_press_raises_a_translated_error_and_changes_no_sensor(
@@ -1010,3 +1028,43 @@ async def test_the_bottle_button_of_each_account_uses_that_accounts_options(
     assert (type(first), first.volume) == (Pumped, Volume(7, "oz"))
     assert isinstance(second, Formula)
     assert second.volume != Volume(7, "oz")
+
+
+@pytest.mark.parametrize(
+    ("zone", "moment", "expected"),
+    [
+        ("America/New_York", datetime(2026, 7, 15, 16, 0, tzinfo=UTC), -18000),
+        ("America/New_York", datetime(2026, 1, 15, 16, 0, tzinfo=UTC), -18000),
+        ("America/Chicago", datetime(2026, 7, 15, 16, 0, tzinfo=UTC), -21600),
+        ("Asia/Kolkata", datetime(2026, 7, 15, 16, 0, tzinfo=UTC), 19800),
+        ("UTC", datetime(2026, 7, 15, 16, 0, tzinfo=UTC), 0),
+        ("Australia/Sydney", datetime(2026, 1, 15, 16, 0, tzinfo=UTC), 36000),
+    ],
+    ids=["new-york-july", "new-york-january", "chicago-july", "no-dst", "utc", "southern-dst"],
+)
+async def test_a_press_sends_the_zones_standard_offset_year_round(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: Any,
+    zone: str,
+    moment: datetime,
+    expected: int,
+) -> None:
+    await hass.config.async_set_time_zone(zone)
+    freezer.move_to(moment)
+
+    await press(hass, BOTTLE_BUTTON)
+
+    assert only_record(server).timezone == expected
+
+
+async def test_a_started_timer_sends_the_standard_offset_in_summer(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, freezer: Any
+) -> None:
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to(datetime(2026, 7, 15, 16, 0, tzinfo=UTC))
+
+    await press(hass, SLEEP_BUTTON)
+
+    assert only_record(server).timezone == -18000

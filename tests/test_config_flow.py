@@ -1,5 +1,6 @@
 """The setup screen, re-sign-in, and the options screen."""
 
+import json
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -29,6 +30,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 from . import EMAIL, NEW_PASSWORD, PASSWORD
 from .fake_server import FakeServer
 from .helpers import (
+    INTEGRATION,
     LEGACY_INTERVAL,
     SLEEP_BUTTON,
     entry_with_options,
@@ -67,20 +69,65 @@ async def _start_reauth(hass: HomeAssistant, entry: MockConfigEntry):
 # --- the library's limits, checked here first with translated errors ------------------------
 
 
-async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
+@pytest.mark.parametrize(
+    ("size", "unit"),
+    [(32, "fl. oz."), (1000, "mL")],
+    ids=["32-oz", "1000-ml"],
+)
+async def test_the_largest_bottle_in_each_unit_is_accepted(
+    hass: HomeAssistant, init_integration: MockConfigEntry, size: int, unit: str
+) -> None:
+    await set_options(
+        hass,
+        init_integration,
+        **{CONF_BOTTLE_SIZE: size, CONF_BOTTLE_UNIT: unit, CONF_BOTTLE_TYPE: "formula"},
+    )
+
+    assert init_integration.options[CONF_BOTTLE_SIZE] == size
+    assert init_integration.options[CONF_BOTTLE_UNIT] == unit
+
+
+async def test_1001_ml_is_rejected_by_the_forms_outer_bound(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    good = {
-        CONF_BOTTLE_SIZE: 32,
-        CONF_BOTTLE_UNIT: "fl. oz.",
-        CONF_BOTTLE_TYPE: "formula",
-    }
-    await set_options(hass, init_integration, **good)
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(
-            result["flow_id"], {**good, CONF_BOTTLE_SIZE: 33}
+            result["flow_id"],
+            {CONF_BOTTLE_SIZE: 1001, CONF_BOTTLE_UNIT: "mL", CONF_BOTTLE_TYPE: "formula"},
         )
+
+
+async def test_33_oz_shows_a_translated_error_and_the_form_recovers(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    size, unit = 33, "fl. oz."
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    bad = {CONF_BOTTLE_SIZE: size, CONF_BOTTLE_UNIT: unit, CONF_BOTTLE_TYPE: "pumped"}
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"], bad)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_BOTTLE_SIZE: "bottle_too_large"}
+    assert init_integration.options.get(CONF_BOTTLE_SIZE) != size
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    assert strings["options"]["error"]["bottle_too_large"]
+
+    good = {**bad, CONF_BOTTLE_SIZE: 4}
+    result = await hass.config_entries.options.async_configure(result["flow_id"], good)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 4
+
+
+async def test_the_form_after_an_error_keeps_what_was_typed(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    bad = {CONF_BOTTLE_SIZE: 40, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"}
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"], bad)
+
+    assert schema_defaults(result) == bad
 
 
 # --- the options screen ------------------------------------------------------------------------
@@ -90,11 +137,11 @@ async def test_the_bottle_size_option_is_capped_at_32_fluid_ounces(
     ("units", "expected"),
     [
         (US_CUSTOMARY_SYSTEM, (4, "fl. oz.", "formula")),
-        (METRIC_SYSTEM, (4, "fl. oz.", "formula")),
+        (METRIC_SYSTEM, (120, "mL", "formula")),
     ],
     ids=["us-customary", "metric"],
 )
-async def test_options_default_the_bottle_to_4_oz_of_formula_in_any_unit_system(
+async def test_options_default_the_bottle_to_4_oz_in_us_customary_and_120_ml_in_metric(
     hass: HomeAssistant, init_integration: MockConfigEntry, units: Any, expected: tuple[Any, ...]
 ) -> None:
     hass.config.units = units
@@ -124,7 +171,7 @@ async def test_options_show_the_saved_bottle(
     assert defaults[CONF_BOTTLE_TYPE] == "pumped"
 
 
-async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_formula(
+async def test_saving_the_default_bottle_in_a_metric_home_saves_120_ml_of_formula(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     hass.config.units = METRIC_SYSTEM
@@ -133,9 +180,24 @@ async def test_saving_the_default_bottle_in_a_metric_home_still_saves_fl_oz_of_f
 
     await set_options(hass, init_integration, **defaults)
 
-    assert init_integration.options[CONF_BOTTLE_SIZE] == 4
-    assert init_integration.options[CONF_BOTTLE_UNIT] == "fl. oz."
+    assert init_integration.options[CONF_BOTTLE_SIZE] == 120
+    assert init_integration.options[CONF_BOTTLE_UNIT] == "mL"
     assert init_integration.options[CONF_BOTTLE_TYPE] == "formula"
+
+
+async def test_saved_ounce_options_are_shown_unchanged_in_a_metric_home(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    hass.config_entries.async_update_entry(
+        init_integration,
+        options={CONF_BOTTLE_SIZE: 3, CONF_BOTTLE_UNIT: "fl. oz.", CONF_BOTTLE_TYPE: "pumped"},
+    )
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+
+    defaults = schema_defaults(result)
+    assert (defaults[CONF_BOTTLE_SIZE], defaults[CONF_BOTTLE_UNIT]) == (3, "fl. oz.")
 
 
 @pytest.mark.parametrize(
@@ -562,7 +624,7 @@ async def test_options_errors_keep_the_form_open_and_the_flow_recovers(
 
     for bad in (
         {**good, CONF_BOTTLE_SIZE: 0},  # below the smallest bottle
-        {**good, CONF_BOTTLE_SIZE: 100},  # more than any bottle
+        {**good, CONF_BOTTLE_SIZE: 5000},  # more than any bottle
         {**good, CONF_BOTTLE_UNIT: "cups"},  # not a unit the form offers
         {**good, CONF_BOTTLE_TYPE: "juice"},  # not a bottle kind
     ):

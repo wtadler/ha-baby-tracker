@@ -240,13 +240,16 @@ def test_the_new_actions_errors_options_and_button_are_translated() -> None:
         "end_before_start",
         "no_duration",
         "no_amount",
-        "metric_not_supported",
     } <= set(strings["exceptions"])
+    assert "metric_not_supported" not in strings["exceptions"]
     assert "bottle" in strings["entity"]["button"]
     options = strings["options"]["step"]["init"]
     for key in (CONF_BOTTLE_SIZE, CONF_BOTTLE_UNIT, CONF_BOTTLE_TYPE):
         assert options["data"][key] and options["data_description"][key]
-    assert "metric isn't supported yet" in options["data_description"][CONF_BOTTLE_UNIT].lower()
+    assert "isn't supported" not in options["data_description"][CONF_BOTTLE_UNIT]
+    assert "120 mL" in options["data_description"][CONF_BOTTLE_SIZE]
+    for text in json.dumps(strings["services"]).split('"description": '):
+        assert "refused for now" not in text
     assert {"formula", "pumped"} <= set(strings["selector"]["bottle_type"]["options"])
     assert strings == json.loads((INTEGRATION / "translations" / "en.json").read_text())
 
