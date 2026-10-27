@@ -15,7 +15,7 @@ from .fake_server import FakeServer
 from .test_pump_account import add_old_pump_entity
 
 
-async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+async def _setup_entry(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
@@ -27,7 +27,7 @@ async def test_an_entry_from_before_the_migration_is_bumped_and_cleaned(
     assert (mock_config_entry.version, mock_config_entry.minor_version) == (1, 1)
     old = add_old_pump_entity(hass, mock_config_entry, BABY_ONE_ID, "Baby One")
 
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
 
     assert mock_config_entry.state is ConfigEntryState.LOADED
     assert (mock_config_entry.version, mock_config_entry.minor_version) == (1, 2)
@@ -38,7 +38,7 @@ async def test_the_cleanup_runs_only_once(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     mock_config_entry.add_to_hass(hass)
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
     assert mock_config_entry.minor_version == 2
 
     # Something that looks like the old entity turns up later: setup must leave it alone.
@@ -54,7 +54,7 @@ async def test_the_migration_is_idempotent_when_the_cleanup_already_ran(
 ) -> None:
     """The live install already ran the cleanup on setup, so nothing is left to remove."""
     mock_config_entry.add_to_hass(hass)
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
     registry = er.async_get(hass)
     before = {
         e.entity_id for e in er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
@@ -63,7 +63,7 @@ async def test_the_migration_is_idempotent_when_the_cleanup_already_ran(
     # Put the entry back at the old minor version, as a live install that has run the cleanup is.
     await hass.config_entries.async_unload(mock_config_entry.entry_id)
     hass.config_entries.async_update_entry(mock_config_entry, minor_version=1)
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
 
     assert mock_config_entry.state is ConfigEntryState.LOADED
     assert mock_config_entry.minor_version == 2
@@ -77,7 +77,7 @@ async def test_the_migration_keeps_the_accounts_own_last_pump_entity(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
     mock_config_entry.add_to_hass(hass)
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
     registry = er.async_get(hass)
     account = registry.async_get_entity_id(
         "sensor", DOMAIN, f"{mock_config_entry.entry_id}_last_pump"
@@ -86,7 +86,7 @@ async def test_the_migration_keeps_the_accounts_own_last_pump_entity(
 
     await hass.config_entries.async_unload(mock_config_entry.entry_id)
     hass.config_entries.async_update_entry(mock_config_entry, minor_version=1)
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
 
     assert registry.async_get(account) is not None
 
@@ -103,7 +103,7 @@ async def test_the_migration_removes_every_old_entity_including_one_for_an_absen
             (BABY_THREE_ID, "Baby Three"),
         )
     ]
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
     registry = er.async_get(hass)
     assert [registry.async_get(entity.entity_id) for entity in old] == [None, None, None]
 
@@ -122,7 +122,7 @@ async def test_the_migration_leaves_other_entries_entities_alone(
     mock_config_entry.add_to_hass(hass)
     theirs = add_old_pump_entity(hass, other, BABY_THREE_ID, "Baby Three")
 
-    await _setup(hass, mock_config_entry)
+    await _setup_entry(hass, mock_config_entry)
 
     assert er.async_get(hass).async_get(theirs.entity_id) is not None
     assert dr.async_get(hass).async_get(theirs.device_id) is not None
@@ -135,7 +135,7 @@ async def test_an_entry_from_a_newer_version_fails_to_migrate(
         domain=DOMAIN, title=EMAIL, unique_id=EMAIL, version=2, data=dict(mock_config_entry.data)
     )
     newer.add_to_hass(hass)
-    await _setup(hass, newer)
+    await _setup_entry(hass, newer)
     assert newer.state is ConfigEntryState.MIGRATION_ERROR
 
 

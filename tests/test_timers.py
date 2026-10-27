@@ -34,7 +34,7 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 from . import BABY_ONE, BABY_TWO
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_A, record_payload
 from .fake_server import FakeServer
-from .helpers import NOW, device_id, get_baby_device, posted, press, sync_interval, tick, undo
+from .helpers import NOW, call, device_id, get_baby_device, posted, press, sync_interval, tick, undo
 
 PHONE_SLEEP = "5EE90000-0000-4000-8000-000000000001"
 PHONE_SLEEP_TWO = "5EE90000-0000-4000-8000-000000000002"
@@ -93,12 +93,6 @@ def phone_ends_sleep(
 async def sync(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     """Let the clock reach the next scheduled sync."""
     await tick(hass)
-
-
-async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
-    await hass.services.async_call(
-        DOMAIN, action, {"device_id": device_id(hass, baby_id), **data}, blocking=True
-    )
 
 
 def state(hass: HomeAssistant, entity_id: str) -> Any:

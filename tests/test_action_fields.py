@@ -7,8 +7,7 @@ the field to switch to.
 """
 
 import json
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -23,10 +22,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.nighp_baby_tracker.const import DOMAIN
 
 from .factories import BABY_ONE_ID, BABY_THREE_ID
-from .helpers import account_device, device_id, posted, press
-
-INTEGRATION = Path(__file__).resolve().parent.parent / "custom_components" / "nighp_baby_tracker"
-NOW = datetime(2026, 10, 26, 15, 0, 0, tzinfo=UTC)
+from .helpers import INTEGRATION, NOW, account_device, device_id, posted, press
 
 # Every baby action, the data it needs besides the baby, and whether a timer must already run.
 BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {

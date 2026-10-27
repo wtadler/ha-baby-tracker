@@ -8,9 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
-VENDORED = INTEGRATION / "pybabytracker"
+from .helpers import INTEGRATION, ROOT, VENDORED
 
 BRONZE_RULES = [
     "action-setup",

@@ -3,7 +3,6 @@
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -34,6 +33,7 @@ from . import EMAIL, OWN_DEVICE, OWN_DEVICE_TWO
 from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, DEVICE_A, DEVICE_B, at
 from .fake_server import FakeServer
 from .helpers import (
+    INTEGRATION,
     NOW,
     OTHER_DEVICES_RECORD,
     button,
@@ -46,8 +46,6 @@ from .helpers import (
     sensor_states,
     undo,
 )
-
-INTEGRATION = Path(__file__).resolve().parent.parent / "custom_components" / "nighp_baby_tracker"
 
 LAST_DIAPER = "sensor.baby_one_last_diaper"
 

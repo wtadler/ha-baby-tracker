@@ -45,7 +45,7 @@ def local(year: int, month: int, day: int, hour: int = 0, minute: int = 0, secon
 
 
 # The default "now" is Monday, October 26, 2026 at 4:00 p.m. Eastern (daylight time).
-NOW = local(2026, 10, 26, 16)
+LOCAL_NOW = local(2026, 10, 26, 16)
 MIDNIGHT = local(2026, 10, 27)
 TODAY = local(2026, 10, 26, 9)
 YESTERDAY = local(2026, 10, 25, 9)
@@ -81,7 +81,7 @@ def _value(hass: HomeAssistant, entity: str, baby: str = "baby_one") -> str:
 async def clock(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
     """Eastern time, frozen at the default "now"."""
     await hass.config.async_set_time_zone("America/New_York")
-    freezer.move_to(NOW)
+    freezer.move_to(LOCAL_NOW)
     return freezer
 
 
@@ -277,7 +277,7 @@ async def test_a_diaper_edited_to_another_day_leaves_the_count(
     await _setup(hass, entry)
     assert _value(hass, "diapers_today") == "1"
     empty.add_record(
-        DEVICE_A, "Diaper", object_id, when=YESTERDAY, changed=NOW, status=0, op=OP_UPDATE
+        DEVICE_A, "Diaper", object_id, when=YESTERDAY, changed=LOCAL_NOW, status=0, op=OP_UPDATE
     )
     await tick(hass, minutes=1440)
     assert _value(hass, "diapers_today") == "0"
@@ -427,7 +427,7 @@ async def test_a_bottle_edited_to_a_new_amount_changes_the_total(
         "Formula",
         bottle,
         when=TODAY,
-        changed=NOW,
+        changed=LOCAL_NOW,
         amount=volume(80, english=False),
         op=OP_UPDATE,
     )
@@ -648,7 +648,7 @@ async def test_asleep_turns_on_when_a_sleep_starts_on_another_device(
 ) -> None:
     await _setup(hass, entry)
     assert _value(hass, "asleep") == "off"
-    empty.add_record(DEVICE_B, "Sleep", _id(), when=NOW, duration=0)
+    empty.add_record(DEVICE_B, "Sleep", _id(), when=LOCAL_NOW, duration=0)
     await tick(hass, minutes=1440)
     assert _value(hass, "asleep") == "on"
 
@@ -660,7 +660,9 @@ async def test_asleep_turns_off_when_the_running_sleep_ends(
     sleep = _sleep(empty, started, 0)
     await _setup(hass, entry)
     assert _value(hass, "asleep") == "on"
-    empty.add_record(DEVICE_A, "Sleep", sleep, when=started, changed=NOW, duration=55, op=OP_UPDATE)
+    empty.add_record(
+        DEVICE_A, "Sleep", sleep, when=started, changed=LOCAL_NOW, duration=55, op=OP_UPDATE
+    )
     await tick(hass, minutes=1440)
     assert _value(hass, "asleep") == "off"
 

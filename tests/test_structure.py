@@ -2,7 +2,6 @@
 translations. Behavior stays the same, so most of these pin what must not change."""
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -31,14 +30,13 @@ from custom_components.nighp_baby_tracker.sensor import (
 
 from .factories import BABY_ONE_ID, OP_UPDATE, at, baby_payload
 from .fake_server import FakeServer
-from .helpers import tick
+from .helpers import INTEGRATION, tick
 
-INTEGRATION = Path(__file__).resolve().parent.parent / "custom_components" / "nighp_baby_tracker"
 DIAPER = "sensor.baby_one_last_diaper"
 LAST_PUMP = "sensor.baby_tracker_account_last_pump"
 
 
-def _load(name: str) -> Any:
+def _load_integration_json(name: str) -> Any:
     return json.loads((INTEGRATION / name).read_text())
 
 
@@ -175,7 +173,7 @@ async def test_a_named_baby_device_keeps_the_babys_name(
 
 def test_the_device_names_are_in_strings_and_the_english_translation() -> None:
     for name in ("strings.json", "translations/en.json"):
-        devices = _load(name)["device"]
+        devices = _load_integration_json(name)["device"]
         assert devices["account"]["name"] == "Baby Tracker account"
         assert devices["baby"]["name"] == "Baby"
 
@@ -289,14 +287,16 @@ async def test_a_rejected_login_is_reported_with_a_translation_key(
 
 def test_the_new_exception_message_is_in_strings_and_the_english_translation() -> None:
     for name in ("strings.json", "translations/en.json"):
-        assert "{error}" in _load(name)["exceptions"]["sync_failed_update"]["message"]
+        assert (
+            "{error}" in _load_integration_json(name)["exceptions"]["sync_failed_update"]["message"]
+        )
 
 
 # Icons
 
 
 def _icons() -> dict[str, Any]:
-    return _load("icons.json")
+    return _load_integration_json("icons.json")
 
 
 def test_icons_json_covers_every_action() -> None:
@@ -310,7 +310,7 @@ def test_icons_json_covers_every_action() -> None:
 
 def test_icons_json_covers_every_entity_with_a_translation_key() -> None:
     entity_icons = _icons()["entity"]
-    keys = _load("strings.json")["entity"]
+    keys = _load_integration_json("strings.json")["entity"]
     for platform, entities in keys.items():
         for key in entities:
             assert key in entity_icons[platform], f"{platform}.{key}"
@@ -331,7 +331,7 @@ def test_email_and_password_constants_come_from_home_assistant() -> None:
 
 
 def test_the_integration_is_a_hub() -> None:
-    assert _load("manifest.json")["integration_type"] == "hub"
+    assert _load_integration_json("manifest.json")["integration_type"] == "hub"
 
 
 async def test_a_failed_setup_closes_the_client(

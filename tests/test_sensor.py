@@ -37,13 +37,13 @@ READINGS = ("sensor", "binary_sensor")
 BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
 
 
-def _id(baby: str, key: str) -> str:
+def _entity_id(baby: str, key: str) -> str:
     return f"sensor.{baby}_{key}"
 
 
-def _state(hass: HomeAssistant, baby: str, key: str):
-    state = hass.states.get(_id(baby, key))
-    assert state is not None, f"{_id(baby, key)} does not exist"
+def _sensor_state(hass: HomeAssistant, baby: str, key: str):
+    state = hass.states.get(_entity_id(baby, key))
+    assert state is not None, f"{_entity_id(baby, key)} does not exist"
     return state
 
 
@@ -92,7 +92,7 @@ async def test_entities_are_named_after_the_baby_and_the_activity(
 ) -> None:
     for baby, name in (("baby_one", "Baby One"), ("baby_two", "Baby Two")):
         for key, label in zip(KEYS, ("Last diaper", "Last feed", "Last sleep"), strict=True):
-            assert _state(hass, baby, key).attributes["friendly_name"] == f"{name} {label}"
+            assert _sensor_state(hass, baby, key).attributes["friendly_name"] == f"{name} {label}"
 
 
 async def test_entities_have_unique_ids(
@@ -122,22 +122,22 @@ async def test_the_sensors_are_timestamps(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     for key in KEYS:
-        assert _state(hass, "baby_one", key).attributes["device_class"] == "timestamp"
+        assert _sensor_state(hass, "baby_one", key).attributes["device_class"] == "timestamp"
 
 
 async def test_the_last_diaper_shows_when_it_happened(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
-    assert _state(hass, "baby_two", "last_diaper").state == at(10).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
+    assert _sensor_state(hass, "baby_two", "last_diaper").state == at(10).isoformat()
 
 
 async def test_babies_do_not_share_records(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     assert (
-        _state(hass, "baby_one", "last_diaper").state
-        != _state(hass, "baby_two", "last_diaper").state
+        _sensor_state(hass, "baby_one", "last_diaper").state
+        != _sensor_state(hass, "baby_two", "last_diaper").state
     )
 
 
@@ -150,7 +150,7 @@ async def test_a_newer_diaper_from_another_device_updates_the_sensor_with_its_ty
     server.add_record(DEVICE_B, "Diaper", _object_id(1), when=at(75), status=2)
     await tick(hass)
 
-    state = _state(hass, "baby_one", "last_diaper")
+    state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == at(75).isoformat()
     assert state.attributes["type"] == "mixed"
 
@@ -165,7 +165,7 @@ async def test_the_diaper_type_names_the_status(
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", _object_id(2), when=at(40), status=status)
     await tick(hass)
-    assert _state(hass, "baby_one", "last_diaper").attributes["type"] == expected
+    assert _sensor_state(hass, "baby_one", "last_diaper").attributes["type"] == expected
 
 
 async def test_an_unknown_diaper_status_has_no_type(
@@ -173,7 +173,7 @@ async def test_an_unknown_diaper_status_has_no_type(
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", _object_id(3), when=at(40), status=9)
     await tick(hass)
-    state = _state(hass, "baby_one", "last_diaper")
+    state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == at(40).isoformat()
     assert "type" not in state.attributes
 
@@ -183,8 +183,8 @@ async def test_the_diaper_note_is_an_attribute_when_there_is_one(
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", _object_id(4), when=at(40), status=0, note="rash cream")
     await tick(hass)
-    assert _state(hass, "baby_one", "last_diaper").attributes["note"] == "rash cream"
-    assert "note" not in _state(hass, "baby_two", "last_diaper").attributes
+    assert _sensor_state(hass, "baby_one", "last_diaper").attributes["note"] == "rash cream"
+    assert "note" not in _sensor_state(hass, "baby_two", "last_diaper").attributes
 
 
 async def test_an_older_record_arriving_later_does_not_replace_the_newest(
@@ -192,7 +192,7 @@ async def test_an_older_record_arriving_later_does_not_replace_the_newest(
 ) -> None:
     server.add_record(DEVICE_B, "Diaper", _object_id(5), when=at(-500), status=1)
     await tick(hass)
-    assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
 
 
 async def test_a_deleted_latest_diaper_falls_back_to_the_previous_one(
@@ -200,11 +200,11 @@ async def test_a_deleted_latest_diaper_falls_back_to_the_previous_one(
 ) -> None:
     server.add_record(DEVICE_A, "Diaper", _object_id(6), when=at(100), status=1)
     await tick(hass)
-    assert _state(hass, "baby_one", "last_diaper").state == at(100).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(100).isoformat()
 
     server.add_record(DEVICE_A, "Diaper", _object_id(6), when=at(100), status=1, op=OP_DELETE)
     await tick(hass)
-    state = _state(hass, "baby_one", "last_diaper")
+    state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == at(0).isoformat()
     assert state.attributes["type"] == "wet"
 
@@ -221,7 +221,7 @@ async def test_deleting_every_diaper_leaves_the_sensor_unknown(
         op=OP_DELETE,
     )
     await tick(hass)
-    state = _state(hass, "baby_one", "last_diaper")
+    state = _sensor_state(hass, "baby_one", "last_diaper")
     assert state.state == "unknown"
     assert "type" not in state.attributes
 
@@ -239,7 +239,7 @@ async def test_an_edit_from_another_device_updates_the_details(
         op=1,
     )
     await tick(hass)
-    assert _state(hass, "baby_one", "last_diaper").attributes["type"] == "mixed"
+    assert _sensor_state(hass, "baby_one", "last_diaper").attributes["type"] == "mixed"
 
 
 # Last feed
@@ -253,7 +253,7 @@ async def test_the_last_feed_is_the_newest_of_nursing_formula_and_pumped(
     server.add_record(DEVICE_A, "Pumped", _object_id(12), when=at(20), amount=volume(3))
     await tick(hass)
 
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == at(20).isoformat()
     assert state.attributes["kind"] == "pumped"
 
@@ -267,7 +267,7 @@ async def test_each_feed_kind_can_be_the_newest(
         server.add_record(DEVICE_A, kind, _object_id(20 + number), when=when)
     await tick(hass)
 
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == at(100).isoformat()
     assert state.attributes["kind"] == newest.lower()
 
@@ -277,7 +277,7 @@ async def test_a_formula_feed_shows_its_amount_in_ounces(
 ) -> None:
     server.add_record(DEVICE_A, "Formula", _object_id(30), when=at(30), amount=volume(4))
     await tick(hass)
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.attributes["kind"] == "formula"
     assert state.attributes["amount"] == 4
     assert state.attributes["unit"] == "fl. oz."
@@ -290,7 +290,7 @@ async def test_a_pumped_bottle_in_milliliters_shows_its_unit(
         DEVICE_A, "Pumped", _object_id(31), when=at(30), amount=volume(90, english=False)
     )
     await tick(hass)
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.attributes["amount"] == 90
     assert state.attributes["unit"] == "mL"
 
@@ -310,7 +310,7 @@ async def test_a_nursing_feed_shows_sides_and_durations(
         note="sleepy",
     )
     await tick(hass)
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.attributes["kind"] == "nursing"
     assert state.attributes["left_duration_minutes"] == 7
     assert state.attributes["right_duration_minutes"] == 12
@@ -325,7 +325,7 @@ async def test_a_feed_that_is_not_nursing_formula_or_pumped_is_ignored(
     server.add_record(DEVICE_A, "Formula", _object_id(33), when=at(10), amount=volume(2))
     server.add_record(DEVICE_A, "OtherFeed", _object_id(34), when=at(99), amount=2.5)
     await tick(hass)
-    assert _state(hass, "baby_one", "last_feed").state == at(10).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_feed").state == at(10).isoformat()
 
 
 # Last sleep
@@ -336,7 +336,7 @@ async def test_the_last_sleep_shows_its_duration_and_note(
 ) -> None:
     server.add_record(DEVICE_A, "Sleep", _object_id(50), when=at(60), duration=45, note="nap")
     await tick(hass)
-    state = _state(hass, "baby_one", "last_sleep")
+    state = _sensor_state(hass, "baby_one", "last_sleep")
     assert state.state == at(60).isoformat()
     assert state.attributes["duration_minutes"] == 45
     assert state.attributes["note"] == "nap"
@@ -347,7 +347,7 @@ async def test_a_sleep_in_progress_has_zero_duration(
 ) -> None:
     server.add_record(DEVICE_A, "Sleep", _object_id(51), when=at(60), duration=0)
     await tick(hass)
-    assert _state(hass, "baby_one", "last_sleep").attributes["duration_minutes"] == 0
+    assert _sensor_state(hass, "baby_one", "last_sleep").attributes["duration_minutes"] == 0
 
 
 async def test_ending_a_sleep_updates_the_duration(
@@ -359,7 +359,7 @@ async def test_ending_a_sleep_updates_the_duration(
         DEVICE_A, "Sleep", _object_id(52), when=at(60), changed=at(100), duration=40, op=1
     )
     await tick(hass)
-    state = _state(hass, "baby_one", "last_sleep")
+    state = _sensor_state(hass, "baby_one", "last_sleep")
     assert state.state == at(60).isoformat()
     assert state.attributes["duration_minutes"] == 40
 
@@ -380,15 +380,15 @@ async def test_a_baby_with_no_records_yet_still_gets_a_device_and_sensors(
     assert device is not None
     assert device.name == "Baby Three"
     for key in KEYS:
-        assert _state(hass, "baby_three", key).state == "unknown"
+        assert _sensor_state(hass, "baby_three", key).state == "unknown"
 
 
 async def test_a_baby_with_only_a_diaper_has_unknown_other_sensors(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    assert _state(hass, "baby_one", "last_diaper").state != "unknown"
+    assert _sensor_state(hass, "baby_one", "last_diaper").state != "unknown"
     for key in ("last_feed", "last_sleep"):
-        state = _state(hass, "baby_one", key)
+        state = _sensor_state(hass, "baby_one", key)
         assert state.state == "unknown"
         assert "kind" not in state.attributes
 
@@ -402,9 +402,9 @@ async def test_a_record_type_the_integration_does_not_model_breaks_nothing(
     await tick(hass)
 
     assert init_integration.state is ConfigEntryState.LOADED
-    assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
     for key in ("last_feed", "last_sleep"):
-        assert _state(hass, "baby_one", key).state == "unknown"
+        assert _sensor_state(hass, "baby_one", key).state == "unknown"
 
 
 async def test_a_modeled_type_with_values_the_library_cannot_read_breaks_nothing(
@@ -421,7 +421,7 @@ async def test_a_modeled_type_with_values_the_library_cannot_read_breaks_nothing
     server.add_payload(DEVICE_A, payload)
     await tick(hass)
     assert init_integration.state is ConfigEntryState.LOADED
-    assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
 
 
 async def test_an_undecodable_transaction_breaks_nothing(
@@ -430,7 +430,7 @@ async def test_an_undecodable_transaction_breaks_nothing(
     server.add_raw(DEVICE_A, {"SyncID": 3, "OPCode": 0, "Transaction": "!!not base64!!"})
     await tick(hass)
     assert init_integration.state is ConfigEntryState.LOADED
-    assert _state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
+    assert _sensor_state(hass, "baby_one", "last_diaper").state == at(0).isoformat()
 
 
 async def test_a_feed_with_an_amount_in_an_unexpected_shape_still_shows(
@@ -438,7 +438,7 @@ async def test_a_feed_with_an_amount_in_an_unexpected_shape_still_shows(
 ) -> None:
     server.add_record(DEVICE_A, "Formula", _object_id(64), when=at(5), amount="lots")
     await tick(hass)
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == at(5).isoformat()
     assert state.attributes["kind"] == "formula"
     assert "amount" not in state.attributes
@@ -450,15 +450,15 @@ async def test_a_feed_with_an_amount_in_an_unexpected_shape_still_shows(
 async def test_a_baby_that_appears_later_is_added_without_a_reload(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    assert hass.states.get(_id("baby_three", "last_diaper")) is None
+    assert hass.states.get(_entity_id("baby_three", "last_diaper")) is None
     clients = len(server.clients)
 
     server.add_record(DEVICE_B, "Diaper", _object_id(70), when=at(300), baby=BABY_THREE, status=1)
     await tick(hass)
 
     assert len(server.clients) == clients
-    assert _state(hass, "baby_three", "last_diaper").state == at(300).isoformat()
-    assert _state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
+    assert _sensor_state(hass, "baby_three", "last_diaper").state == at(300).isoformat()
+    assert _sensor_state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
     device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
     assert device is not None
     entries = er.async_entries_for_device(er.async_get(hass), device.id)
@@ -485,7 +485,7 @@ async def test_babies_are_restored_from_saved_state_after_a_restart(
     await hass.async_block_till_done()
 
     for baby in ("baby_one", "baby_two", "baby_three"):
-        assert _state(hass, baby, "last_diaper").state != "unknown"
+        assert _sensor_state(hass, baby, "last_diaper").state != "unknown"
 
 
 async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
@@ -502,6 +502,6 @@ async def test_a_feed_kept_raw_by_the_library_breaks_nothing(
     server.add_payload(DEVICE_A, payload)
     await tick(hass)
     assert init_integration.state is ConfigEntryState.LOADED
-    state = _state(hass, "baby_one", "last_feed")
+    state = _sensor_state(hass, "baby_one", "last_feed")
     assert state.state == "unknown"  # a raw record carries no baby, so it isn't shown
     assert "amount" not in state.attributes

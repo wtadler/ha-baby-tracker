@@ -1,6 +1,7 @@
 """Small helpers shared by the test modules."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -14,6 +15,10 @@ from custom_components.nighp_baby_tracker.pybabytracker import decode_transactio
 
 from .factories import BABY_ONE_ID  # noqa: F401
 from .fake_server import FakeServer
+
+ROOT = Path(__file__).resolve().parent.parent
+INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
+VENDORED = INTEGRATION / "pybabytracker"
 
 NOW = datetime(2026, 10, 26, 15, 0, 0, tzinfo=UTC)
 OTHER_DEVICES_RECORD = "D0000000-0000-4000-8000-000000000001"  # baby one's diaper from device A
@@ -102,3 +107,16 @@ def account_device(hass: HomeAssistant, entry: MockConfigEntry) -> dr.DeviceEntr
     device = dr.async_get(hass).async_get(entity.device_id)
     assert device is not None
     return device
+
+
+async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
+    """Call one of the integration's actions for a baby (a pump names its account instead)."""
+    if action == "log_pump":
+        # A pump belongs to the account: it names the account, not a baby.
+        [entry, *_] = hass.config_entries.async_entries(DOMAIN)
+        data = {"config_entry_id": entry.entry_id, **data}
+        await hass.services.async_call(DOMAIN, action, data, blocking=True)
+        return
+    await hass.services.async_call(
+        DOMAIN, action, {"device_id": device_id(hass, baby_id), **data}, blocking=True
+    )

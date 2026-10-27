@@ -37,7 +37,17 @@ from custom_components.nighp_baby_tracker.pybabytracker import (
 
 from .factories import BABY_ONE_ID, BABY_TWO_ID
 from .fake_server import FakeServer
-from .helpers import NOW, OTHER_DEVICES_RECORD, device_id, get_baby_device, posted, press, undo
+from .helpers import (
+    INTEGRATION,
+    NOW,
+    OTHER_DEVICES_RECORD,
+    call,
+    device_id,
+    get_baby_device,
+    posted,
+    press,
+    undo,
+)
 
 CAPTURE = json.loads((Path(__file__).parent / "fixtures" / "captured_payloads.json").read_text())
 IGNORED = ("objectID", "timestamp", "note", "baby")
@@ -56,18 +66,6 @@ def captured(prefix: str) -> dict[str, Any]:
     """The captured add payload for a label, minus the keys a write fills in itself."""
     [entry] = [e for e in CAPTURE if e["label"].startswith(prefix) and e["opcode"] == 0]
     return {k: v for k, v in entry["payload"].items() if k not in IGNORED}
-
-
-async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
-    if action == "log_pump":
-        # A pump belongs to the account: it names the account, not a baby.
-        [entry, *_] = hass.config_entries.async_entries(DOMAIN)
-        data = {"config_entry_id": entry.entry_id, **data}
-        await hass.services.async_call(DOMAIN, action, data, blocking=True)
-        return
-    await hass.services.async_call(
-        DOMAIN, action, {"device_id": device_id(hass, baby_id), **data}, blocking=True
-    )
 
 
 async def set_options(hass: HomeAssistant, entry: MockConfigEntry, **options: Any) -> None:
@@ -1199,8 +1197,6 @@ async def test_the_bottle_button_of_each_account_uses_that_accounts_options(
 
 
 # --- metadata ----------------------------------------------------------------------------------
-
-INTEGRATION = Path(__file__).resolve().parent.parent / "custom_components" / "nighp_baby_tracker"
 
 
 def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
