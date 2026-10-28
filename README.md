@@ -42,8 +42,9 @@ whichever your Home Assistant has:
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=wtadler&repository=ha-baby-tracker&category=integration)
 
 The integration isn't in the catalog yet, so the link first offers to add the repository. Confirm,
-download **Baby Tracker (Nighp)**, and restart Home Assistant. On 2026.11 and later, a
-`marketplace_repository` link opens the Marketplace directly.
+download **Baby Tracker (Nighp)**, and restart Home Assistant. On 2026.11 and later,
+[this link](https://my.home-assistant.io/redirect/marketplace_repository/?owner=wtadler&repository=ha-baby-tracker&category=integration)
+opens it in the Marketplace directly.
 
 To install by hand instead, copy `custom_components/baby_tracker` from this repository to
 `<config>/custom_components/baby_tracker/` and restart. Either way, Home Assistant installs the

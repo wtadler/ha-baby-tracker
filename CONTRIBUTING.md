@@ -24,8 +24,8 @@ differently. At core submission:
 - `categories` is added as `["health_wellbeing"]`. The hassfest image CI runs doesn't accept the key
   yet, so it waits.
 - `requirements` keeps the `pybabytracker` pin, and `loggers` keeps `["pybabytracker"]`.
-- `quality_scale` is added with the highest tier that holds. It can't be declared today: Bronze
-  needs `dependency-transparency`.
+- `quality_scale` is added with the highest tier that holds, which is Gold today (`strict-typing`,
+  a Platinum rule, is still open). A custom integration's manifest leaves the key out.
 
 `quality_scale.yaml` lists all 54 rules. A test pins the rule list to Home Assistant's, and
 hassfest checks the file's shape for core integrations only. `core-prep/README.md` describes how the
