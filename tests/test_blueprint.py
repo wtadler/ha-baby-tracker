@@ -6,6 +6,7 @@ Companion app's notify service is a recorder, so the assertions are on the paylo
 documented Live Activity API would receive.
 """
 
+import asyncio
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -616,9 +617,29 @@ async def test_an_automation_from_only_the_old_inputs_runs_unchanged(
 # --- the sleep detail entity -------------------------------------------------------------------
 
 
-async def hold(hass: HomeAssistant, seconds: float) -> None:
+async def advance(hass: HomeAssistant, seconds: float) -> None:
+    """Move time on without waiting for runs that are still holding.
+
+    A run waiting out the 15 seconds is a running task, so ``async_block_till_done`` would wait
+    for it in real time; yield to the loop instead, so the run reaches its timer first.
+    """
+    for _ in range(20):
+        await asyncio.sleep(0)
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=seconds))
+    for _ in range(20):
+        await asyncio.sleep(0)
+
+
+async def hold(hass: HomeAssistant, seconds: float) -> None:
+    """Move time on, then wait for every run to finish."""
+    await advance(hass, seconds)
     await hass.async_block_till_done()
+
+
+async def settle(hass: HomeAssistant) -> None:
+    """Let every pending change play out so no timer outlives the test."""
+    await hold(hass, 30)
+    await hold(hass, 30)
 
 
 async def test_without_a_detail_entity_the_sleep_message_stays_asleep(
@@ -677,12 +698,12 @@ async def test_a_detail_change_held_less_than_fifteen_seconds_sends_nothing(
     await set_state(hass, SLEEP, STARTED.isoformat())
 
     hass.states.async_set(DETAIL, "rocking")
-    await hold(hass, 10)
+    await advance(hass, 10)
     hass.states.async_set(DETAIL, "in_bassinet")
-    await hold(hass, 10)
+    await advance(hass, 10)
 
     assert len(calls) == 1
-    await hold(hass, 30)  # let the last change settle so no timer outlives the test
+    await settle(hass)
 
 
 async def test_a_flap_that_never_settles_sends_nothing(
@@ -694,10 +715,10 @@ async def test_a_flap_that_never_settles_sends_nothing(
 
     for state in ("b", "c", "b", "c"):
         hass.states.async_set(DETAIL, state)
-        await hold(hass, 5)
+        await advance(hass, 5)
 
     assert len(calls) == 1
-    await hold(hass, 30)  # let the last change settle so no timer outlives the test
+    await settle(hass)
 
 
 async def test_a_detail_change_while_awake_sends_nothing(
@@ -764,6 +785,100 @@ async def test_a_detail_entity_does_not_affect_nursing(
 
     assert len(calls) == 1
     assert "left" in calls[0].data["message"].lower()
+
+
+EMPTY_DETAIL_FORMS = [None, "", "  ", [], [""], [None]]
+
+
+@pytest.mark.parametrize("empty", EMPTY_DETAIL_FORMS, ids=repr)
+async def test_every_empty_form_of_the_detail_input_loads_and_runs_a_sleep(
+    hass: HomeAssistant, calls: list[ServiceCall], empty: Any
+) -> None:
+    await install(hass, inputs(sleep_detail=empty))
+
+    assert hass.states.get("automation.live_activity_0").state == "on"
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, SLEEP, "unknown")
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
+
+
+async def test_an_omitted_detail_input_loads_and_runs_a_sleep(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+
+    assert hass.states.get("automation.live_activity_0").state == "on"
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert [c.data["message"] for c in calls] == ["Asleep"]
+
+
+async def test_a_detail_entity_given_as_a_one_item_list_works(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=[DETAIL]))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await hold(hass, 15)
+
+    assert calls[1].data["message"] == "rocking"
+
+
+@pytest.mark.parametrize("blank", [None, "", "  "], ids=repr)
+async def test_blank_icons_fall_back_to_the_defaults(
+    hass: HomeAssistant, calls: list[ServiceCall], blank: Any
+) -> None:
+    await install(hass, inputs(sleep_icon=blank, nursing_icon=blank))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon"] == "mdi:sleep"
+    assert payload(calls[1])["notification_icon"] == "mdi:mother-nurse"
+
+
+@pytest.mark.parametrize(
+    "bad", [None, "", "  ", "red", "7E57C2", "#12", "#12345", "#1234567", "#GGGGGG"], ids=repr
+)
+async def test_blank_or_invalid_colors_fall_back_to_the_defaults(
+    hass: HomeAssistant, calls: list[ServiceCall], bad: Any
+) -> None:
+    await install(hass, inputs(sleep_color=bad, nursing_color=bad))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon_color"] == "#7E57C2"
+    assert payload(calls[1])["notification_icon_color"] == "#EC407A"
+
+
+@pytest.mark.parametrize("good", ["#abc", "#ABC", "#a1b2c3", "#A1B2C3"], ids=repr)
+async def test_short_and_long_hex_colors_are_sent_as_given(
+    hass: HomeAssistant, calls: list[ServiceCall], good: str
+) -> None:
+    await install(hass, inputs(sleep_color=good))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert payload(calls[0])["notification_icon_color"] == good
+
+
+async def test_a_pending_detail_change_is_dropped_when_the_sleep_stops(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await advance(hass, 5)
+    await set_state(hass, SLEEP, "unknown")
+    await hold(hass, 30)
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
 
 
 async def test_the_detail_message_is_the_entitys_displayed_state(

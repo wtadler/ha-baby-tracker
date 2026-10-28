@@ -86,7 +86,7 @@ blueprint:
         An optional entity, such as a bassinet's state. While a sleep runs, its displayed state
         becomes the sleep activity's message, updated silently once a new state has held for 15
         seconds. Leave it empty to keep "Asleep".
-      default: []
+      default: ""
       selector:
         entity:
           multiple: false
@@ -99,15 +99,34 @@ blueprint:
 mode: queued
 max: 10
 
+# The detail input reaches the event trigger below as a template, so any empty form the editor
+# or hand-written YAML might store (omitted, null, "", whitespace, [], [""]) means "no detail
+# entity" instead of making the whole automation invalid.
+trigger_variables:
+  detail_input: !input sleep_detail
+  detail_entity: >-
+    {% set d = detail_input[0] if detail_input is not string and detail_input else detail_input %}
+    {{ (d | string | trim) if d else '' }}
+
 variables:
   sleep_timer: !input sleep_timer
   nursing_timer: !input nursing_timer
   sleep_title: !input sleep_title
   nursing_title: !input nursing_title
-  sleep_icon: !input sleep_icon
-  nursing_icon: !input nursing_icon
-  sleep_color: !input sleep_color
-  nursing_color: !input nursing_color
+  # A blank icon or color, or a color that isn't #RGB or #RRGGBB, falls back to the default.
+  sleep_icon_input: !input sleep_icon
+  nursing_icon_input: !input nursing_icon
+  sleep_color_input: !input sleep_color
+  nursing_color_input: !input nursing_color
+  sleep_icon: "{{ (sleep_icon_input | string | trim if sleep_icon_input else '') or 'mdi:sleep' }}"
+  nursing_icon: >-
+    {{ (nursing_icon_input | string | trim if nursing_icon_input else '') or 'mdi:mother-nurse' }}
+  sleep_color: >-
+    {% set c = sleep_color_input | string | trim if sleep_color_input else '' %}
+    {{ c if c | regex_match('^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$') else '#7E57C2' }}
+  nursing_color: >-
+    {% set c = nursing_color_input | string | trim if nursing_color_input else '' %}
+    {{ c if c | regex_match('^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$') else '#EC407A' }}
   tap_link: !input tap_link
   # One tag per baby and timer, from the entity id (letters, numbers, and underscores only).
   sleep_tag: "{{ ('sleep_' ~ sleep_timer.split('.')[1])[:64] }}"
@@ -120,12 +139,12 @@ trigger:
   - trigger: state
     entity_id: !input nursing_timer
     id: nursing
-  # The optional sleep detail entity. Unset, the input is an empty list and the trigger watches
-  # nothing. A new state must hold for 15 seconds, since some devices flap.
-  - trigger: state
-    entity_id: !input sleep_detail
-    for:
-      seconds: 15
+  # The optional sleep detail entity, as a state_changed event filtered by a templated entity id.
+  # Unset, the id is empty and no event matches. The 15-second hold is in the action below.
+  - trigger: event
+    event_type: state_changed
+    event_data:
+      entity_id: "{{ detail_entity }}"
     id: detail
 
 action:
@@ -159,7 +178,6 @@ action:
       message: >-
         {{ 'Nursing · ' ~ side | capitalize ~ ' side' if is_nursing and side else
            ('Nursing' if is_nursing else 'Asleep') }}
-      detail_message: "{{ state_translated(trigger.entity_id) if is_detail else '' }}"
   - choose:
       # Started: from no timer to a start time.
       - conditions: "{{ is_running and not was_running }}"
@@ -190,15 +208,35 @@ action:
               title: "{{ title }}"
               message: "{{ message }}"
               data: "{{ live_data | combine({'silent': true}) }}"
-      # The sleep detail settled on a new state while a sleep runs: update the message.
+      # The sleep detail changed while a sleep runs. Wait until the new state has held for 15
+      # seconds (some devices flap), then update the message if it still stands: unchanged since
+      # the event, and the sleep still running. The wait ends early when either stops being true,
+      # so a stop or a newer change never sits in the queue behind it, and a change overtaken by
+      # a newer one is dropped (the newer one's own run sends it).
       - conditions: >-
-          {{ is_detail and sleep_running and trigger.to_state is not none
-             and trigger.to_state.state not in not_running
-             and trigger.from_state is not none
-             and trigger.from_state.state != trigger.to_state.state }}
+          {{ is_detail and sleep_running
+             and trigger.event.data.new_state is not none
+             and trigger.event.data.old_state is not none
+             and trigger.event.data.new_state.state not in not_running
+             and trigger.event.data.old_state.state != trigger.event.data.new_state.state
+             and states[detail_entity].last_changed == trigger.event.data.new_state.last_changed }}
         sequence:
+          - variables:
+              changed_at: "{{ trigger.event.data.new_state.last_changed.timestamp() }}"
+          - wait_template: >-
+              {{ states[detail_entity].last_changed.timestamp() != changed_at
+                 or states(sleep_timer) in not_running }}
+            timeout:
+              seconds: "{{ [0, 15 - (as_timestamp(now()) - changed_at)] | max }}"
+            continue_on_timeout: true
+          - condition: template
+            value_template: >-
+              {{ states[detail_entity].last_changed.timestamp() == changed_at
+                 and states(sleep_timer) not in not_running }}
           - action: !input notify_service
             data:
               title: "{{ title }}"
-              message: "{{ detail_message }}"
-              data: "{{ live_data | combine({'silent': true}) }}"
+              message: "{{ state_translated(detail_entity) }}"
+              data: >-
+                {{ live_data | combine({'when': as_timestamp(states(sleep_timer), none),
+                                        'silent': true}) }}
