@@ -369,7 +369,8 @@ def test_the_source_comment_states_the_scope_and_the_polling_caveat() -> None:
     _, body = _split()
     top = body.lstrip().split("\n\n", 1)[0]
     assert "user config flow, coordinator, Last diaper, Last feed, and Last sleep sensors" in top
-    assert "every minute while a timer runs" in top
+    assert "every 5 minutes whatever timers run" in top
+    assert "every minute" not in top
 
 
 def test_the_troubleshooting_section_covers_a_changed_password_without_a_prompt() -> None:
