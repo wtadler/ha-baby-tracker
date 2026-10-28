@@ -110,6 +110,17 @@ nursing timer as an iOS Live Activity through the Home Assistant Companion app. 
 then create one automation per baby and phone with that baby's **Sleep timer** and **Nursing
 timer** sensors and the phone's `notify.mobile_app_…` action.
 
+Every other input is optional:
+
+- **Icons and colors** for the sleep and nursing activities. They default to `mdi:sleep` in
+  `#7E57C2` and `mdi:mother-nurse` in `#EC407A`.
+- **Tap link**, a dashboard path such as `/lovelace/baby` to open when the activity is tapped.
+- **Sleep detail**, an entity such as a bassinet's state. While a sleep runs, its displayed state
+  replaces "Asleep" as the activity's message. Each change updates the activity silently once the
+  new state has held for 15 seconds. Leave it empty to keep "Asleep".
+
+A start alerts, and side switches and detail changes update the activity silently.
+
 It needs iOS 17.2 or later and Home Assistant 2026.7.0 or later. Sleeps show from any device;
 nursing shows only for Home Assistant's own timer.
 

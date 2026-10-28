@@ -4,6 +4,11 @@ blueprint:
     Shows a running sleep or nursing timer as an iOS Live Activity (a Live Update on Android)
     through the Home Assistant Companion app. It starts when a timer starts, updates the side when
     nursing switches sides, and ends when the timer stops. Create one automation per baby.
+    Every input after the notify service is optional: an icon and color for each activity, a
+    dashboard path to open when the activity is tapped, and a sleep detail entity (such as a
+    bassinet's state) whose state replaces "Asleep" while a sleep runs. Starts alert; side
+    switches and detail changes update the activity silently, and a detail change only counts once
+    it has held for 15 seconds.
     Needs Home Assistant 2026.7.0 or later and a Companion app with Live Activity support.
   domain: automation
   source_url: https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/baby_tracker/live_activity.yaml
@@ -43,6 +48,48 @@ blueprint:
       default: Nursing
       selector:
         text:
+    sleep_icon:
+      name: Sleep icon
+      description: The icon shown on the sleep activity.
+      default: mdi:sleep
+      selector:
+        icon:
+    nursing_icon:
+      name: Nursing icon
+      description: The icon shown on the nursing activity.
+      default: mdi:mother-nurse
+      selector:
+        icon:
+    sleep_color:
+      name: Sleep icon color
+      description: A hex color for the sleep icon, such as #7E57C2.
+      default: "#7E57C2"
+      selector:
+        text:
+    nursing_color:
+      name: Nursing icon color
+      description: A hex color for the nursing icon, such as #EC407A.
+      default: "#EC407A"
+      selector:
+        text:
+    tap_link:
+      name: Tap link
+      description: >
+        A dashboard path to open when the activity is tapped, such as /lovelace/baby. Leave it
+        empty to open the app's default screen.
+      default: ""
+      selector:
+        text:
+    sleep_detail:
+      name: Sleep detail
+      description: >
+        An optional entity, such as a bassinet's state. While a sleep runs, its displayed state
+        becomes the sleep activity's message, updated silently once a new state has held for 15
+        seconds. Leave it empty to keep "Asleep".
+      default: []
+      selector:
+        entity:
+          multiple: false
 
 # Queued, not parallel or single: the start, the side switches, and the end of one timer must
 # reach the notify service in the order they happened (a parallel stop could overtake its own
@@ -57,6 +104,11 @@ variables:
   nursing_timer: !input nursing_timer
   sleep_title: !input sleep_title
   nursing_title: !input nursing_title
+  sleep_icon: !input sleep_icon
+  nursing_icon: !input nursing_icon
+  sleep_color: !input sleep_color
+  nursing_color: !input nursing_color
+  tap_link: !input tap_link
   # One tag per baby and timer, from the entity id (letters, numbers, and underscores only).
   sleep_tag: "{{ ('sleep_' ~ sleep_timer.split('.')[1])[:64] }}"
   nursing_tag: "{{ ('nursing_' ~ nursing_timer.split('.')[1])[:64] }}"
@@ -68,22 +120,46 @@ trigger:
   - trigger: state
     entity_id: !input nursing_timer
     id: nursing
+  # The optional sleep detail entity. Unset, the input is an empty list and the trigger watches
+  # nothing. A new state must hold for 15 seconds, since some devices flap.
+  - trigger: state
+    entity_id: !input sleep_detail
+    for:
+      seconds: 15
+    id: detail
 
 action:
   - variables:
       not_running: ["unknown", "unavailable", "none", ""]
       was_running: >-
-        {{ trigger.from_state is not none and trigger.from_state.state not in not_running }}
+        {{ trigger.id != 'detail' and trigger.from_state is not none
+           and trigger.from_state.state not in not_running }}
       is_running: >-
-        {{ trigger.to_state is not none and trigger.to_state.state not in not_running }}
+        {{ trigger.id != 'detail' and trigger.to_state is not none
+           and trigger.to_state.state not in not_running }}
+      is_detail: "{{ trigger.id == 'detail' }}"
       is_nursing: "{{ trigger.id == 'nursing' }}"
       tag: "{{ nursing_tag if is_nursing else sleep_tag }}"
       title: "{{ nursing_title if is_nursing else sleep_title }}"
+      # The sleep timer's start time, whichever trigger fired.
+      timer_state: >-
+        {{ states(sleep_timer) if is_detail else
+           (trigger.to_state.state if trigger.to_state is not none else '') }}
+      sleep_running: "{{ is_detail and timer_state not in not_running }}"
+      icon: "{{ nursing_icon if is_nursing else sleep_icon }}"
+      color: "{{ nursing_color if is_nursing else sleep_color }}"
+      # The Live Activity payload. The tap link is left out when empty.
+      live_data: >-
+        {{ {'tag': tag, 'live_update': true, 'chronometer': true,
+            'when': as_timestamp(timer_state, none), 'notification_icon': icon,
+            'notification_icon_color': color}
+           | combine({'url': tap_link} if tap_link else {}) }}
       side: >-
         {{ (trigger.to_state.attributes.get('side') or '') if is_running else '' }}
       message: >-
         {{ 'Nursing · ' ~ side | capitalize ~ ' side' if is_nursing and side else
            ('Nursing' if is_nursing else 'Asleep') }}
+      detail_message: "{{ state_translated(trigger.entity_id) if is_detail else '' }}"
   - choose:
       # Started: from no timer to a start time.
       - conditions: "{{ is_running and not was_running }}"
@@ -92,15 +168,11 @@ action:
             data:
               title: "{{ title }}"
               message: "{{ message }}"
-              data:
-                tag: "{{ tag }}"
-                live_update: true
-                chronometer: true
-                when: "{{ as_timestamp(trigger.to_state.state) }}"
+              data: "{{ live_data }}"
       # Stopped: the timer went to unknown, from a running timer or from unavailable (a failed sync
       # mid-timer goes running, unavailable, unknown). A clear for a tag with no activity is harmless.
       - conditions: >-
-          {{ trigger.to_state is not none and trigger.to_state.state == 'unknown'
+          {{ not is_detail and trigger.to_state is not none and trigger.to_state.state == 'unknown'
              and trigger.from_state is not none and trigger.from_state.state != 'unknown' }}
         sequence:
           - action: !input notify_service
@@ -117,8 +189,16 @@ action:
             data:
               title: "{{ title }}"
               message: "{{ message }}"
-              data:
-                tag: "{{ tag }}"
-                live_update: true
-                chronometer: true
-                when: "{{ as_timestamp(trigger.to_state.state) }}"
+              data: "{{ live_data | combine({'silent': true}) }}"
+      # The sleep detail settled on a new state while a sleep runs: update the message.
+      - conditions: >-
+          {{ is_detail and sleep_running and trigger.to_state is not none
+             and trigger.to_state.state not in not_running
+             and trigger.from_state is not none
+             and trigger.from_state.state != trigger.to_state.state }}
+        sequence:
+          - action: !input notify_service
+            data:
+              title: "{{ title }}"
+              message: "{{ detail_message }}"
+              data: "{{ live_data | combine({'silent': true}) }}"
