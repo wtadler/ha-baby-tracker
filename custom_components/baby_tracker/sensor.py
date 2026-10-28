@@ -49,14 +49,16 @@ SIDES = {0: "left", 1: "right"}  # Core PR 4
 
 # Core PR 4
 def _note(record: Record | None) -> str | None:
-    note = record.note if record is not None else None
-    return note if note else None
+    note: object = record.note if record is not None else None
+    # The library doesn't check payload types at runtime, so the annotation can't be trusted.
+    return note if isinstance(note, str) and note else None
 
 
 # Core PR 4
-def _label(labels: dict[int, str], code: int | None) -> str | None:
+def _label(labels: dict[int, str], code: object) -> str | None:
     """Return the label for a record's numeric code, or None when it has no known code."""
-    return labels.get(code) if code is not None else None
+    # The payload is unvalidated at runtime, so a list or dict can arrive where an int is typed.
+    return labels.get(code) if isinstance(code, int) else None
 
 
 # Core PR 4
@@ -87,21 +89,20 @@ def _feed_attributes(record: Record | None) -> dict[str, Any]:
 
 # Core PR 5
 def _pump_attributes(record: Record | None) -> dict[str, Any]:
-    if not isinstance(record, Pump):
-        record = None
-    amount, unit = volume_parts(record.volume if record else None)
+    pump = record if isinstance(record, Pump) else None
+    amount, unit = volume_parts(pump.volume if pump else None)
     if amount == 0:
         # A timed pump saved with no volume carries an amount of 0: that is no volume, not 0 fl. oz.
         amount = unit = None
     return {
         "amount": amount,
         "unit": unit,
-        "left_amount": volume_parts(record.left_volume if record else None)[0],
-        "right_amount": volume_parts(record.right_volume if record else None)[0],
-        "left_duration_minutes": record.left_duration if record else None,
-        "right_duration_minutes": record.right_duration if record else None,
-        "sides": record.sides if record else None,
-        "note": _note(record),
+        "left_amount": volume_parts(pump.left_volume if pump else None)[0],
+        "right_amount": volume_parts(pump.right_volume if pump else None)[0],
+        "left_duration_minutes": pump.left_duration if pump else None,
+        "right_duration_minutes": pump.right_duration if pump else None,
+        "sides": pump.sides if pump else None,
+        "note": _note(pump),
     }
 
 

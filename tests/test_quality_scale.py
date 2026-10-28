@@ -270,7 +270,7 @@ def test_strict_typing_is_done_with_no_comment() -> None:
     assert _rules()["strict-typing"] == "done"
 
 
-def test_no_module_reads_a_record_field_with_getattr() -> None:
+def test_the_integration_makes_no_getattr_call_of_two_or_three_arguments() -> None:
     # Strict typing means narrowing a record by its class, so mypy knows each field.
     offenders = [
         f"{path.name}:{node.lineno}"
@@ -279,7 +279,7 @@ def test_no_module_reads_a_record_field_with_getattr() -> None:
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "getattr"
-        and len(node.args) == 3
+        and len(node.args) in (2, 3)
     ]
     assert offenders == []
 
