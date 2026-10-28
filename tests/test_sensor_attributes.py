@@ -124,6 +124,7 @@ async def test_a_sleep_with_a_duration_and_a_note_has_every_sleep_key(
     assert _attributes(hass, LAST_SLEEP) == {"duration_minutes": 45, "note": "nap"}
 
 
+# Core PR 5
 async def test_a_pump_with_everything_set_has_every_pump_key(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -210,6 +211,7 @@ async def test_a_sleep_with_no_note_still_has_every_sleep_key(
     assert _attributes(hass, LAST_SLEEP) == {"duration_minutes": 30, "note": None}
 
 
+# Core PR 5
 async def test_a_total_only_pump_still_has_every_pump_key(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -228,6 +230,7 @@ async def test_a_total_only_pump_still_has_every_pump_key(
     }
 
 
+# Core PR 5
 async def test_a_timed_pump_with_a_zero_amount_reads_as_no_amount_but_keeps_its_keys(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

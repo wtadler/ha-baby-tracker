@@ -9,7 +9,7 @@ device write just before a post, or report a log shorter than it is.
 
 import asyncio  # Core PR 9
 from collections.abc import Mapping
-from dataclasses import replace  # Core PR 9
+from dataclasses import replace
 from datetime import datetime
 from types import MappingProxyType
 from typing import Any
@@ -47,7 +47,7 @@ class FakeServer:
         self.posted: list[tuple[int, int, str]] = []  # Core PR 9
         # Each is an error and whether the post it fails still lands.
         self.post_errors: list[tuple[Exception, bool]] = []  # Core PR 9
-        self.last_sync_override: dict[str, int] = {}  # Core PR 9
+        self.last_sync_override: dict[str, int] = {}
         # Holds a post until the test opens it.
         self.post_gate: asyncio.Event | None = None  # Core PR 9
         # Callables run as the next post starts.
@@ -94,8 +94,11 @@ class FakeServer:
         self.names.setdefault(device, f"Device {device[:1]}")
 
     def listed_devices(self) -> list[Device]:
-        """The devices the service lists, each with the length of its log."""
-        return [
+        """The devices the service lists, each with the length of its log.
+
+        ``last_sync_override`` makes it report a log shorter (or longer) than it is.
+        """
+        devices = [
             Device(
                 device_uuid=uuid,
                 last_sync_id=len(log),
@@ -103,6 +106,18 @@ class FakeServer:
                 device_os_info="test",
             )
             for uuid, log in self.logs.items()
+        ]
+        listed = {device.device_uuid for device in devices}
+        devices += [
+            Device(uuid, last, "Home Assistant", "test")
+            for uuid, last in self.last_sync_override.items()
+            if uuid not in listed
+        ]
+        return [
+            replace(device, last_sync_id=self.last_sync_override[device.device_uuid])
+            if device.device_uuid in self.last_sync_override
+            else device
+            for device in devices
         ]
 
     @property
@@ -168,21 +183,7 @@ class FakeClient:
         await asyncio.sleep(0)  # Core PR 9
         await self._ensure_session()
         self.server.device_list_calls += 1
-        devices = self.server.listed_devices()  # Core PR 9
-        listed = {device.device_uuid for device in devices}  # Core PR 9
-        # A log the service reports as shorter than it is.
-        devices += [  # Core PR 9
-            Device(uuid, last, "Home Assistant", "test")
-            for uuid, last in self.server.last_sync_override.items()
-            if uuid not in listed
-        ]
-        return [  # Core PR 9
-            replace(device, last_sync_id=self.server.last_sync_override[device.device_uuid])
-            if device.device_uuid in self.server.last_sync_override
-            else device
-            for device in devices
-        ]
-        # Core: return self.server.listed_devices()
+        return self.server.listed_devices()
 
     async def get_transactions(
         self, device_uuid: str, since_sync_id: int = 0

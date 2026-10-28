@@ -22,10 +22,10 @@ from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import (
     BABY_ONE,  # Core PR 7
-    BABY_THREE,  # Core PR 5
+    BABY_THREE,
     BABY_TWO,
     EMAIL,
-    EMAIL_TWO,  # Core PR 5
+    EMAIL_TWO,
     ENTRY_ID,
     OWN_DEVICE,
     OWN_DEVICE_TWO,  # Core PR 5
@@ -34,7 +34,7 @@ from . import (
 )
 from .factories import (
     DEVICE_A,
-    DEVICE_B,  # Core PR 5
+    DEVICE_B,
     at,
     volume,
 )
@@ -112,7 +112,6 @@ def server() -> FakeServer:
     return server
 
 
-# Core PR 5
 @pytest.fixture
 def second_server() -> FakeServer:
     """A second account's service, with one phone that has logged for a third baby."""
@@ -130,10 +129,7 @@ def second_server() -> FakeServer:
 
 
 @pytest.fixture(autouse=True)
-def mock_baby_tracker_client(
-    server: FakeServer,
-    second_server: FakeServer,  # Core PR 5
-) -> Iterator[FakeServer]:
+def mock_baby_tracker_client(server: FakeServer, second_server: FakeServer) -> Iterator[FakeServer]:
     """Replace the library's client everywhere the integration builds one.
 
     It is autouse so that no test can reach the real service by accident.
@@ -141,10 +137,7 @@ def mock_baby_tracker_client(
 
     def factory(email: str, *args: Any, **kwargs: Any) -> FakeClient:
         # The second account signs in to its own service, every other one to the first.
-        return FakeClient(  # Core PR 5
-            second_server if email == EMAIL_TWO else server, email, *args, **kwargs
-        )
-        # Core: return FakeClient(server, email, *args, **kwargs)
+        return FakeClient(second_server if email == EMAIL_TWO else server, email, *args, **kwargs)
 
     with (
         patch("custom_components.baby_tracker.BabyTrackerClient", factory),

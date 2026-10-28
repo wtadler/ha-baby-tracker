@@ -489,6 +489,8 @@ async def test_a_failing_save_does_not_replace_the_sync_error(
         await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)  # Core PR 2
+    assert not flows  # Core PR 2
     assert "disk full" in caplog.text
 
 

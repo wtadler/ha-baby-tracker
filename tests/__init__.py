@@ -12,7 +12,7 @@ from custom_components.baby_tracker.const import DOMAIN
 
 from .factories import (
     BABY_ONE_ID,
-    BABY_THREE_ID,  # Core PR 5
+    BABY_THREE_ID,
     BABY_TWO_ID,
     baby_payload,
 )
@@ -24,14 +24,14 @@ if TYPE_CHECKING:
 EMAIL = "parent@example.com"
 PASSWORD = "test-password"
 NEW_PASSWORD = "test-new-password"  # Core PR 2
-EMAIL_TWO = "second-parent@example.com"  # Core PR 5
+EMAIL_TWO = "second-parent@example.com"
 ENTRY_ID = "01TESTENTRY0000000000000000"
 OWN_DEVICE = "EEEEEEEE-0000-4000-8000-0000000000EE"
 OWN_DEVICE_TWO = "FFFFFFFF-0000-4000-8000-0000000000FF"  # Core PR 5
 
 BABY_ONE = baby_payload("Baby One", BABY_ONE_ID)
 BABY_TWO = baby_payload("Baby Two", BABY_TWO_ID)
-BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)  # Core PR 5
+BABY_THREE = baby_payload("Baby Three", BABY_THREE_ID)
 
 NOW = datetime(2026, 10, 26, 15, 0, 0, tzinfo=UTC)
 DIAPER = "sensor.baby_one_last_diaper"

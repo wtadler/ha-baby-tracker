@@ -156,3 +156,5 @@ async def test_more_accounts_can_be_added(
     assert second["result"].unique_id == "third@example.com"
     assert first["data"][CONF_DEVICE_UUID] != second["data"][CONF_DEVICE_UUID]
     assert len(hass.config_entries.async_entries(DOMAIN)) == 3
+    # The default entry sets up with the first flow, then each new entry once.
+    assert len(mock_setup_entry.mock_calls) == 3
