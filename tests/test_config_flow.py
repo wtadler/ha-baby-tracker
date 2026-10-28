@@ -59,37 +59,11 @@ async def test_full_flow_creates_one_entry(
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
     assert len(mock_setup_entry.mock_calls) == 1
 
-
-async def test_the_entry_has_a_generated_device_id_the_login_check_used(
-    hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
-) -> None:
-    """Test the entry keeps the device ID the login check signed in with."""
-    result = await _start(hass)
-    result = await _submit(hass, result["flow_id"])
-
+    # The entry keeps the device ID the login check signed in with, and that client is closed.
     device_uuid = result["data"][CONF_DEVICE_UUID]
     assert str(uuid.UUID(device_uuid)).upper() == device_uuid.upper()
-    first_sign_in = server.sign_ins[0]
-    assert first_sign_in["device_uuid"] == device_uuid
-    assert first_sign_in["device_name"] == "Home Assistant"
-
-
-async def test_each_new_entry_gets_its_own_device_id(
-    hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
-) -> None:
-    """Test each new entry gets a device ID of its own."""
-    first = await _submit(hass, (await _start(hass))["flow_id"], email="one@example.com")
-    second = await _submit(hass, (await _start(hass))["flow_id"], email="two@example.com")
-    assert first["data"][CONF_DEVICE_UUID] != second["data"][CONF_DEVICE_UUID]
-    assert len(mock_setup_entry.mock_calls) == 2
-
-
-async def test_the_login_check_client_is_closed(
-    hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
-) -> None:
-    """Test the client that checks the login is closed afterwards."""
-    result = await _start(hass)
-    await _submit(hass, result["flow_id"])
+    assert server.sign_ins[0]["device_uuid"] == device_uuid
+    assert server.sign_ins[0]["device_name"] == "Home Assistant"
     assert server.clients[0].closed
 
 
@@ -153,50 +127,34 @@ async def test_the_form_keeps_what_was_typed_after_an_error(
     assert suggested[CONF_EMAIL] == {"suggested_value": EMAIL}
 
 
+@pytest.mark.parametrize("email", [EMAIL, EMAIL.upper()], ids=["same", "different-case"])
 async def test_an_account_already_set_up_aborts(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, email: str
 ) -> None:
-    """Test adding an account that is already set up aborts."""
+    """Test adding an account that is already set up aborts, whatever the email's case."""
     mock_config_entry.add_to_hass(hass)
     result = await _start(hass)
-    result = await _submit(hass, result["flow_id"])
+    result = await _submit(hass, result["flow_id"], email=email)
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 
 
-async def test_the_same_account_in_a_different_case_aborts(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry
-) -> None:
-    """Test the email's case doesn't make a second entry for an account."""
-    mock_config_entry.add_to_hass(hass)
-    result = await _start(hass)
-    result = await _submit(hass, result["flow_id"], email=EMAIL.upper())
-
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
-
-
-async def test_the_unique_id_is_the_lowercased_email(
-    hass: HomeAssistant, server: FakeServer, mock_setup_entry: AsyncMock
-) -> None:
-    """Test the unique ID is the email in lowercase."""
-    result = await _start(hass)
-    result = await _submit(hass, result["flow_id"], email="Parent@Example.COM")
-    entry = result["result"]
-    assert entry.unique_id == "parent@example.com"
-
-
-async def test_a_second_account_can_be_added(
+async def test_more_accounts_can_be_added(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
-    mock_setup_entry: AsyncMock,
+    mock_setup_entry: AsyncMock,  # stops the new entries from setting up
 ) -> None:
-    """Test a second account gets its own entry."""
+    """Test each new account gets an entry of its own, with a unique ID in lowercase."""
     mock_config_entry.add_to_hass(hass)
-    result = await _start(hass)
-    result = await _submit(hass, result["flow_id"], email="other@example.com")
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["result"].unique_id == "other@example.com"
-    assert len(hass.config_entries.async_entries(DOMAIN)) == 2
+    first = await _submit(hass, (await _start(hass))["flow_id"], email="Other@Example.COM")
+    second = await _submit(hass, (await _start(hass))["flow_id"], email="third@example.com")
+
+    assert first["type"] is second["type"] is FlowResultType.CREATE_ENTRY
+    assert first["result"].unique_id == "other@example.com"
+    assert second["result"].unique_id == "third@example.com"
+    assert first["data"][CONF_DEVICE_UUID] != second["data"][CONF_DEVICE_UUID]
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 3
+    # The default entry sets up with the first flow, then each new entry once.
+    assert len(mock_setup_entry.mock_calls) == 3

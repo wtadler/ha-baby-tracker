@@ -132,11 +132,11 @@ def second_server() -> FakeServer:
 def mock_baby_tracker_client(server: FakeServer, second_server: FakeServer) -> Iterator[FakeServer]:
     """Replace the library's client everywhere the integration builds one.
 
-    The second account (``EMAIL_TWO``) signs in to ``second_server``, every other one to
-    ``server``. It is autouse so that no test can reach the real service by accident.
+    It is autouse so that no test can reach the real service by accident.
     """
 
     def factory(email: str, *args: Any, **kwargs: Any) -> FakeClient:
+        # The second account signs in to its own service, every other one to the first.
         return FakeClient(second_server if email == EMAIL_TWO else server, email, *args, **kwargs)
 
     with (
@@ -230,7 +230,7 @@ def populated_server(server: FakeServer) -> FakeServer:
         baby=BABY_TWO,
         duration=0,
     )
-    server.add_pump(
+    server.add_pump(  # Core PR 5
         DEVICE_A, "F0000000-0000-4000-8000-000000000006", when=at(150), amount=volume(5)
     )
     return server

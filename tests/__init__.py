@@ -1,7 +1,7 @@
 """Tests for Baby Tracker (Nighp). Everything here is invented fixture data."""
 
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING  # Core PR 8
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -10,18 +10,24 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from custom_components.baby_tracker.const import DOMAIN
 
-from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, baby_payload
+from .factories import (
+    BABY_ONE_ID,
+    BABY_THREE_ID,
+    BABY_TWO_ID,
+    baby_payload,
+)
 
+# Core PR 8
 if TYPE_CHECKING:
     from .fake_server import FakeServer
 
 EMAIL = "parent@example.com"
 PASSWORD = "test-password"
-NEW_PASSWORD = "test-new-password"
+NEW_PASSWORD = "test-new-password"  # Core PR 2
 EMAIL_TWO = "second-parent@example.com"
 ENTRY_ID = "01TESTENTRY0000000000000000"
 OWN_DEVICE = "EEEEEEEE-0000-4000-8000-0000000000EE"
-OWN_DEVICE_TWO = "FFFFFFFF-0000-4000-8000-0000000000FF"
+OWN_DEVICE_TWO = "FFFFFFFF-0000-4000-8000-0000000000FF"  # Core PR 5
 
 BABY_ONE = baby_payload("Baby One", BABY_ONE_ID)
 BABY_TWO = baby_payload("Baby Two", BABY_TWO_ID)
@@ -44,6 +50,7 @@ async def tick(hass: HomeAssistant, minutes: float = 5) -> None:
     await hass.async_block_till_done()
 
 
+# Core PR 8
 async def sync_interval(hass: HomeAssistant, server: FakeServer) -> timedelta:
     """How often the integration syncs, found by moving the clock and counting the reads.
 

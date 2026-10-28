@@ -7,7 +7,7 @@ devices, their logs, and switches to make a call fail, hang for an interleaving 
 device write just before a post, or report a log shorter than it is.
 """
 
-import asyncio
+import asyncio  # Core PR 9
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime
@@ -41,15 +41,19 @@ class FakeServer:
         self.sign_ins: list[dict[str, str]] = []
         self.device_list_calls = 0
         self.transaction_reads: list[tuple[str, int]] = []
-        # Write support.
-        self.calls: list[str] = []
-        self.posted: list[tuple[int, int, str]] = []
-        self.post_errors: list[tuple[Exception, bool]] = []  # (error, whether the post landed)
+
+        # Write support, from the PR that adds the first action.
+        self.calls: list[str] = []  # Core PR 9
+        self.posted: list[tuple[int, int, str]] = []  # Core PR 9
+        # Each is an error and whether the post it fails still lands.
+        self.post_errors: list[tuple[Exception, bool]] = []  # Core PR 9
         self.last_sync_override: dict[str, int] = {}
-        self.post_gate: asyncio.Event | None = None  # hold a post until the test opens it
-        self.before_post: list[Any] = []  # callables run as the next post starts
-        self.active_posts = 0
-        self.max_active_posts = 0
+        # Holds a post until the test opens it.
+        self.post_gate: asyncio.Event | None = None  # Core PR 9
+        # Callables run as the next post starts.
+        self.before_post: list[Any] = []  # Core PR 9
+        self.active_posts = 0  # Core PR 9
+        self.max_active_posts = 0  # Core PR 9
 
     def add_record(
         self,
@@ -70,6 +74,7 @@ class FakeServer:
         )
         return self.add_payload(device, payload, op=op)
 
+    # Core PR 5
     def add_pump(self, device: str, object_id: str, *, when: datetime, **fields: Any) -> int:
         """A pump as the live service shapes it: no ``baby`` key."""
         return self.add_record(device, "Pump", object_id, when=when, baby=None, **fields)
@@ -82,10 +87,38 @@ class FakeServer:
         self.names.setdefault(device, f"Device {device[:1]}")
         return sync_id
 
+    # HACS-only
     def add_raw(self, device: str, entry: dict[str, Any]) -> None:
         """Add an entry to a device's log exactly as given."""
         self.logs.setdefault(device, []).append(entry)
         self.names.setdefault(device, f"Device {device[:1]}")
+
+    def listed_devices(self) -> list[Device]:
+        """The devices the service lists, each with the length of its log.
+
+        ``last_sync_override`` makes it report a log shorter (or longer) than it is.
+        """
+        devices = [
+            Device(
+                device_uuid=uuid,
+                last_sync_id=len(log),
+                device_name=self.names[uuid],
+                device_os_info="test",
+            )
+            for uuid, log in self.logs.items()
+        ]
+        listed = {device.device_uuid for device in devices}
+        devices += [
+            Device(uuid, last, "Home Assistant", "test")
+            for uuid, last in self.last_sync_override.items()
+            if uuid not in listed
+        ]
+        return [
+            replace(device, last_sync_id=self.last_sync_override[device.device_uuid])
+            if device.device_uuid in self.last_sync_override
+            else device
+            for device in devices
+        ]
 
     @property
     def open_clients(self) -> list[FakeClient]:
@@ -145,31 +178,12 @@ class FakeClient:
 
     async def get_devices(self) -> list[Device]:
         """List the devices in the sync group."""
-        self.server.calls.append("devices")
-        await asyncio.sleep(0)  # a real await point, so concurrent callers can interleave
+        self.server.calls.append("devices")  # Core PR 9
+        # A real await point, so concurrent callers can interleave.
+        await asyncio.sleep(0)  # Core PR 9
         await self._ensure_session()
         self.server.device_list_calls += 1
-        devices = [
-            Device(
-                device_uuid=uuid,
-                last_sync_id=len(log),
-                device_name=self.server.names[uuid],
-                device_os_info="test",
-            )
-            for uuid, log in self.server.logs.items()
-        ]
-        listed = {device.device_uuid for device in devices}
-        devices += [
-            Device(uuid, last, "Home Assistant", "test")
-            for uuid, last in self.server.last_sync_override.items()
-            if uuid not in listed
-        ]
-        return [
-            replace(device, last_sync_id=self.server.last_sync_override[device.device_uuid])
-            if device.device_uuid in self.server.last_sync_override
-            else device
-            for device in devices
-        ]
+        return self.server.listed_devices()
 
     async def get_transactions(
         self, device_uuid: str, since_sync_id: int = 0
@@ -184,6 +198,7 @@ class FakeClient:
             RawTransaction(e["SyncID"], e["OPCode"], e["Transaction"]) for e in entries[:PAGE_SIZE]
         ]
 
+    # Core PR 9
     async def post_transaction(self, op_code: int, sync_id: int, transaction: str) -> None:
         """Append a transaction to this device's log."""
         server = self.server
@@ -205,6 +220,7 @@ class FakeClient:
         finally:
             server.active_posts -= 1
 
+    # Core PR 9
     def _append(self, op_code: int, sync_id: int, transaction: str) -> None:
         log = self.server.logs.setdefault(self.device_uuid, [])
         log.append({"SyncID": sync_id, "OPCode": op_code, "Transaction": transaction})
