@@ -31,6 +31,8 @@ class DayTotals:
     feeds: int = 0
     # Formula and pumped bottles together, in milliliters.
     bottle_milliliters: float = 0.0
+    # The start of the day these totals cover: what the sensors report as ``last_reset``.
+    start: datetime | None = None
 
 
 def day_totals(
@@ -57,4 +59,4 @@ def day_totals(
                 amount, unit = volume_parts(record.volume)
                 if amount is not None and unit is not None:
                     milliliters += VolumeConverter.convert(amount, unit, UnitOfVolume.MILLILITERS)
-    return DayTotals(diapers, wet, dirty, mixed, feeds, milliliters)
+    return DayTotals(diapers, wet, dirty, mixed, feeds, milliliters, start)

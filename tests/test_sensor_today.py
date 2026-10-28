@@ -1,19 +1,29 @@
 """Core PR 7: the today sensors (counts and volume), with the midnight rollover."""
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.components.recorder import Recorder, get_instance, migration
+from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import recorder as recorder_helpers
+from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
+from pytest_homeassistant_custom_component.components.recorder.common import (
+    async_wait_recording_done,
+    do_adhoc_statistics,
+)
+from sqlalchemy.orm import Session
 
 from . import BABY_ONE, BABY_TWO, NOW, get_baby_device, tick
 from .factories import (
@@ -534,3 +544,349 @@ async def test_a_spring_forward_day_still_counts_the_local_calendar_day(
 
     await pass_midnight(hass, clock, local(2026, 3, 9))
     assert baby_value(hass, "diapers_today") == "1"
+
+
+TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today")
+
+# Local midnight at the start of the default "today" in New York.
+START_OF_TODAY = local(2026, 10, 26)
+
+TOKYO = ZoneInfo("Asia/Tokyo")
+
+
+def _last_reset(hass: HomeAssistant, entity: str, baby: str = "baby_one") -> datetime:
+    value = baby_state(hass, entity, baby).attributes["last_reset"]
+    parsed = dt_util.parse_datetime(value)
+    assert parsed is not None
+    return parsed
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_each_today_sensor_is_a_total_that_resets(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer, key: str
+) -> None:
+    await setup_loaded(hass, entry)
+    state = baby_state(hass, key)
+    assert state.attributes["state_class"] == "total"
+    assert "last_reset" in state.attributes
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_last_reset_is_local_midnight_of_today(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer, key: str
+) -> None:
+    await setup_loaded(hass, entry)
+    assert _last_reset(hass, key) == START_OF_TODAY
+    # Written with the local offset (daylight time), so it reads as midnight local time.
+    assert baby_state(hass, key).attributes["last_reset"] == "2026-10-26T00:00:00-04:00"
+
+
+async def test_every_baby_has_its_own_last_reset_on_the_same_day(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    await setup_loaded(hass, entry)
+    for baby in ("baby_one", "baby_two"):
+        for key in TODAY_KEYS:
+            assert _last_reset(hass, key, baby) == START_OF_TODAY
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_last_reset_moves_to_the_new_midnight_after_midnight(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+    key: str,
+) -> None:
+    _diaper(empty, TODAY)
+    await setup_loaded(hass, entry)
+    assert _last_reset(hass, key) == START_OF_TODAY
+
+    await pass_midnight(hass, clock)
+    assert _last_reset(hass, key) == MIDNIGHT
+
+    await pass_midnight(hass, clock, local(2026, 10, 28))
+    assert _last_reset(hass, key) == local(2026, 10, 28)
+
+
+async def test_the_value_resets_together_with_last_reset(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+) -> None:
+    _diaper(empty, TODAY)
+    await setup_loaded(hass, entry)
+    assert baby_value(hass, "diapers_today") == "1"
+    await pass_midnight(hass, clock)
+    assert baby_value(hass, "diapers_today") == "0"
+    assert _last_reset(hass, "diapers_today") == MIDNIGHT
+
+
+async def test_last_reset_is_not_moved_by_a_sync_within_the_day(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    await setup_loaded(hass, entry)
+    empty.add_record(DEVICE_B, "Diaper", _id(), when=TODAY, status=1)
+    await tick(hass, minutes=1440)
+    assert baby_value(hass, "diapers_today") == "1"
+    assert _last_reset(hass, "diapers_today") == START_OF_TODAY
+
+
+@pytest.mark.engine
+async def test_a_count_that_goes_down_within_the_day_keeps_last_reset(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    gone = _diaper(empty, TODAY, 1)
+    _diaper(empty, TODAY, 0)
+    empty.add_record(DEVICE_A, "Formula", _id(), when=TODAY, amount=volume(120, english=False))
+    await setup_loaded(hass, entry)
+    assert baby_value(hass, "diapers_today") == "2"
+    before = {key: _last_reset(hass, key) for key in TODAY_KEYS}
+
+    empty.add_record(DEVICE_A, "Diaper", gone, when=TODAY, status=1, op=OP_DELETE)
+    await tick(hass, minutes=1440)
+
+    assert baby_value(hass, "diapers_today") == "1"
+    assert {key: _last_reset(hass, key) for key in TODAY_KEYS} == before
+
+
+@pytest.mark.engine
+async def test_a_record_moved_to_yesterday_keeps_last_reset(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    object_id = _diaper(empty, TODAY, 0)
+    await setup_loaded(hass, entry)
+    empty.add_record(
+        DEVICE_A, "Diaper", object_id, when=YESTERDAY, changed=LOCAL_NOW, status=0, op=OP_UPDATE
+    )
+    await tick(hass, minutes=1440)
+    assert baby_value(hass, "diapers_today") == "0"
+    assert _last_reset(hass, "diapers_today") == START_OF_TODAY
+
+
+async def test_last_reset_follows_the_configured_time_zone(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+) -> None:
+    await hass.config.async_set_time_zone("Asia/Tokyo")
+    clock.move_to(datetime(2026, 10, 27, 1, 0, tzinfo=TOKYO))
+    # Both are on October 26 in UTC: only the first is on October 27 in Tokyo.
+    _diaper(empty, datetime(2026, 10, 27, 0, 30, tzinfo=TOKYO))
+    _diaper(empty, datetime(2026, 10, 26, 23, 30, tzinfo=TOKYO))
+    await setup_loaded(hass, entry)
+
+    assert baby_value(hass, "diapers_today") == "1"
+    start = datetime(2026, 10, 27, tzinfo=TOKYO)
+    assert _last_reset(hass, "diapers_today") == start
+    assert baby_state(hass, "diapers_today").attributes["last_reset"] == "2026-10-27T00:00:00+09:00"
+    for key in TODAY_KEYS:
+        assert _last_reset(hass, key) == start
+
+
+async def test_last_reset_rolls_over_at_midnight_in_another_time_zone(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+) -> None:
+    await hass.config.async_set_time_zone("Asia/Tokyo")
+    clock.move_to(datetime(2026, 10, 27, 23, 0, tzinfo=TOKYO))
+    await setup_loaded(hass, entry)
+    assert _last_reset(hass, "feeds_today") == datetime(2026, 10, 27, tzinfo=TOKYO)
+
+    await pass_midnight(hass, clock, datetime(2026, 10, 28, tzinfo=TOKYO))
+    assert _last_reset(hass, "feeds_today") == datetime(2026, 10, 28, tzinfo=TOKYO)
+
+
+async def test_last_reset_is_midnight_local_time_on_a_fall_back_day(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+) -> None:
+    clock.move_to(local(2026, 11, 1, 23, 40))
+    _diaper(empty, local(2026, 11, 1, 0, 0, 0))
+    await setup_loaded(hass, entry)
+    assert baby_state(hass, "diapers_today").attributes["last_reset"] == "2026-11-01T00:00:00-04:00"
+
+    await pass_midnight(hass, clock, local(2026, 11, 2))
+    assert baby_state(hass, "diapers_today").attributes["last_reset"] == "2026-11-02T00:00:00-05:00"
+
+
+async def test_last_reset_is_the_day_boundary_the_counts_use(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+) -> None:
+    clock.move_to(local(2026, 10, 26, 12))
+    _diaper(empty, local(2026, 10, 26, 0, 0, 0))  # at last_reset: counted
+    _diaper(empty, local(2026, 10, 25, 23, 59, 59))  # just before last_reset: not counted
+    await setup_loaded(hass, entry)
+    assert _last_reset(hass, "diapers_today") == START_OF_TODAY
+    assert baby_value(hass, "diapers_today") == "1"
+
+
+async def test_the_counts_have_translated_units(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    await setup_loaded(hass, entry)
+    assert baby_state(hass, "diapers_today").attributes["unit_of_measurement"] == "diapers"
+    assert baby_state(hass, "feeds_today").attributes["unit_of_measurement"] == "feeds"
+
+
+async def test_the_count_states_are_numeric(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer
+) -> None:
+    _diaper(empty, TODAY)
+    empty.add_record(DEVICE_A, "Formula", _id(), when=TODAY, amount=volume(120, english=False))
+    await setup_loaded(hass, entry)
+    for key in TODAY_KEYS:
+        float(baby_value(hass, key))
+    assert baby_value(hass, "diapers_today") == "1"
+
+
+@pytest.mark.parametrize(
+    ("system", "unit"), [(METRIC_SYSTEM, "mL"), (US_CUSTOMARY_SYSTEM, "fl. oz.")]
+)
+async def test_bottle_volume_keeps_its_unit_and_total_state_class(
+    hass: HomeAssistant, entry: MockConfigEntry, empty: FakeServer, system: Any, unit: str
+) -> None:
+    hass.config.units = system
+    empty.add_record(DEVICE_A, "Formula", _id(), when=TODAY, amount=volume(4))
+    await setup_loaded(hass, entry)
+    state = baby_state(hass, "bottle_volume_today")
+    assert state.attributes["unit_of_measurement"] == unit
+    assert state.attributes["state_class"] == "total"
+    assert state.attributes["device_class"] == "volume"
+    expected = 4 * ML_PER_OZ if unit == "mL" else 4
+    assert float(state.state) == pytest.approx(expected, abs=0.01)
+    assert _last_reset(hass, "bottle_volume_today") == START_OF_TODAY
+
+
+@pytest.fixture
+def recorder_db_url() -> str:
+    """An in-memory database for the recorder.
+
+    The plugin's own fixture refuses to run once ``hass`` exists, and this suite's autouse
+    fixtures create ``hass`` first. The in-memory URL is what it would return anyway.
+    """
+    return "sqlite://"
+
+
+@pytest.fixture
+def recorder_annotations(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the recorder's migration module's annotations resolvable on Python 3.14.
+
+    Core imports ``Recorder`` there only for type checking, and the plugin inspects the
+    signatures when it patches that module. Python 3.14 evaluates annotations lazily, so
+    the missing name raises a ``NameError`` unless it is defined.
+    """
+    monkeypatch.setattr(migration, "Recorder", Recorder, raising=False)
+    monkeypatch.setattr(migration, "Session", Session, raising=False)
+    monkeypatch.setattr(recorder_helpers, "Session", Session, raising=False)
+
+
+def _period() -> datetime:
+    """The five-minute statistics period that holds the (frozen) clock."""
+    now = dt_util.utcnow()
+    return now.replace(minute=now.minute - now.minute % 5, second=0, microsecond=0)
+
+
+async def _compile(hass: HomeAssistant, period: datetime) -> None:
+    await async_wait_recording_done(hass)
+    do_adhoc_statistics(hass, start=period)
+    await async_wait_recording_done(hass)
+
+
+async def _sums(hass: HomeAssistant, entity_id: str, start: datetime) -> list[dict[str, Any]]:
+    stats = await get_instance(hass).async_add_executor_job(
+        statistics_during_period,
+        hass,
+        start,
+        None,
+        {entity_id},
+        "5minute",
+        None,
+        {"state", "sum"},
+    )
+    return stats.get(entity_id, [])
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_the_recorder_compiles_statistics_with_a_sum(
+    recorder_annotations: None,
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+    key: str,
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    _diaper(empty, TODAY)
+    await setup_loaded(hass, entry)
+    entity_id = baby_state(hass, key).entity_id
+    first_value = float(baby_value(hass, key))
+    start = _period()
+    await _compile(hass, start)
+
+    # More is logged on another phone, and the sum grows by the difference.
+    clock.move_to(start + timedelta(minutes=5, seconds=10))
+    _diaper(empty, TODAY, 1)
+    empty.add_record(DEVICE_B, "Formula", _id(), when=TODAY, amount=volume(100, english=False))
+    await entry.runtime_data.async_refresh()
+    second_value = float(baby_value(hass, key))
+    assert second_value > first_value
+    await _compile(hass, _period())
+
+    first, second = await _sums(hass, entity_id, start)
+    assert first["state"] == pytest.approx(first_value)
+    assert second["state"] == pytest.approx(second_value)
+    assert second["sum"] - first["sum"] == pytest.approx(second_value - first_value)
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_statistics_do_not_double_count_when_the_value_drops_or_resets(
+    recorder_annotations: None,
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+    key: str,
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    gone = _diaper(empty, TODAY, 1)
+    _diaper(empty, TODAY, 0)
+    empty.add_record(DEVICE_A, "Nursing", _id(), when=TODAY, leftDuration=5)
+    gone_feed = _id()
+    empty.add_record(DEVICE_A, "Formula", gone_feed, when=TODAY, amount=volume(100, english=False))
+    await setup_loaded(hass, entry)
+    entity_id = baby_state(hass, key).entity_id
+    start = _period()
+    await _compile(hass, start)
+
+    # An undo within the day lowers the value: the sum follows it down, once.
+    clock.move_to(start + timedelta(minutes=5, seconds=10))
+    empty.add_record(DEVICE_A, "Diaper", gone, when=TODAY, status=1, op=OP_DELETE)
+    empty.add_record(
+        DEVICE_A, "Formula", gone_feed, when=TODAY, amount=volume(100, english=False), op=OP_DELETE
+    )
+    # A refresh rather than a tick: a tick fires the midnight timer a day early.
+    await entry.runtime_data.async_refresh()
+    after_drop = float(baby_value(hass, key))
+    await _compile(hass, _period())
+
+    # At midnight the value goes back to 0 with a new last_reset: that is not a drop.
+    await pass_midnight(hass, clock)
+    assert float(baby_value(hass, key)) == 0
+    await _compile(hass, _period())
+
+    first, second, third = await _sums(hass, entity_id, start)
+    assert second["sum"] - first["sum"] == pytest.approx(after_drop - first["state"])
+    assert third["state"] == 0
+    assert third["sum"] == pytest.approx(second["sum"])

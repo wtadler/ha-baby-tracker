@@ -339,7 +339,8 @@ it in the conditions of the automations that make noise.
 timer as an iOS Live Activity.
 
 **A daily intake check.** **Diapers today**, **Feeds today**, and **Bottle volume today** count
-from local midnight. This sends a message at 8 p.m. if there have been fewer than four feeds:
+from local midnight. They are totals that reset each day, so their history draws as a chart and
+Home Assistant keeps long-term statistics for them. This sends a message at 8 p.m. if there have been fewer than four feeds:
 
 ```yaml
 automation:

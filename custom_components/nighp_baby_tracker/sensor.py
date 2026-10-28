@@ -15,6 +15,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
+    SensorStateClass,  # Core PR 7
 )
 from homeassistant.const import (  # Core PR 7
     UnitOfTime,  # Core PR 19
@@ -231,6 +232,7 @@ TODAY_SENSORS: tuple[BabyTrackerTodaySensorDescription, ...] = (
     BabyTrackerTodaySensorDescription(
         key="diapers_today",
         translation_key="diapers_today",
+        state_class=SensorStateClass.TOTAL,
         value_fn=lambda totals: totals.diapers,
         attributes_fn=lambda totals: {
             "wet": totals.wet,
@@ -241,12 +243,14 @@ TODAY_SENSORS: tuple[BabyTrackerTodaySensorDescription, ...] = (
     BabyTrackerTodaySensorDescription(
         key="feeds_today",
         translation_key="feeds_today",
+        state_class=SensorStateClass.TOTAL,
         value_fn=lambda totals: totals.feeds,
     ),
     BabyTrackerTodaySensorDescription(
         key="bottle_volume_today",
         translation_key="bottle_volume_today",
         device_class=SensorDeviceClass.VOLUME,
+        state_class=SensorStateClass.TOTAL,
         # The value is in milliliters; the entity converts it to the unit system's unit.
         value_fn=lambda totals: totals.bottle_milliliters,
     ),
@@ -269,6 +273,17 @@ class BabyTrackerTodaySensor(BabyTrackerBabyEntity, SensorEntity):
         if self.hass.config.units.volume_unit == UnitOfVolume.GALLONS:
             return UnitOfVolume.FLUID_OUNCES
         return UnitOfVolume.MILLILITERS
+
+    @property
+    @override
+    def last_reset(self) -> datetime | None:
+        """Return the start of the local day the totals cover.
+
+        It is the boundary the totals are counted from, so the two can't disagree. A count that
+        drops within the day (an undo, a deletion) keeps it, and it moves only at midnight.
+        """
+        baby = self._baby
+        return baby.today.start if baby is not None else None
 
     @property
     @override
