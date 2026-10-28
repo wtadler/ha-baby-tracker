@@ -1,7 +1,12 @@
+<p align="center">
+  <img src="custom_components/nighp_baby_tracker/brand/icon.png" alt="Baby Tracker icon" width="128">
+</p>
+
 # Baby Tracker (Nighp) for Home Assistant
 
-A custom integration for the Nighp "Baby Tracker" app. Home Assistant signs in to your account's
-sync service and shows each baby's last diaper, feed, pump, and sleep.
+A custom integration for the [Baby Tracker](https://apps.apple.com/us/app/baby-tracker-newborn-log/id779656557)
+app by [Nighp](https://nighp.com). Home Assistant signs in to your account's sync service and shows
+each baby's last diaper, feed, pump, and sleep.
 
 This integration is not made or supported by Nighp, the maker of Baby Tracker. For help, open an
 issue in this repository; please don't contact Nighp.
