@@ -27,6 +27,7 @@ jobs:
           python-version: "3.14"
       - name: Install pinned test requirements
         run: pip install -r requirements_test.txt
+      # "Latest" means the latest Home Assistant that the latest pytest-homeassistant-custom-component supports.
       # Upgrading after the pins install, so the pins don't win. The upgrade pulls in whatever
       # Home Assistant version the latest pytest-homeassistant-custom-component requires.
       - name: Upgrade to the latest Home Assistant
@@ -52,6 +53,6 @@ jobs:
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$body"
           else
-            gh label create needs-triage --force --color "d4c5f9" --description "Waiting for triage"
+            gh label create needs-triage --color "d4c5f9" --description "Waiting for triage" || true
             gh issue create --title "$TITLE" --label needs-triage --body "$body"
           fi

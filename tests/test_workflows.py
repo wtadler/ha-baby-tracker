@@ -6,6 +6,7 @@ run, a failure step that reports to an issue without spamming one, and that regu
 pinned.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,9 @@ from .helpers import ROOT
 WORKFLOWS = ROOT / ".github" / "workflows"
 LATEST = WORKFLOWS / "latest-ha.yml"
 CI = WORKFLOWS / "ci.yml"
+CRON_FIELDS = re.compile(
+    r"([0-5]?\d) ([01]?\d|2[0-3]) (\*|[1-9]|[12]\d|3[01]) (\*|[1-9]|1[0-2]) (\*|[0-7])"
+)
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -51,7 +55,9 @@ def test_latest_ha_runs_weekly_and_can_be_started_by_hand() -> None:
 
     assert "workflow_dispatch" in on
     cron = on["schedule"][0]["cron"]
-    assert len(cron.split()) == 5
+    # minute, hour, day of month, month, day of week, each within its range; weekly means Monday.
+    assert CRON_FIELDS.fullmatch(cron), cron
+    assert cron.split()[4] == "1"
 
 
 def test_latest_ha_upgrades_both_packages_after_the_pinned_install() -> None:
@@ -102,6 +108,10 @@ def test_latest_ha_failure_step_opens_or_comments_on_one_issue() -> None:
     assert "gh issue comment" in run
     assert "gh issue create" in run
     assert "needs-triage" in run
+    # Creating the label must not overwrite an existing one, and a failure must not stop the step.
+    assert "gh label create needs-triage" in run
+    assert "--force" not in run
+    assert "|| true" in run
     assert failure["env"]["GH_TOKEN"] == "${{ secrets.GITHUB_TOKEN }}"
 
 
