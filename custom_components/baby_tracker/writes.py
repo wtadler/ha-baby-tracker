@@ -7,9 +7,9 @@ the checks that refuse bad input before anything is sent.
 """
 
 import logging
-import math
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 from homeassistant.const import CONF_EMAIL
@@ -24,23 +24,37 @@ from pybabytracker import (
     DIAPER_WET,
     SIDE_LEFT,
     SIDE_RIGHT,
+    AmountTooSmallError,
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
+    EndBeforeStartError,
+    InvalidAmountError,
+    MinutesTooLongError,
     NotOwnRecordError,
     ObjectIdInUseError,
     ProtocolError,
     RecordNotFoundError,
     Sleep,
+    SleepStartOutOfRangeError,
+    SleepTooLongError,
     SyncEngine,
     TimerNotRunningError,
     UnknownBabyError,
+    ValidationError,
     Volume,
     WriteOutcomeUnknownError,
     WrongRecordTypeError,
 )
-from pybabytracker.builders import MAX_MINUTES_PER_SIDE, MAX_SLEEP, START_SKEW
 from pybabytracker.times import standard_offset_seconds
+from pybabytracker.validation import (
+    check_amount,
+    check_end_after_start,
+    check_minutes,
+    check_pump_amounts,
+    check_sleep_range,
+    check_sleep_start,
+)
 
 from .bottle import BOTTLE_KINDS, OUNCES, VOLUME_UNITS, configured_bottle
 from .const import DOMAIN
@@ -63,6 +77,26 @@ def _error(key: str, **placeholders: str) -> HomeAssistantError:
 def validation_error(key: str) -> ServiceValidationError:
     """Return a translated validation error for ``key``."""
     return ServiceValidationError(translation_domain=DOMAIN, translation_key=key)
+
+
+# The translation key for each error the library's checks raise.
+VALIDATION_KEYS: dict[type[ValidationError], str] = {
+    InvalidAmountError: "invalid_amount",
+    AmountTooSmallError: "amount_too_small",
+    MinutesTooLongError: "minutes_too_long",
+    EndBeforeStartError: "end_before_start",
+    SleepTooLongError: "sleep_too_long",
+    SleepStartOutOfRangeError: "sleep_start_out_of_range",
+}
+
+
+@contextmanager
+def _validated() -> Iterator[None]:
+    """Run the library's checks, turning the error one raises into its translated one."""
+    try:
+        yield
+    except ValidationError as err:
+        raise validation_error(VALIDATION_KEYS[type(err)]) from err
 
 
 def issue_id(entry_id: str) -> str:
@@ -165,16 +199,14 @@ def _volume(amount: float, unit: str | None) -> Volume:
 
 
 def _checked_amount(amount: float) -> float:
-    if not math.isfinite(amount) or amount <= 0:
-        raise validation_error("invalid_amount")
-    if round(amount, 2) <= 0:  # the library writes two decimals
-        raise validation_error("amount_too_small")
-    return amount
+    with _validated():
+        checked = check_amount(amount)
+    return checked
 
 
 def _checked_minutes(*minutes: int) -> None:
-    if any(m > MAX_MINUTES_PER_SIDE for m in minutes):
-        raise validation_error("minutes_too_long")
+    with _validated():
+        check_minutes(*minutes)
 
 
 async def _add(
@@ -325,10 +357,8 @@ async def async_log_sleep(
     """
     begin, offset = _in_home_assistant_time(start)
     finish, _ = _in_home_assistant_time(end)
-    if finish <= begin:
-        raise validation_error("end_before_start")
-    if finish - begin > MAX_SLEEP:
-        raise validation_error("sleep_too_long")
+    with _validated():
+        check_sleep_range(begin, finish)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
         return await engine.add_sleep(
@@ -379,12 +409,8 @@ async def async_log_pump(
         left = right = None
     else:
         total = None
-        for side_amount in (left_amount, right_amount):
-            if side_amount is not None and (not math.isfinite(side_amount) or side_amount < 0):
-                raise validation_error("invalid_amount")
-        _checked_amount((left_amount or 0) + (right_amount or 0))
-        if round(left_amount or 0, 2) + round(right_amount or 0, 2) <= 0:
-            raise validation_error("amount_too_small")  # each side is saved to two decimals
+        with _validated():
+            check_pump_amounts(left_amount, right_amount)
         left = _volume(left_amount, unit) if left_amount is not None else None
         right = _volume(right_amount, unit) if right_amount is not None else None
     left_length = minutes if minutes is not None else (left_minutes or 0)
@@ -437,8 +463,8 @@ async def async_start_sleep(
     """
     begin, offset = _in_home_assistant_time(start)
     now = dt_util.utcnow()
-    if begin - now > START_SKEW or now - begin > MAX_SLEEP:
-        raise validation_error("sleep_start_out_of_range")
+    with _validated():
+        check_sleep_start(begin, now)
 
     async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
         running = running_sleep(engine, baby_id)
@@ -461,8 +487,9 @@ async def async_stop_sleep(
         running = running_sleep(engine, baby_id)
         if running is None:
             raise validation_error("no_running_sleep")
-        if running.time is not None and finish <= running.time:
-            raise validation_error("end_before_start")
+        if running.time is not None:
+            with _validated():
+                check_end_after_start(running.time, finish)
         return await engine.end_sleep(client, running.object_id, end=finish)
 
     await _write(coordinator, operation)
