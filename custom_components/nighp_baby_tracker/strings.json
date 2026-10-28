@@ -609,7 +609,7 @@
     },
     "nursing_timer_long": {
       "title": "The nursing timer for {baby} has run for over an hour",
-      "description": "Home Assistant's nursing timer for {baby} has been running for more than an hour. The Baby Tracker app doesn't show a running nursing timer, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, either:\n\n1. Stop the timer (turn off the Nursing switch that is on, or call the Stop nursing action) to save one nursing record. A side is saved as at most 240 minutes.\n2. Discard the timer with the Discard nursing button or action to throw it away without saving anything.\n\nThis notice goes away when the timer stops or is discarded."
+      "description": "Home Assistant's nursing timer for {baby} has been running for more than an hour. The Baby Tracker app doesn't show a running nursing timer, so nothing else will end it.\n\nTo fix it, either:\n\n1. Stop the timer (turn off the Nursing switch that is on, or call the Stop nursing action) to save one nursing record. A side is saved as at most 240 minutes.\n2. Discard the timer with the Discard nursing button or action to throw it away without saving anything.\n\nThis notice goes away when the timer stops or is discarded."
     },
     "deprecated_action_field": {
       "title": "An automation uses an old field of {action}",
@@ -617,7 +617,7 @@
     },
     "pump_timer_long": {
       "title": "The pump timer has run for over an hour",
-      "description": "Home Assistant's pump timer has been running for more than an hour. The Baby Tracker app doesn't show a running pump, so nothing else will end it, and Home Assistant has stopped syncing every minute because of it.\n\nTo fix it, turn off the Pump timer switch, or call the Stop pump action, to save the session. A session is saved as at most 240 minutes. If the session wasn't real, use the Undo action to delete the record Home Assistant just saved.\n\nThis notice goes away when the timer stops."
+      "description": "Home Assistant's pump timer has been running for more than an hour. The Baby Tracker app doesn't show a running pump, so nothing else will end it.\n\nTo fix it, turn off the Pump timer switch, or call the Stop pump action, to save the session. A session is saved as at most 240 minutes. If the session wasn't real, use the Undo action to delete the record Home Assistant just saved.\n\nThis notice goes away when the timer stops."
     }
   }
 }

@@ -33,11 +33,6 @@ async def async_get_config_entry_diagnostics(
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
-            "update_interval_seconds": (
-                coordinator.update_interval.total_seconds()
-                if coordinator.update_interval is not None
-                else None
-            ),
             "babies": len(data.babies),
             "has_last_pump": data.last_pump is not None,
             "pump_timer_running": data.pump is not None,

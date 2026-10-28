@@ -176,9 +176,6 @@ quality_scale:
       9: done
     appropriate-polling:
       1: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it)."}
-      8: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep runs."}
-      18: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep or nursing timer runs."}
-      21: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep, nursing, or pump timer runs."}
     brands:
       1: {status: done, comment: "The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker."}
     common-modules:

@@ -16,8 +16,8 @@ SCAN_INTERVAL = timedelta(minutes=5)
 
 # Core PR 18
 # A nursing timer is Home Assistant's alone (the app doesn't sync a running one), so a forgotten one
-# can't be seen or ended anywhere else. Once it has run this long it raises a repair and stops
-# counting toward the one-minute polling. Sleeps are synced, so they have no such limit.
+# can't be seen or ended anywhere else. Once it has run this long it raises a repair. Sleeps are
+# synced, so they have no such limit.
 NURSING_TIMER_GUARD_AFTER = timedelta(minutes=60)
 # Core PR 21
 # The pump timer is Home Assistant's alone in the same way, so it has the same hour.

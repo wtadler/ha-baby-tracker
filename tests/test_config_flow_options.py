@@ -265,7 +265,7 @@ async def test_saving_the_options_drops_a_legacy_interval(
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
-async def test_an_options_change_leaves_a_running_timer_at_one_minute(
+async def test_an_options_change_leaves_a_running_timer_at_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     await toggle(hass, SLEEP_SWITCH)
@@ -277,7 +277,7 @@ async def test_an_options_change_leaves_a_running_timer_at_one_minute(
     )
     await hass.async_block_till_done()
 
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_saving_the_options_neither_reloads_nor_syncs(

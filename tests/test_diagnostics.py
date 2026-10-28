@@ -89,7 +89,7 @@ async def test_diagnostics_count_the_records_and_babies(
     diagnostics = await _diagnostics(hass, hass_client, init_integration)
     assert diagnostics["coordinator"]["babies"] == 2
     assert diagnostics["coordinator"]["last_update_success"] is True
-    assert diagnostics["coordinator"]["update_interval_seconds"] == 300
+    assert "update_interval_seconds" not in diagnostics["coordinator"]
     assert diagnostics["engine"]["records_by_type"]["Diaper"] == 2
 
 

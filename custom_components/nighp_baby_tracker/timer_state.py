@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Callable, Container
-from datetime import datetime
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -12,8 +11,6 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     DOMAIN,
-    NURSING_TIMER_GUARD_AFTER,
-    PUMP_TIMER_GUARD_AFTER,
     STORAGE_VERSION,
 )
 from .timers import NursingTimer, PumpTimer, load_pump_timer, load_timers
@@ -69,17 +66,6 @@ class TimerState:
             self.pump = load_pump_timer(await self._pump_store.async_load())
         except HomeAssistantError as err:
             _LOGGER.warning("The saved pump timer couldn't be read (%s); starting with none", err)
-
-    def nursing_running(self, known_babies: Container[str], now: datetime) -> bool:
-        """Return whether a nursing timer of a known baby runs and isn't past its guard hour."""
-        return any(
-            baby_id in known_babies and not timer.is_overdue(now, NURSING_TIMER_GUARD_AFTER)
-            for baby_id, timer in self.nursing.items()
-        )
-
-    def pump_running(self, now: datetime) -> bool:
-        """Return whether the pump timer runs and isn't past its guard hour."""
-        return self.pump is not None and not self.pump.is_overdue(now, PUMP_TIMER_GUARD_AFTER)
 
     async def async_set_nursing(self, baby_id: str, timer: NursingTimer | None) -> None:
         """Start, change, or (with ``None``) clear a baby's nursing timer, publish it, and save it.

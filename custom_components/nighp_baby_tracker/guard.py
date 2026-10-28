@@ -130,7 +130,7 @@ class TimerGuard:
 
     @callback
     def async_due(self, now: datetime) -> None:
-        """Publish when a timer reaches its hour: raise its repair and ease polling."""
+        """Publish when a timer reaches its hour: raise its repair."""
         for key, (due, _) in list(self._waiting.items()):
             if due <= now:
                 del self._waiting[key]

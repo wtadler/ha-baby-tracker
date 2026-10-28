@@ -145,11 +145,10 @@ any dashboard or automation that used one.
     change still happens and an error says so).
   - It does what the `start_pump` and `stop_pump` actions do. The **Pump timer** sensor shows its
     start time.
-- While a sleep, a nursing timer, or the pump timer runs, Home Assistant syncs every minute, so a phone's stop shows
-  up quickly. It returns to every 5 minutes when none is running. A nursing or pump timer that has
-  run for an hour or more no longer counts: it's probably forgotten, and a
-  [repair](#troubleshooting) asks you to stop (or discard, for nursing) it. A running sleep always counts, however long, because the app syncs it
-  and every phone shows it.
+- Home Assistant syncs every 5 minutes, whatever timer runs, so a phone's stop shows up within 5
+  minutes. A nursing or pump timer that has run for an hour or more is probably forgotten, and a
+  [repair](#troubleshooting) asks you to stop (or discard, for nursing) it. A running sleep is never
+  flagged, however long, because the app syncs it and every phone shows it.
 - A sleep can't be longer than 24 hours. Stopping one later than that saves 24 hours, so a
   forgotten timer can always be stopped; fix the length in the app.
 
@@ -379,9 +378,8 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
   `stop_pump` with an `amount` when you want it saved with the minutes. Without one the record's
   amount is 0, as the app writes it, and **Last pump** shows no amount for it.
 - **Records arrive on a schedule, not instantly.** Home Assistant checks for new records every 5
-  minutes, and every minute while a sleep timer, or a nursing or pump timer under an hour old, runs. No option
-  changes this. Records
-  Home Assistant writes show at once. Call `homeassistant.update_entity` to check sooner.
+  minutes, whatever timer runs. No option changes this. Records Home Assistant writes show at
+  once. Call `homeassistant.update_entity` to check sooner.
 - **A sleep is at most 24 hours.** Stopping a sleep later than that saves 24 hours. Fix the length
   in the app. A sleep can't start in the future or more than 24 hours ago, and nursing and pump
   minutes are capped at 240 per side.
@@ -439,8 +437,8 @@ never flagged or capped.
 **A write says "the last entry is still being confirmed."** The service didn't answer the last
 write. Wait a minute and try again. Reusing the same `object_id` on a retry adds the record once.
 
-**A sensor looks stale.** Phone records arrive at the next sync, within 5 minutes (1 minute while a
-timer runs). To check now, call `homeassistant.update_entity` on any Baby Tracker entity. If the
+**A sensor looks stale.** Phone records arrive at the next sync, within 5 minutes. To check now,
+call `homeassistant.update_entity` on any Baby Tracker entity. If the
 sensors say unavailable, the sync is failing: look in the Home Assistant log for the error. A baby
 deleted in the app disappears at the next sync, as described under
 [Removing a baby](#removing-a-baby).

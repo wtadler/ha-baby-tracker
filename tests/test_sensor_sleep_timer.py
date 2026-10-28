@@ -65,7 +65,7 @@ async def test_a_sleep_a_phone_ends_while_home_assistant_shows_it_running_clears
     assert state(hass, ASLEEP).state == "on"
 
     phone_ends_sleep(server, PHONE_SLEEP, start=minutes(-40), duration=40, changed=NOW)
-    await tick(hass, minutes=1)
+    await tick(hass, minutes=5)
 
     assert state(hass, ASLEEP).state == "off"
     assert state(hass, SLEEP_TIMER).state == "unknown"

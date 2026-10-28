@@ -569,7 +569,7 @@ async def test_a_running_timer_is_saved_and_clearing_it_is_saved_too(
     assert hass_storage[key]["data"] == {}
 
 
-async def test_a_running_timer_survives_a_reload_and_keeps_one_minute_polling(
+async def test_a_running_timer_survives_a_reload_and_syncs_every_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -584,7 +584,7 @@ async def test_a_running_timer_survives_a_reload_and_keeps_one_minute_polling(
     assert init_integration.state is ConfigEntryState.LOADED
     assert state(hass, PUMP_SWITCH).state == "on"
     assert state(hass, PUMP_TIMER).state == NOW.isoformat()
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
     freezer.move_to(minutes(13))
     await turn_off(hass, PUMP_SWITCH)
@@ -702,34 +702,6 @@ async def test_removing_the_entry_deletes_the_saved_pump_timer(
 async def test_an_idle_account_polls_every_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    assert await sync_interval(hass, server) == timedelta(minutes=5)
-
-
-async def test_a_running_pump_timer_polls_every_minute_and_five_again_after_the_stop(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    await turn_on(hass, PUMP_SWITCH)
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
-
-    await turn_off(hass, PUMP_SWITCH)
-
-    assert await sync_interval(hass, server) == timedelta(minutes=5)
-
-
-async def test_past_an_hour_polling_falls_back_to_five_minutes(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    await turn_on(hass, PUMP_SWITCH)
-    assert state(hass, PUMP_SWITCH).state == "on"
-
-    await at(hass, freezer, 61)
-
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
