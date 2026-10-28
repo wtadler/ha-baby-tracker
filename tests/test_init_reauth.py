@@ -6,13 +6,13 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from pybabytracker import (
+    AuthenticationError,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.baby_tracker.const import (
     DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
-    AuthenticationError,
 )
 
 from . import (

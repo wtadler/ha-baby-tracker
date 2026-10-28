@@ -9,6 +9,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import pybabytracker
 import pytest
 import yaml
 
@@ -89,18 +90,32 @@ def test_imports_of_the_integration_point_at_core(core_cut: ModuleType) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "source",
-    [
-        "from .pybabytracker import Record\n",
-        "from custom_components.baby_tracker.pybabytracker import Record\n",
-    ],
-    ids=["relative", "absolute"],
-)
-def test_imports_of_the_vendored_library_point_at_the_package(
-    core_cut: ModuleType, source: str
+def test_imports_of_the_library_are_already_the_packages_and_stay_untouched(
+    core_cut: ModuleType,
 ) -> None:
-    assert core_cut.rewrite_imports(source) == "from pybabytracker import Record\n"
+    source = "from pybabytracker import Record\nfrom pybabytracker.times import utc_now\n"
+    assert core_cut.rewrite_imports(source) == source
+
+
+def test_the_library_version_core_pins_comes_from_the_manifest_pin(
+    core_cut: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    folder = tmp_path / "component"
+    folder.mkdir()
+    (folder / "manifest.json").write_text('{"requirements": ["pybabytracker==9.8.7"]}')
+    monkeypatch.setattr(core_cut, "INTEGRATION", folder)
+    assert core_cut.library_version() == "9.8.7"
+
+
+def test_the_library_version_fails_loudly_when_the_manifest_has_no_pin(
+    core_cut: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    folder = tmp_path / "component"
+    folder.mkdir()
+    (folder / "manifest.json").write_text('{"requirements": []}')
+    monkeypatch.setattr(core_cut, "INTEGRATION", folder)
+    with pytest.raises(ValueError, match="pybabytracker"):
+        core_cut.library_version()
 
 
 def test_test_helpers_come_from_cores_test_package(core_cut: ModuleType) -> None:
@@ -263,9 +278,7 @@ def test_the_manifest_is_reshaped_for_core(core_cut: ModuleType) -> None:
     assert manifest["loggers"] == ["pybabytracker"]
     assert manifest["quality_scale"] == "bronze"
     assert manifest["categories"] == ["health_wellbeing"]
-    vendored = (INTEGRATION / "pybabytracker" / "_version.py").read_text()
-    version = vendored.split('"')[1]
-    assert manifest["requirements"] == [f"pybabytracker=={version}"]
+    assert manifest["requirements"] == [f"pybabytracker=={pybabytracker.__version__}"]
     hacs = json.loads((INTEGRATION / "manifest.json").read_text())
     for key in ("domain", "name", "codeowners", "config_flow", "integration_type", "iot_class"):
         assert manifest[key] == hacs[key]
@@ -438,8 +451,8 @@ def test_the_last_pr_reaches_the_repositorys_statuses(core_cut: ModuleType) -> N
         return value if isinstance(value, str) else value["status"]
 
     differ = {rule for rule in hacs if status(hacs[rule]) != status(rules[rule])}
-    # Both wait on the library being a typed PyPI package (#12), which core requires.
-    assert differ == {"dependency-transparency", "strict-typing"}
+    # Strict typing waits on sensor.py's getattr probes going, which core's rule asks for.
+    assert differ == {"strict-typing"}
 
 
 # The cut

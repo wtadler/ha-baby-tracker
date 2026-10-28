@@ -10,17 +10,17 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.baby_tracker.const import (
-    DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
+from pybabytracker import (
     OP_ADD,
     AuthenticationError,
     BabyTrackerConnectionError,
     Diaper,
     NoResponseError,
+)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.baby_tracker.const import (
+    DOMAIN,
 )
 
 from . import NOW, OWN_DEVICE

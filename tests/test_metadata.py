@@ -1,11 +1,12 @@
-"""HACS only: services.yaml, strings, icons, manifest, quality scale, and the vendored library's
-packaging. Core checks these with hassfest, so this file does not go to core."""
+"""HACS only: services.yaml, strings, icons, manifest, quality scale, and the library's pin.
+Core checks these with hassfest, so this file does not go to core."""
 
 import json
 import re
 from pathlib import Path
 from typing import Any
 
+import pybabytracker
 import pytest
 import yaml
 from homeassistant.core import is_callback
@@ -23,7 +24,6 @@ from .helpers import (
     ALL_ACTIONS,
     INTEGRATION,
     ROOT,
-    VENDORED,
     load_integration_json,
 )
 
@@ -415,12 +415,64 @@ def test_the_manifest_names_the_integration() -> None:
     assert manifest["iot_class"] == "cloud_polling"
 
 
-def test_the_manifest_requires_nothing_because_the_library_is_bundled() -> None:
-    assert _load(INTEGRATION / "manifest.json")["requirements"] == []
+def test_the_manifest_requires_the_library_version_the_environment_imports() -> None:
+    requirements = _load(INTEGRATION / "manifest.json")["requirements"]
+    assert requirements == [f"pybabytracker=={pybabytracker.__version__}"]
+
+
+def test_the_manifest_names_the_librarys_logger() -> None:
+    assert _load(INTEGRATION / "manifest.json")["loggers"] == ["pybabytracker"]
+
+
+def test_the_test_requirements_pin_the_same_library_version() -> None:
+    lines = (ROOT / "requirements_test.txt").read_text().splitlines()
+    assert f"pybabytracker=={pybabytracker.__version__}" in lines
 
 
 def test_hacs_json_is_present() -> None:
     assert _load(ROOT / "hacs.json")["name"] == "Baby Tracker (Nighp)"
+
+
+# Every key the Marketplace and HACS document for hacs.json (marketplace/reference/hacs-json).
+HACS_JSON_KEYS = {
+    "name",
+    "content_in_root",
+    "filename",
+    "zip_release",
+    "persistent_directory",
+    "homeassistant",
+    "hide_default_branch",
+    "hacs",
+    "country",
+}
+
+
+def test_hacs_json_uses_only_documented_keys() -> None:
+    assert set(_load(ROOT / "hacs.json")) <= HACS_JSON_KEYS
+
+
+def test_hacs_json_names_the_oldest_home_assistant_the_integration_loads_on() -> None:
+    # services.py imports probatio, which Home Assistant ships from 2026.9.0 (2026.8.0 does not).
+    # Later changes were only tested on 2026.10, so hacs.json names that release.
+    assert _load(ROOT / "hacs.json")["homeassistant"] == "2026.10.0"
+    assert "import probatio" in (INTEGRATION / "services.py").read_text()
+
+
+def test_the_readme_names_the_same_minimum_home_assistant_as_hacs_json() -> None:
+    minimum = _load(ROOT / "hacs.json")["homeassistant"]
+    assert f"Home Assistant {minimum} or later" in (ROOT / "README.md").read_text()
+
+
+def test_the_readme_offers_the_install_and_setup_links() -> None:
+    readme = (ROOT / "README.md").read_text()
+    assert (
+        "https://my.home-assistant.io/redirect/hacs_repository/"
+        "?owner=wtadler&repository=ha-baby-tracker&category=integration"
+    ) in readme
+    assert (
+        "https://my.home-assistant.io/redirect/config_flow_start/?domain=baby_tracker"
+    ) in readme
+    assert "custom_components/baby_tracker" in readme
 
 
 def test_english_translations_match_strings() -> None:
@@ -479,23 +531,36 @@ def test_the_quality_scale_marks_the_silver_rules_built_in_this_ticket(rule: str
     assert scale[rule] == "done"
 
 
-def test_the_vendored_copy_records_its_source_commit() -> None:
-    commit = (VENDORED / "VENDORED_FROM").read_text().strip()
-    assert re.fullmatch(r"[0-9a-f]{40}", commit)
+def test_no_bundled_copy_of_the_library_is_left() -> None:
+    assert not (INTEGRATION / "pybabytracker").exists()
+    assert not (ROOT / "scripts" / "vendor_library.sh").exists()
 
 
-def test_the_vendored_library_only_imports_itself_relatively() -> None:
+def test_nothing_in_the_integration_or_tests_imports_the_library_from_inside_the_integration() -> (
+    None
+):
+    pattern = re.compile(r"from \.pybabytracker|baby_tracker\.pybabytracker")
     offenders = [
-        path.name
-        for path in VENDORED.glob("*.py")
-        if re.search(r"^\s*(from|import)\s+pybabytracker\b", path.read_text(), re.MULTILINE)
+        str(path.relative_to(ROOT))
+        for folder in (INTEGRATION, ROOT / "tests")
+        for path in folder.rglob("*.py")
+        if pattern.search(path.read_text())
+        # This file writes the pattern down.
+        and path.name != "test_metadata.py"
     ]
     assert offenders == []
 
 
-def test_lint_rules_leave_the_vendored_copy_out() -> None:
+def test_lint_and_type_rules_no_longer_leave_a_bundled_copy_out() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text()
-    assert "custom_components/baby_tracker/pybabytracker" in pyproject
+    assert "pybabytracker" not in pyproject.replace("tests/", "")
+    assert "vendored" not in pyproject.lower()
+
+
+def test_the_readme_does_not_describe_a_bundled_library() -> None:
+    readme = (ROOT / "README.md").read_text().lower()
+    assert "vendor" not in readme
+    assert "bundled" not in readme
 
 
 def test_the_readme_covers_install_and_removal() -> None:

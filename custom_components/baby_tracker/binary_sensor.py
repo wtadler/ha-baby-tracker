@@ -8,10 +8,10 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from pybabytracker import Sleep
 
 from .coordinator import BabyTrackerConfigEntry
 from .entity import BabyTrackerBabyEntity
-from .pybabytracker import Sleep
 
 PARALLEL_UPDATES = 0
 

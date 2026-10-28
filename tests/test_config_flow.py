@@ -9,16 +9,16 @@ from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pybabytracker import (
+    AuthenticationError,
+    BabyTrackerConnectionError,
+    ProtocolError,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.baby_tracker.const import (
     CONF_DEVICE_UUID,
     DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
-    AuthenticationError,
-    BabyTrackerConnectionError,
-    ProtocolError,
 )
 
 from . import EMAIL, PASSWORD

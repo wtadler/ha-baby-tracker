@@ -14,7 +14,7 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import Any
 
-from custom_components.baby_tracker.pybabytracker import (
+from pybabytracker import (
     AuthenticationError,
     Device,
     RawTransaction,

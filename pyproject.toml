@@ -9,20 +9,16 @@ markers = [
 [tool.coverage.run]
 source = ["custom_components.baby_tracker"]
 branch = true
-# The vendored library is tested in its own repo.
-omit = ["custom_components/baby_tracker/pybabytracker/*"]
 
 [tool.coverage.report]
 show_missing = true
-# The floor for the integration alone (the vendored library is omitted): the total when it was
-# set, rounded down. config_flow.py is held to 100% separately, in CI.
+# The floor for the integration alone (the library is tested in its own repository): the total
+# when it was set, rounded down. config_flow.py is held to 100% separately, in CI.
 fail_under = 97
 
 [tool.ruff]
 target-version = "py314"
 line-length = 100
-# The vendored library is linted in its own repo.
-extend-exclude = ["custom_components/baby_tracker/pybabytracker"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D", "SLF"]
@@ -39,16 +35,3 @@ strict = true
 # Core requires @override on every overriding method.
 enable_error_code = ["explicit-override"]
 files = ["custom_components/baby_tracker"]
-# The vendored library is checked in its own repo.
-exclude = ["custom_components/baby_tracker/pybabytracker/"]
-
-[[tool.mypy.overrides]]
-module = "custom_components.baby_tracker.pybabytracker.*"
-follow_imports = "skip"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-# Run on the folder, mypy names the vendored library without custom_components. The library is
-# checked in its own repo, which has no @override rule yet.
-module = "baby_tracker.pybabytracker.*"
-disable_error_code = ["explicit-override"]

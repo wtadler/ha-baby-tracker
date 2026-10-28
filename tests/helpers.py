@@ -16,17 +16,17 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from pybabytracker import (
+    OP_ADD,
+    Nursing,
+    decode_transaction,
+)
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
 
 from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
-from custom_components.baby_tracker.pybabytracker import (
-    OP_ADD,
-    Nursing,
-    decode_transaction,
-)
 
 from . import BABY_ONE, EMAIL, NOW, PASSWORD, get_baby_device, tick
 from .factories import (
@@ -39,7 +39,6 @@ from .fake_server import FakeServer
 
 ROOT = Path(__file__).resolve().parent.parent
 INTEGRATION = ROOT / "custom_components" / "baby_tracker"
-VENDORED = INTEGRATION / "pybabytracker"
 
 OTHER_DEVICES_RECORD = "D0000000-0000-4000-8000-000000000001"  # baby one's diaper from device A
 

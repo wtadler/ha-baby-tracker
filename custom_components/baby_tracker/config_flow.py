@@ -29,6 +29,11 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from pybabytracker import (
+    AuthenticationError,
+    BabyTrackerClient,
+    BabyTrackerConnectionError,
+)
 
 from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES, configured_bottle  # Core PR 15
 from .const import (
@@ -39,11 +44,6 @@ from .const import (
     CONFIG_ENTRY_MINOR_VERSION,  # HACS-only: the config entry migration
     DEVICE_NAME,
     DOMAIN,
-)
-from .pybabytracker import (
-    AuthenticationError,
-    BabyTrackerClient,
-    BabyTrackerConnectionError,
 )
 
 _LOGGER = logging.getLogger(__name__)

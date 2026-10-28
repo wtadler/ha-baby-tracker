@@ -9,14 +9,13 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.baby_tracker.pybabytracker import (
+from pybabytracker import (
     OP_ADD,
     OP_DELETE,
     BabyTrackerConnectionError,
     Nursing,
 )
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from . import NOW
 from .factories import (

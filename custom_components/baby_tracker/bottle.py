@@ -6,9 +6,9 @@ from typing import Any
 
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
+from pybabytracker import UNIT_MILLILITERS, UNIT_OUNCES
 
 from .const import CONF_BOTTLE_SIZE, CONF_BOTTLE_TYPE, CONF_BOTTLE_UNIT
-from .pybabytracker import UNIT_MILLILITERS, UNIT_OUNCES
 
 # Home Assistant's names for the two bottle units, and the library's.
 OUNCES = UnitOfVolume.FLUID_OUNCES.value

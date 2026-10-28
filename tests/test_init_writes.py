@@ -12,13 +12,13 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_system import METRIC_SYSTEM
+from pybabytracker import (
+    NoResponseError,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.baby_tracker.const import (
     DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
-    NoResponseError,
 )
 
 from . import (

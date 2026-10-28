@@ -22,8 +22,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.util import dt as dt_util
-
-from .pybabytracker.builders import MAX_MINUTES_PER_SIDE
+from pybabytracker.builders import MAX_MINUTES_PER_SIDE
 
 _LOGGER = logging.getLogger(__name__)
 

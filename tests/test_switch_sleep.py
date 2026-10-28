@@ -7,18 +7,18 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
+from pybabytracker import (
+    OP_ADD,
+    OP_UPDATE,
+    BabyTrackerConnectionError,
+    Sleep,
+)
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
 )
 
 from custom_components.baby_tracker.const import (
     DOMAIN,
-)
-from custom_components.baby_tracker.pybabytracker import (
-    OP_ADD,
-    OP_UPDATE,
-    BabyTrackerConnectionError,
-    Sleep,
 )
 
 from . import NOW, get_baby_device

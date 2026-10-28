@@ -11,13 +11,12 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from pybabytracker import BabyTrackerConnectionError
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     snapshot_platform,
 )
 from syrupy.assertion import SnapshotAssertion
-
-from custom_components.baby_tracker.pybabytracker import BabyTrackerConnectionError
 
 from . import BABY_ONE, BABY_TWO, get_baby_device, setup_integration, tick
 from .factories import (
