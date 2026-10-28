@@ -3,6 +3,9 @@
 A custom integration for the Nighp "Baby Tracker" app. Home Assistant signs in to your account's
 sync service and shows each baby's last diaper, feed, pump, and sleep.
 
+This integration is not made or supported by Nighp, the maker of Baby Tracker. For help, open an
+issue in this repository; please don't contact Nighp.
+
 This version reads, logs diapers, bottles, nursing, sleep, and pumps, and runs sleep and nursing
 timers. See
 `PROTOCOL.md` for how the sync service works and `GLOSSARY.md` for the terms used here.
