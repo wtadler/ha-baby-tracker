@@ -1,0 +1,57 @@
+name: Latest Home Assistant
+
+# A weekly run against the latest Home Assistant and pytest-homeassistant-custom-component, so a
+# breaking change shows up before users report it. Regular CI stays on the pinned requirements.
+
+on:
+  schedule:
+    # Mondays at 06:17 UTC.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Opens or comments on the failure issue below.
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Home Assistant 2026.10 requires Python 3.14 (see ruff target-version in pyproject.toml).
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install pinned test requirements
+        run: pip install -r requirements_test.txt
+      # Upgrading after the pins install, so the pins don't win. The upgrade pulls in whatever
+      # Home Assistant version the latest pytest-homeassistant-custom-component requires.
+      - name: Upgrade to the latest Home Assistant
+        run: pip install --upgrade homeassistant pytest-homeassistant-custom-component
+      - name: Print installed versions
+        run: pip show homeassistant pytest-homeassistant-custom-component
+      - name: pytest
+        run: pytest --cov
+
+      - name: Open or update the failure issue
+        # Only scheduled runs open an issue. A failed manual run is already in front of whoever
+        # started it.
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: Weekly run against the latest Home Assistant failed
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          body="The scheduled run against the latest Home Assistant failed: $RUN_URL"
+          existing=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create needs-triage --force --color "d4c5f9" --description "Waiting for triage"
+            gh issue create --title "$TITLE" --label needs-triage --body "$body"
+          fi
