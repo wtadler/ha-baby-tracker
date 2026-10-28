@@ -161,6 +161,10 @@ to save it, or press **Discard nursing** to drop a nursing one.
 skipped or overwritten. Delete the account's entry under **Settings > Devices & services** and add
 it again with the same email and password.
 
+**No Live Activity appears.** Open the automation's trace. If it shows the `notify` action sent,
+the phone is dropping it: under **Settings > Apps > Home Assistant > Live Activities** on the
+iPhone, turn Live Activities off and back on, then start a timer again.
+
 **A write says "the last entry is still being confirmed."** The service didn't answer the last
 write. Try again in a minute.
 
