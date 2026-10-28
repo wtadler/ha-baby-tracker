@@ -7,12 +7,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.components.recorder import Recorder, get_instance, migration
+from homeassistant.components.recorder import Recorder, get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import recorder as recorder_helpers
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 from pytest_homeassistant_custom_component.common import (
@@ -23,7 +22,6 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
     do_adhoc_statistics,
 )
-from sqlalchemy.orm import Session
 
 from . import BABY_ONE, BABY_TWO, NOW, get_baby_device, tick
 from .factories import (
@@ -767,29 +765,6 @@ async def test_bottle_volume_keeps_its_unit_and_total_state_class(
     assert _last_reset(hass, "bottle_volume_today") == START_OF_TODAY
 
 
-@pytest.fixture
-def recorder_db_url() -> str:
-    """An in-memory database for the recorder.
-
-    The plugin's own fixture refuses to run once ``hass`` exists, and this suite's autouse
-    fixtures create ``hass`` first. The in-memory URL is what it would return anyway.
-    """
-    return "sqlite://"
-
-
-@pytest.fixture
-def recorder_annotations(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make the recorder's migration module's annotations resolvable on Python 3.14.
-
-    Core imports ``Recorder`` there only for type checking, and the plugin inspects the
-    signatures when it patches that module. Python 3.14 evaluates annotations lazily, so
-    the missing name raises a ``NameError`` unless it is defined.
-    """
-    monkeypatch.setattr(migration, "Recorder", Recorder, raising=False)
-    monkeypatch.setattr(migration, "Session", Session, raising=False)
-    monkeypatch.setattr(recorder_helpers, "Session", Session, raising=False)
-
-
 def _period() -> datetime:
     """The five-minute statistics period that holds the (frozen) clock."""
     now = dt_util.utcnow()
@@ -818,7 +793,6 @@ async def _sums(hass: HomeAssistant, entity_id: str, start: datetime) -> list[di
 
 @pytest.mark.parametrize("key", TODAY_KEYS)
 async def test_the_recorder_compiles_statistics_with_a_sum(
-    recorder_annotations: None,
     recorder_mock: Recorder,
     hass: HomeAssistant,
     entry: MockConfigEntry,
@@ -851,7 +825,6 @@ async def test_the_recorder_compiles_statistics_with_a_sum(
 
 @pytest.mark.parametrize("key", TODAY_KEYS)
 async def test_statistics_do_not_double_count_when_the_value_drops_or_resets(
-    recorder_annotations: None,
     recorder_mock: Recorder,
     hass: HomeAssistant,
     entry: MockConfigEntry,
@@ -890,3 +863,41 @@ async def test_statistics_do_not_double_count_when_the_value_drops_or_resets(
     assert second["sum"] - first["sum"] == pytest.approx(after_drop - first["state"])
     assert third["state"] == 0
     assert third["sum"] == pytest.approx(second["sum"])
+
+
+@pytest.mark.parametrize("key", TODAY_KEYS)
+async def test_counts_logged_just_after_midnight_are_added_to_the_sum(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    empty: FakeServer,
+    clock: FrozenDateTimeFactory,
+    key: str,
+) -> None:
+    hass.config.units = METRIC_SYSTEM
+    _diaper(empty, TODAY)
+    await setup_loaded(hass, entry)
+    entity_id = baby_state(hass, key).entity_id
+    start = _period()
+    await _compile(hass, start)
+
+    # The first state of the new day is not 0: records at 00:00:30 are already counted.
+    _diaper(empty, MIDNIGHT + timedelta(seconds=30))
+    empty.add_record(
+        DEVICE_A,
+        "Formula",
+        _id(),
+        when=MIDNIGHT + timedelta(seconds=30),
+        amount=volume(100, english=False),
+    )
+    await pass_midnight(hass, clock)
+    await entry.runtime_data.async_refresh()
+    reset_value = float(baby_value(hass, key))
+    assert reset_value > 0
+    assert _last_reset(hass, key) == MIDNIGHT
+    await _compile(hass, _period())
+
+    first, second = await _sums(hass, entity_id, start)
+    # The new day starts from 0, so what it counted by its first state is added to the sum.
+    assert second["state"] == pytest.approx(reset_value)
+    assert second["sum"] - first["sum"] == pytest.approx(reset_value)
