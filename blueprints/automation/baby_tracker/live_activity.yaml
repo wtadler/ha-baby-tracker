@@ -62,13 +62,13 @@ blueprint:
         icon:
     sleep_color:
       name: Sleep icon color
-      description: A hex color for the sleep icon, such as #7E57C2.
+      description: "A hex color for the sleep icon, such as #7E57C2."
       default: "#7E57C2"
       selector:
         text:
     nursing_color:
       name: Nursing icon color
-      description: A hex color for the nursing icon, such as #EC407A.
+      description: "A hex color for the nursing icon, such as #EC407A."
       default: "#EC407A"
       selector:
         text:
