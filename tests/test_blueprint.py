@@ -26,10 +26,10 @@ BLUEPRINT = (
     Path(__file__).parent.parent
     / "blueprints"
     / "automation"
-    / "nighp_baby_tracker"
+    / "baby_tracker"
     / "live_activity.yaml"
 )
-BLUEPRINT_PATH = "nighp_baby_tracker/live_activity.yaml"
+BLUEPRINT_PATH = "baby_tracker/live_activity.yaml"
 
 SLEEP = "sensor.baby_one_sleep_timer"
 NURSING = "sensor.baby_one_nursing_timer"
@@ -79,7 +79,7 @@ def test_the_timer_inputs_are_entity_selectors_limited_to_this_integrations_sens
     for name in ("sleep_timer", "nursing_timer"):
         selector = blueprint.inputs[name]["selector"]["entity"]
         assert selector["domain"] == ["sensor"]
-        assert selector["integration"] == "nighp_baby_tracker"
+        assert selector["integration"] == "baby_tracker"
         assert selector["device_class"] == ["timestamp"]
 
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="custom_components/nighp_baby_tracker/brand/icon.png" alt="Baby Tracker icon" width="128">
+  <img src="custom_components/baby_tracker/brand/icon.png" alt="Baby Tracker icon" width="128">
 </p>
 
 # Baby Tracker (Nighp) for Home Assistant
@@ -58,8 +58,8 @@ timers. See
 
 The integration isn't in HACS yet, so install it by copying:
 
-1. Copy the `custom_components/nighp_baby_tracker` folder from this repository into your Home
-   Assistant configuration folder, so you have `<config>/custom_components/nighp_baby_tracker/`.
+1. Copy the `custom_components/baby_tracker` folder from this repository into your Home
+   Assistant configuration folder, so you have `<config>/custom_components/baby_tracker/`.
 2. Restart Home Assistant.
 
 The library that talks to the service is bundled inside the integration (in `pybabytracker/`), so
@@ -166,19 +166,19 @@ more release. Using it raises a repair in **Settings > System > Repairs** that n
 and the field to switch to: `device_id` for a baby, and `config_entry_id` for an account.
 
 
-- `nighp_baby_tracker.log_diaper` takes `device_id` (the baby's device), `type` (`wet`, `dirty`, or
+- `baby_tracker.log_diaper` takes `device_id` (the baby's device), `type` (`wet`, `dirty`, or
   `mixed`), an optional `time` (default now; a time with no offset is read in Home Assistant's time
   zone), and an optional `note`.
-- `nighp_baby_tracker.log_bottle` takes `device_id`, `kind` (`formula` or `pumped`), `amount` (more than
+- `baby_tracker.log_bottle` takes `device_id`, `kind` (`formula` or `pumped`), `amount` (more than
   zero), an optional `unit` (`fl. oz.` or `mL`), an optional `time`, and an optional `note`.
-- `nighp_baby_tracker.log_nursing` takes `device_id`, `left_minutes` and `right_minutes` (whole
+- `baby_tracker.log_nursing` takes `device_id`, `left_minutes` and `right_minutes` (whole
   minutes; at least one above zero), an optional `finish_side` (`left` or `right`; default the last
   side used, right when both), an optional `end_time` (default now), and an optional `note`. The
   record starts at the end time minus the total minutes.
-- `nighp_baby_tracker.log_sleep` takes `device_id`, `start` and `end` (the end must be after the start),
+- `baby_tracker.log_sleep` takes `device_id`, `start` and `end` (the end must be after the start),
   and an optional `note`. The length is saved in whole minutes, rounded half up, and never less
   than 1.
-- `nighp_baby_tracker.log_pump` takes `config_entry_id` (the account), an optional `unit` (`fl. oz.`
+- `baby_tracker.log_pump` takes `config_entry_id` (the account), an optional `unit` (`fl. oz.`
   or `mL`), an optional `finish_side`, an optional `time` (the start; default now), an optional
   `note`, and the volume and length, either as a total or by side:
   - **A total**, which is how most pumps are logged in the app: `amount` (the total volume) and,
@@ -191,30 +191,30 @@ and the field to switch to: `device_id` for a baby, and `config_entry_id` for an
   Passing `amount` with `left_amount` or `right_amount`, or `minutes` with `left_minutes` or
   `right_minutes` (even 0), is an error and posts nothing. A pump belongs to the account, so no baby
   is saved with it.
-- `nighp_baby_tracker.start_pump` takes `config_entry_id` and starts Home Assistant's pump timer.
+- `baby_tracker.start_pump` takes `config_entry_id` and starts Home Assistant's pump timer.
   It's refused while the timer runs.
-- `nighp_baby_tracker.stop_pump` takes `config_entry_id`, an optional `amount` (the total, more
+- `baby_tracker.stop_pump` takes `config_entry_id`, an optional `amount` (the total, more
   than zero), an optional `unit`, and an optional `note`. It saves one pump with the elapsed
   whole minutes on both sides, and the amount if you gave one. It's refused when no timer runs, and
   a bad amount is refused with the timer still running.
-- `nighp_baby_tracker.undo` deletes a record Home Assistant created. Give it `device_id` (a baby) or
+- `baby_tracker.undo` deletes a record Home Assistant created. Give it `device_id` (a baby) or
   `config_entry_id` (the account), and optionally an `object_id`. Without one, it deletes the most
   recent record Home Assistant created (for that baby, if you gave `device_id`). Run it again and it
   deletes the next older Home Assistant entry, and so on, until none are left. If you give both
   `device_id` and `object_id`, the record must belong to that baby. It can't delete records the phones
   made.
-- `nighp_baby_tracker.start_sleep` takes `device_id`, an optional `start` (default now; not in the
+- `baby_tracker.start_sleep` takes `device_id`, an optional `start` (default now; not in the
   future or more than 24 hours ago), an optional `note`, and an optional `object_id`. It's refused
   while the baby's newest sleep is running.
-- `nighp_baby_tracker.stop_sleep` takes `device_id` and an optional `end` (default now). It ends the
+- `baby_tracker.stop_sleep` takes `device_id` and an optional `end` (default now). It ends the
   baby's running sleep, whether Home Assistant or a phone started it, and is refused when none is
   running.
-- `nighp_baby_tracker.start_nursing` takes `device_id` and `side` (`left` or `right`). With the timer on
+- `baby_tracker.start_nursing` takes `device_id` and `side` (`left` or `right`). With the timer on
   the other side, it switches; on the same side, nothing changes.
-- `nighp_baby_tracker.switch_nursing_side` takes `device_id` and moves the timer to the other side.
-- `nighp_baby_tracker.stop_nursing` takes `device_id` and an optional `note`, and saves the nursing
+- `baby_tracker.switch_nursing_side` takes `device_id` and moves the timer to the other side.
+- `baby_tracker.stop_nursing` takes `device_id` and an optional `note`, and saves the nursing
   record. Switching or stopping with no timer running is refused.
-- `nighp_baby_tracker.discard_nursing` takes `device_id` and throws away Home Assistant's running
+- `baby_tracker.discard_nursing` takes `device_id` and throws away Home Assistant's running
   nursing timer without saving anything. Use it for a timer started or left running by mistake. It
   is refused when that baby has no timer running, and it never contacts the service.
 - Every `log_*` action, and `start_sleep`, also takes an optional `object_id` (a UUID; reuse the same one to retry safely).
@@ -228,15 +228,15 @@ shorter gap raises an error on the write and no repair. A rejected login starts 
 
 ## Live activity on your iPhone
 
-The blueprint `blueprints/automation/nighp_baby_tracker/live_activity.yaml` turns a baby's running
+The blueprint `blueprints/automation/baby_tracker/live_activity.yaml` turns a baby's running
 timers into iOS Live Activities through the Home Assistant Companion app. The integration itself
 sends no notifications; the blueprint does, from the timer sensors.
 
 **Import it**
 
-1. Copy the file to `<config>/blueprints/automation/nighp_baby_tracker/live_activity.yaml`, or
+1. Copy the file to `<config>/blueprints/automation/baby_tracker/live_activity.yaml`, or
    open **Settings > Automations & scenes > Blueprints > Import blueprint** and paste its GitHub
-   URL: `https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/nighp_baby_tracker/live_activity.yaml`
+   URL: `https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/baby_tracker/live_activity.yaml`
 2. Create an automation from it, one per baby, and fill in:
    - **Sleep timer** and **Nursing timer**: that baby's two timer sensors (the pickers list only
      this integration's timestamp sensors).
@@ -282,7 +282,7 @@ Yours follow your baby's name.
 **A crib-side button.** Put the **Wet diaper**, **Dirty diaper**, and **Bottle** buttons on a
 dashboard, or map a physical button to `button.press` on one of them. One press logs the record
 now, and the phones show it after their next sync. A mistaken press is fixed with
-`nighp_baby_tracker.undo`.
+`baby_tracker.undo`.
 
 **A 3 a.m. dashboard.** One card with **Last diaper**, **Last feed**, and **Asleep**, plus the
 buttons. The last-activity sensors are timestamps, so the card can show "23 minutes ago" instead of
@@ -301,7 +301,7 @@ script:
   stop_pump_with_amount:
     alias: Stop pump and save the amount
     sequence:
-      - action: nighp_baby_tracker.stop_pump
+      - action: baby_tracker.stop_pump
         data:
           config_entry_id: YOUR_CONFIG_ENTRY_ID
           amount: "{{ states('input_number.pumped_amount') | float }}"
@@ -393,7 +393,7 @@ Change the number to suit your baby, and use your own phone's `notify` action, a
   may stop the integration until it's updated.
 - **The iPhone live activity needs the Companion app,** iOS 17.2 or later, and Home Assistant
   2026.7.0 or later. See [Live activity on your iPhone](#live-activity-on-your-iphone).
-- **Undo only removes Home Assistant's own entries.** `nighp_baby_tracker.undo` can't delete a
+- **Undo only removes Home Assistant's own entries.** `baby_tracker.undo` can't delete a
   record a phone made. Delete those in the app.
 - **Pumps belong to the account,** not a baby, so **Last pump** is on the account device.
 - **Home Assistant is its own device** in the account, named "Home Assistant". It never uses a
@@ -420,7 +420,7 @@ error on the write.
 
 **A repair says the pump timer has run for over an hour.** Home Assistant's pump timer is probably
 forgotten. Turn off the **Pump timer** switch, or call `stop_pump`, to save the session (at most
-240 minutes), then use `nighp_baby_tracker.undo` for the account if the record wasn't real. The
+240 minutes), then use `baby_tracker.undo` for the account if the record wasn't real. The
 repair goes away when the timer stops.
 
 **A repair says an automation uses an old field.** The `baby` field (and `device` on `log_pump`)
@@ -432,8 +432,8 @@ after the next restart unless something still uses the old field.
 **A repair says a nursing timer has run for over an hour.** Home Assistant's own nursing timer for
 that baby was probably forgotten: the app doesn't show a running nursing timer, so nothing else
 will end it. Either stop it (turn off the **Nursing** switch that is on, or call
-`nighp_baby_tracker.stop_nursing`) to save one nursing record, with each side capped at 240
-minutes, or press **Discard nursing** (or call `nighp_baby_tracker.discard_nursing`) to throw it
+`baby_tracker.stop_nursing`) to save one nursing record, with each side capped at 240
+minutes, or press **Discard nursing** (or call `baby_tracker.discard_nursing`) to throw it
 away without saving anything. The
 repair clears when the timer stops or is discarded, and returns after a restart if the timer is
 still over an hour old. This guard applies only to nursing: a running sleep is synced, so it is
@@ -474,7 +474,7 @@ and it holds no baby's name or ID and no notes.
 
 1. Go to **Settings > Devices & services**, open **Baby Tracker (Nighp)**, and choose **Delete**.
    This also deletes the saved sync state.
-2. Delete the `custom_components/nighp_baby_tracker` folder and restart Home Assistant.
+2. Delete the `custom_components/baby_tracker` folder and restart Home Assistant.
 
 ## Core submission
 
@@ -508,5 +508,5 @@ uv pip install -r requirements_test.txt
 
 The library is vendored while it's private. To update the bundled copy, run
 `scripts/vendor_library.sh <path-to-pybabytracker>`. It copies the package and writes the source
-commit to `custom_components/nighp_baby_tracker/pybabytracker/VENDORED_FROM`. The vendored copy is
+commit to `custom_components/baby_tracker/pybabytracker/VENDORED_FROM`. The vendored copy is
 excluded from this repository's lint rules, because it's checked in the library's own repository.

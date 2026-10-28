@@ -8,7 +8,7 @@ rules:
     comment: Polls every 5 minutes, fixed (no option changes it).
   brands:
     status: done
-    comment: The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker.
+    comment: The icon and logo are in the brands repository, under core_integrations/baby_tracker.
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done

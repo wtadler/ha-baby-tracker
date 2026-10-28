@@ -14,8 +14,8 @@ from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM, UnitSystem
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker import config_flow
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker import config_flow
+from custom_components.baby_tracker.const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
     CONF_BOTTLE_UNIT,

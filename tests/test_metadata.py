@@ -10,8 +10,8 @@ import pytest
 import yaml
 from homeassistant.core import is_callback
 
-from custom_components.nighp_baby_tracker import const as integration_const
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker import const as integration_const
+from custom_components.baby_tracker.const import (
     CONF_BOTTLE_SIZE,
     CONF_BOTTLE_TYPE,
     CONF_BOTTLE_UNIT,
@@ -272,7 +272,7 @@ def test_the_new_actions_errors_options_and_button_are_translated() -> None:
 
 
 def test_the_actions_are_set_up_by_a_callback_named_for_core() -> None:
-    from custom_components.nighp_baby_tracker import services
+    from custom_components.baby_tracker import services
 
     assert is_callback(services.async_setup_services)
     assert not hasattr(services, "async_register_services")
@@ -409,7 +409,7 @@ def test_the_quality_scale_marks_the_gold_rules_built_in_this_ticket(rule: str) 
 
 def test_the_manifest_names_the_integration() -> None:
     manifest = _load(INTEGRATION / "manifest.json")
-    assert manifest["domain"] == "nighp_baby_tracker"
+    assert manifest["domain"] == "baby_tracker"
     assert manifest["name"] == "Baby Tracker (Nighp)"
     assert manifest["config_flow"] is True
     assert manifest["iot_class"] == "cloud_polling"
@@ -495,7 +495,7 @@ def test_the_vendored_library_only_imports_itself_relatively() -> None:
 
 def test_lint_rules_leave_the_vendored_copy_out() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text()
-    assert "custom_components/nighp_baby_tracker/pybabytracker" in pyproject
+    assert "custom_components/baby_tracker/pybabytracker" in pyproject
 
 
 def test_the_readme_covers_install_and_removal() -> None:

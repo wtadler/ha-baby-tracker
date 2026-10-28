@@ -31,7 +31,7 @@ async def test_switches(
     snapshot: SnapshotAssertion,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.SWITCH]):
+    with patch("custom_components.baby_tracker.PLATFORMS", [Platform.SWITCH]):
         await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)

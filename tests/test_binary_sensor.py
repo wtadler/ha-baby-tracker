@@ -17,7 +17,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
+from custom_components.baby_tracker.pybabytracker import BabyTrackerConnectionError
 
 from . import BABY_ONE, BABY_TWO, get_baby_device, setup_integration, tick
 from .factories import (
@@ -72,7 +72,7 @@ async def test_binary_sensors(
     populated_server: FakeServer,
 ) -> None:
     freezer.move_to(at(180))
-    with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.BINARY_SENSOR]):
+    with patch("custom_components.baby_tracker.PLATFORMS", [Platform.BINARY_SENSOR]):
         await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)

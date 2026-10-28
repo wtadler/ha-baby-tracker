@@ -14,7 +14,7 @@ from PIL import Image, ImageChops
 from .helpers import INTEGRATION, ROOT
 
 README = ROOT / "README.md"
-PAGE = ROOT / "docs" / "home-assistant-io" / "nighp_baby_tracker.markdown"
+PAGE = ROOT / "docs" / "home-assistant-io" / "baby_tracker.markdown"
 BRAND = INTEGRATION / "brand"
 
 

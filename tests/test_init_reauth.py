@@ -8,10 +8,10 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     DOMAIN,
 )
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     AuthenticationError,
 )
 

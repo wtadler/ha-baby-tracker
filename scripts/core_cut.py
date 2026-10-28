@@ -6,8 +6,8 @@ Usage:
     scripts/core_cut.py --quality-scales
     scripts/core_cut.py --record-snapshot <pr-number>
 
-The first form replaces ``homeassistant/components/nighp_baby_tracker/`` and
-``tests/components/nighp_baby_tracker/`` in the checkout with everything planned for PRs 1 to
+The first form replaces ``homeassistant/components/baby_tracker/`` and
+``tests/components/baby_tracker/`` in the checkout with everything planned for PRs 1 to
 <pr-number>, then formats them with the checkout's ruff. The second regenerates
 ``core-prep/quality_scale/prNN.yaml``. The third records what a refreshed snapshot overlay was
 made from (see ``core-prep/README.md``). The plan is ``core-prep/plan.yaml``.
@@ -50,10 +50,10 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
+INTEGRATION = ROOT / "custom_components" / "baby_tracker"
 TESTS = ROOT / "tests"
 CORE_PREP = ROOT / "core-prep"
-DOMAIN = "nighp_baby_tracker"
+DOMAIN = "baby_tracker"
 COMPONENT = Path("homeassistant/components") / DOMAIN
 CORE_TESTS = Path("tests/components") / DOMAIN
 OWN_TEST_FOLDER = Path("components") / DOMAIN
@@ -67,9 +67,9 @@ CLAUSE = re.compile(r"(elif|else|except|finally|case)\b(?!\s*[=.,)\]])")
 CORE_LINE = re.compile(r"#\s*Core:\s?(?P<code>.*)$")
 MODULE_DOCSTRING_PR = re.compile(r'^(?P<quote>"""|\'\'\')Core PRs? [^:]*: ')
 IMPORT_REWRITES = (
-    ("custom_components.nighp_baby_tracker.pybabytracker", "pybabytracker"),
+    ("custom_components.baby_tracker.pybabytracker", "pybabytracker"),
     ("from .pybabytracker import", "from pybabytracker import"),
-    ("custom_components.nighp_baby_tracker", "homeassistant.components.nighp_baby_tracker"),
+    ("custom_components.baby_tracker", "homeassistant.components.baby_tracker"),
     ("pytest_homeassistant_custom_component.", "pytest_homeassistant."),
 )
 

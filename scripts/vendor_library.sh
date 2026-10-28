@@ -14,7 +14,7 @@ fi
 library="$1"
 source_dir="$library/src/pybabytracker"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-target="${VENDOR_TARGET:-$repo_root/custom_components/nighp_baby_tracker/pybabytracker}"
+target="${VENDOR_TARGET:-$repo_root/custom_components/baby_tracker/pybabytracker}"
 
 if [ ! -d "$source_dir" ]; then
   echo "error: $source_dir not found; expected a checkout with src/pybabytracker" >&2

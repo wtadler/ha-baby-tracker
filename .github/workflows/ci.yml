@@ -25,13 +25,13 @@ jobs:
         run: pytest --cov
       # The config-flow-test-coverage rule asks for 100% of the config flow.
       - name: config flow coverage
-        run: coverage report --include="*/nighp_baby_tracker/config_flow.py" --fail-under=100
+        run: coverage report --include="*/baby_tracker/config_flow.py" --fail-under=100
       - name: ruff check
         run: ruff check .
       - name: ruff format
         run: ruff format --check .
       - name: mypy
-        run: mypy --strict custom_components/nighp_baby_tracker
+        run: mypy --strict custom_components/baby_tracker
 
   hassfest:
     runs-on: ubuntu-latest

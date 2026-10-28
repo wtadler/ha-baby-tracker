@@ -8,7 +8,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
-from custom_components.nighp_baby_tracker.const import DOMAIN
+from custom_components.baby_tracker.const import DOMAIN
 
 from .factories import BABY_ONE_ID, BABY_THREE_ID, BABY_TWO_ID, baby_payload
 

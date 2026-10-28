@@ -12,9 +12,9 @@ When `test_the_pr1_snapshot_was_made_from_the_current_sources` fails (or the cut
 
 ```sh
 scripts/core_cut.py 1 ~/path/to/core
-(cd ~/path/to/core && python -m script.translations develop --integration nighp_baby_tracker \
-  && pytest tests/components/nighp_baby_tracker/test_sensor.py --snapshot-update)
-cp ~/path/to/core/tests/components/nighp_baby_tracker/snapshots/test_sensor.ambr core-prep/overlay/pr01/tests/snapshots/
+(cd ~/path/to/core && python -m script.translations develop --integration baby_tracker \
+  && pytest tests/components/baby_tracker/test_sensor.py --snapshot-update)
+cp ~/path/to/core/tests/components/baby_tracker/snapshots/test_sensor.ambr core-prep/overlay/pr01/tests/snapshots/
 scripts/core_cut.py --record-snapshot 1
 ```
 
@@ -26,18 +26,18 @@ Read the snapshot's diff before committing it: it should change only the way the
 scripts/core_cut.py 1 ~/path/to/core
 ```
 
-The checkout needs core's development environment (its `.venv` and ruff) and the library installed. The script replaces `homeassistant/components/nighp_baby_tracker/` and `tests/components/nighp_baby_tracker/`, adds the integration to `.strict-typing` when the PR marks `strict-typing` done, and formats the result with the checkout's ruff. It never touches the checkout's git state or remotes.
+The checkout needs core's development environment (its `.venv` and ruff) and the library installed. The script replaces `homeassistant/components/baby_tracker/` and `tests/components/baby_tracker/`, adds the integration to `.strict-typing` when the PR marks `strict-typing` done, and formats the result with the checkout's ruff. It never touches the checkout's git state or remotes.
 
 Then run core's checks in the checkout:
 
 ```sh
-python -m script.hassfest --integration-path homeassistant/components/nighp_baby_tracker
-python -m script.translations develop --integration nighp_baby_tracker
-ruff check homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
-ruff format --check homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
-mypy homeassistant/components/nighp_baby_tracker
-pylint homeassistant/components/nighp_baby_tracker tests/components/nighp_baby_tracker
-pytest tests/components/nighp_baby_tracker --cov=homeassistant.components.nighp_baby_tracker --cov-report=term-missing
+python -m script.hassfest --integration-path homeassistant/components/baby_tracker
+python -m script.translations develop --integration baby_tracker
+ruff check homeassistant/components/baby_tracker tests/components/baby_tracker
+ruff format --check homeassistant/components/baby_tracker tests/components/baby_tracker
+mypy homeassistant/components/baby_tracker
+pylint homeassistant/components/baby_tracker tests/components/baby_tracker
+pytest tests/components/baby_tracker --cov=homeassistant.components.baby_tracker --cov-report=term-missing
 ```
 
 ## Markers

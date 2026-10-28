@@ -18,7 +18,7 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
 )
 
-from custom_components.nighp_baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
+from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import (
     BABY_ONE,  # Core PR 7
@@ -83,7 +83,7 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterato
 def mock_setup_entry() -> Generator[AsyncMock]:
     """Override async_setup_entry, so a config flow test doesn't set the integration up."""
     with patch(
-        "custom_components.nighp_baby_tracker.async_setup_entry",
+        "custom_components.baby_tracker.async_setup_entry",
         return_value=True,  # Core: return_value=None,
     ) as mock_setup_entry:
         yield mock_setup_entry
@@ -140,8 +140,8 @@ def mock_baby_tracker_client(server: FakeServer, second_server: FakeServer) -> I
         return FakeClient(second_server if email == EMAIL_TWO else server, email, *args, **kwargs)
 
     with (
-        patch("custom_components.nighp_baby_tracker.BabyTrackerClient", factory),
-        patch("custom_components.nighp_baby_tracker.config_flow.BabyTrackerClient", factory),
+        patch("custom_components.baby_tracker.BabyTrackerClient", factory),
+        patch("custom_components.baby_tracker.config_flow.BabyTrackerClient", factory),
     ):
         yield server
 
@@ -264,7 +264,7 @@ def entry(
 ) -> MockConfigEntry:
     # A day-long interval, so a sync can never be what moves a count at midnight.
     monkeypatch.setattr(
-        "custom_components.nighp_baby_tracker.coordinator.SCAN_INTERVAL", timedelta(days=1)
+        "custom_components.baby_tracker.coordinator.SCAN_INTERVAL", timedelta(days=1)
     )
     entry = MockConfigEntry(
         domain=DOMAIN,
