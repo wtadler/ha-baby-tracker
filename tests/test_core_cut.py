@@ -451,8 +451,7 @@ def test_the_last_pr_reaches_the_repositorys_statuses(core_cut: ModuleType) -> N
         return value if isinstance(value, str) else value["status"]
 
     differ = {rule for rule in hacs if status(hacs[rule]) != status(rules[rule])}
-    # Strict typing waits on sensor.py's getattr probes going, which core's rule asks for.
-    assert differ == {"strict-typing"}
+    assert differ == set()
 
 
 # The cut

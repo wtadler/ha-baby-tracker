@@ -1,6 +1,7 @@
 """HACS only: quality_scale.yaml lists exactly the current rules, and the manifest claims only
 what holds. Core checks this with hassfest."""
 
+import ast
 import importlib
 import json
 import pkgutil
@@ -258,11 +259,29 @@ def test_the_manifest_declares_no_tier_a_rule_denies() -> None:
     assert TIER_ORDER.index(declared) <= TIER_ORDER.index(met)
 
 
-def test_every_tier_up_to_gold_holds_now_the_library_is_on_pypi_but_none_is_declared() -> None:
+def test_every_tier_up_to_platinum_holds_now_the_library_is_on_pypi_but_none_is_declared() -> None:
     # A custom integration's manifest leaves quality_scale out: core adds it at submission, from
     # the plan, and hassfest checks the file's shape for core integrations only.
-    assert _highest_tier_met() == "gold"
+    assert _highest_tier_met() == "platinum"
     assert "quality_scale" not in _manifest()
+
+
+def test_strict_typing_is_done_with_no_comment() -> None:
+    assert _rules()["strict-typing"] == "done"
+
+
+def test_the_integration_makes_no_getattr_call_of_two_or_three_arguments() -> None:
+    # Strict typing means narrowing a record by its class, so mypy knows each field.
+    offenders = [
+        f"{path.name}:{node.lineno}"
+        for path in sorted(INTEGRATION.glob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) in (2, 3)
+    ]
+    assert offenders == []
 
 
 def test_the_custom_only_keys_stay_for_the_repository() -> None:

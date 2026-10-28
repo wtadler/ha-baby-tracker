@@ -29,7 +29,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval  # Core PR 19
 from homeassistant.util import dt as dt_util  # Core PR 19
 from homeassistant.util.unit_conversion import VolumeConverter  # Core PR 7
-from pybabytracker import Record
+from pybabytracker import Diaper, Formula, Nursing, Pump, Pumped, Record, Sleep
 
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .entity import (
@@ -49,34 +49,38 @@ SIDES = {0: "left", 1: "right"}  # Core PR 4
 
 # Core PR 4
 def _note(record: Record | None) -> str | None:
-    note = getattr(record, "note", None)
+    note: object = record.note if record is not None else None
+    # The library doesn't check payload types at runtime, so the annotation can't be trusted.
     return note if isinstance(note, str) and note else None
 
 
 # Core PR 4
 def _label(labels: dict[int, str], code: object) -> str | None:
     """Return the label for a record's numeric code, or None when it has no known code."""
+    # The payload is unvalidated at runtime, so a list or dict can arrive where an int is typed.
     return labels.get(code) if isinstance(code, int) else None
 
 
 # Core PR 4
 def _diaper_attributes(record: Record | None) -> dict[str, Any]:
-    return {
-        "type": _label(DIAPER_TYPES, getattr(record, "status", None)),
-        "note": _note(record),
-    }
+    status = record.status if isinstance(record, Diaper) else None
+    return {"type": _label(DIAPER_TYPES, status), "note": _note(record)}
 
 
 # Core PR 4
 def _feed_attributes(record: Record | None) -> dict[str, Any]:
     kind = FEED_KINDS.get(record.record_type) if record is not None else None
-    amount, unit = volume_parts(getattr(record, "volume", None))
+    left = right = both = finish_side = None
+    if isinstance(record, Nursing):
+        left, right, both = record.left_duration, record.right_duration, record.both_duration
+        finish_side = record.finish_side
+    amount, unit = volume_parts(record.volume if isinstance(record, Formula | Pumped) else None)
     return {
         "kind": kind,
-        "left_duration_minutes": getattr(record, "left_duration", None),
-        "right_duration_minutes": getattr(record, "right_duration", None),
-        "both_duration_minutes": getattr(record, "both_duration", None),
-        "finish_side": _label(SIDES, getattr(record, "finish_side", None)),
+        "left_duration_minutes": left,
+        "right_duration_minutes": right,
+        "both_duration_minutes": both,
+        "finish_side": _label(SIDES, finish_side),
         "amount": amount,
         "unit": unit,
         "note": _note(record),
@@ -85,25 +89,27 @@ def _feed_attributes(record: Record | None) -> dict[str, Any]:
 
 # Core PR 5
 def _pump_attributes(record: Record | None) -> dict[str, Any]:
-    amount, unit = volume_parts(getattr(record, "volume", None))
+    pump = record if isinstance(record, Pump) else None
+    amount, unit = volume_parts(pump.volume if pump else None)
     if amount == 0:
         # A timed pump saved with no volume carries an amount of 0: that is no volume, not 0 fl. oz.
         amount = unit = None
     return {
         "amount": amount,
         "unit": unit,
-        "left_amount": volume_parts(getattr(record, "left_volume", None))[0],
-        "right_amount": volume_parts(getattr(record, "right_volume", None))[0],
-        "left_duration_minutes": getattr(record, "left_duration", None),
-        "right_duration_minutes": getattr(record, "right_duration", None),
-        "sides": getattr(record, "sides", None),
-        "note": _note(record),
+        "left_amount": volume_parts(pump.left_volume if pump else None)[0],
+        "right_amount": volume_parts(pump.right_volume if pump else None)[0],
+        "left_duration_minutes": pump.left_duration if pump else None,
+        "right_duration_minutes": pump.right_duration if pump else None,
+        "sides": pump.sides if pump else None,
+        "note": _note(pump),
     }
 
 
 # Core PR 4
 def _sleep_attributes(record: Record | None) -> dict[str, Any]:
-    return {"duration_minutes": getattr(record, "duration", None), "note": _note(record)}
+    duration = record.duration if isinstance(record, Sleep) else None
+    return {"duration_minutes": duration, "note": _note(record)}
 
 
 @dataclass(frozen=True, kw_only=True)

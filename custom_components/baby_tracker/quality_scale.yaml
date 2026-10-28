@@ -89,6 +89,4 @@ rules:
   # Platinum
   async-dependency: done
   inject-websession: done
-  strict-typing:
-    status: todo
-    comment: mypy --strict passes on the integration in CI, now checking it against the library's own types, but sensor.py still probes record fields with getattr. Finish once that is cleaned up; the library is on PyPI with py.typed.
+  strict-typing: done
