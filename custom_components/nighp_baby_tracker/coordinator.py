@@ -49,10 +49,6 @@ type BabyTrackerConfigEntry = ConfigEntry[BabyTrackerCoordinator]
 
 FEED_TYPES = ("Nursing", "Formula", "Pumped")
 
-# Core PR 8
-# How often to sync while a sleep, nursing, or pump timer runs, so a phone's stop shows up quickly.
-TIMER_INTERVAL = timedelta(minutes=1)
-
 
 @dataclass(frozen=True, slots=True)
 class BabyData:
@@ -237,9 +233,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         # The saved copy of an orphaned nursing timer is dropped in a task the entry tracks.
         self.timers.drop_orphaned_nursing(data.babies)
         self.guard.check(self._baby_names)  # Core PR 18
-        # Core PR 8
-        # Set here, so the next refresh is scheduled on it after a sync, a write, or a timer change.
-        self.update_interval = self.wanted_interval(data)
         return data
 
     # Core PR 9
@@ -256,31 +249,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         """
         self.data = self._rebuild()
         self.async_update_listeners()
-
-    # Core PR 8
-    def wanted_interval(self, data: BabyTrackerData | None = None) -> timedelta:
-        """Return the sync interval: one minute while a timer runs, else five.
-
-        A sleep timer (synced), a nursing timer, or the pump timer (both Home Assistant's) counts
-        as running. A nursing or pump timer that has run past its guard hour is probably
-        forgotten, so it no longer counts. A synced sleep always does: every phone shows it, and
-        any can end it.
-        """
-        current = data if data is not None else self.data
-        babies = current.babies if current is not None else {}
-        now = dt_util.utcnow()
-        if (
-            self.timers.nursing_running(babies, now)
-            or self._sleep_running(babies)
-            or self.timers.pump_running(now)
-        ):
-            return TIMER_INTERVAL
-        return SCAN_INTERVAL
-
-    # Core PR 8
-    @staticmethod
-    def _sleep_running(babies: dict[str, BabyData]) -> bool:
-        return any(baby.running_sleep is not None for baby in babies.values())
 
     # Core PR 7
     def _today(self, baby_id: str) -> DayTotals:

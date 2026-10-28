@@ -3,7 +3,7 @@ rules:
   action-setup: done
   appropriate-polling:
     status: done
-    comment: Polls every 5 minutes, fixed (no option changes it), and every minute only while a sleep runs.
+    comment: Polls every 5 minutes, fixed (no option changes it).
   brands:
     status: done
     comment: The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker.

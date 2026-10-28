@@ -52,6 +52,13 @@ Captured on the test account on 2026-10-26, with the sync screen opened while ea
 - **Pump timers (assumed, not captured).** The app's pump timer wasn't captured. Real timed pumps carry equal `leftDuration` and `rightDuration` with `sides` 0, so Home Assistant keeps its own pump timer like the nursing one and writes the finished pump at the stop. A stop with no amount writes the durations and an `amount` of 0 (checked against the app's own database: every timed pump it saved without a volume has amount 0, never a missing value).
 - Durations are whole minutes. About 30 seconds per side was stored as 1.
 
+The app maker says the following about timers, beyond what we captured:
+
+- Running nursing, pumping, and other-activity timers are not sent to the server. Only the finished record syncs.
+- Each device in a sync group needs its own unique device ID.
+
+The maker's list doesn't name sleep. Our capture above shows sleep timers do sync while running, so we keep treating a sleep with `duration` 0 as one in progress. Because only sleeps sync mid-timer, a sleep ended on a phone can take up to one sync interval (5 minutes) to reach Home Assistant.
+
 ## Payloads by type
 
 Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `timestamp`, `timezone`, `note`, `newFlage`, `pictureLoaded`, `pictureNote`, `baby`):

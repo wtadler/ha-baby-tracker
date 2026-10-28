@@ -2,7 +2,7 @@
 
 A running sleep is synced, so every phone shows it and no cap applies. A nursing timer lives only
 in Home Assistant until it stops, so one left running is flagged after an hour with a repair, and
-stops counting toward the one-minute polling. Everything here is invented fixture data.
+doesn't change how often Home Assistant syncs. Everything here is invented fixture data.
 """
 
 import asyncio
@@ -160,14 +160,14 @@ async def test_a_side_switch_does_not_restart_the_hour(
     assert _issue(hass, init_integration) is not None
 
 
-async def test_the_repair_is_raised_by_the_polling_sync_too(
+async def test_the_repair_is_raised_by_the_next_sync_too(
     hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     freezer.move_to(NOW)
     await toggle(hass, NURSE_LEFT)
     freezer.move_to(minutes(61))
 
-    # No scheduled callback is fired by hand: the next one-minute sync notices.
+    # No scheduled callback is fired by hand: the next sync notices.
     async_fire_time_changed(hass, minutes(62))
     await hass.async_block_till_done()
 
@@ -221,35 +221,7 @@ async def test_each_baby_has_their_own_repair_and_clock(
 # --- polling ----------------------------------------------------------------------------------
 
 
-async def test_a_nursing_timer_well_under_an_hour_still_polls_every_minute(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    freezer.move_to(NOW)
-    await toggle(hass, NURSE_LEFT)
-
-    await _at(hass, freezer, 50)  # the probe's own ticks run up to seven minutes ahead
-
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
-
-
-async def test_past_an_hour_polling_falls_back_to_five_minutes(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    freezer.move_to(NOW)
-    await toggle(hass, NURSE_LEFT)
-
-    await _at(hass, freezer, 61)
-
-    assert await sync_interval(hass, server) == timedelta(minutes=5)
-
-
-async def test_a_synced_running_sleep_keeps_one_minute_polling_past_the_nursing_cap(
+async def test_a_synced_running_sleep_does_not_hide_the_nursing_repair(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -264,7 +236,7 @@ async def test_a_synced_running_sleep_keeps_one_minute_polling_past_the_nursing_
     await hass.async_block_till_done()
     assert state(hass, ASLEEP).state == "on"
 
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
     # The sleep isn't capped or flagged: only the nursing timer is.
     assert _issue(hass, init_integration) is not None
 
@@ -284,40 +256,10 @@ async def test_a_running_sleep_alone_is_never_flagged_however_long_it_runs(
     await _at(hass, freezer, 600)
 
     assert _guard_issues(hass) == []
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
-
-
-async def test_discarding_an_overdue_timer_leaves_polling_at_five_minutes(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    freezer.move_to(NOW)
-    await toggle(hass, NURSE_LEFT)
-    await _at(hass, freezer, 61)
-
-    await call(hass, "discard_nursing")
-
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
-async def test_discarding_a_young_timer_returns_polling_to_five_minutes(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    freezer.move_to(NOW)
-    await toggle(hass, NURSE_LEFT)
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
-
-    await call(hass, "discard_nursing")
-
-    assert await sync_interval(hass, server) == timedelta(minutes=5)
-
-
-async def test_a_new_timer_after_an_overdue_one_polls_every_minute_again(
+async def test_a_new_timer_after_an_overdue_one_syncs_every_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -331,7 +273,7 @@ async def test_a_new_timer_after_an_overdue_one_polls_every_minute_again(
 
     await toggle(hass, NURSE_LEFT)
 
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
     assert _issue(hass, init_integration) is None
 
 
@@ -529,7 +471,7 @@ async def test_a_saved_timer_under_an_hour_old_raises_no_repair_until_the_hour(
     assert _issue(hass, mock_config_entry) is not None
 
 
-async def test_a_saved_timer_well_under_an_hour_old_polls_every_minute_after_a_restart(
+async def test_a_saved_timer_well_under_an_hour_old_syncs_every_five_minutes_after_a_restart(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
@@ -540,7 +482,7 @@ async def test_a_saved_timer_well_under_an_hour_old_polls_every_minute_after_a_r
 
     await _setup_with_saved(hass, mock_config_entry, hass_storage, {BABY_ONE_ID: _saved_timer(30)})
 
-    assert await sync_interval(hass, server) == timedelta(minutes=1)
+    assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
 async def test_a_reload_with_an_overdue_timer_raises_the_repair_again(
