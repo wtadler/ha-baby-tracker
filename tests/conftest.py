@@ -22,10 +22,10 @@ from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import (
     BABY_ONE,  # Core PR 7
-    BABY_THREE,
+    BABY_THREE,  # Core PR 5
     BABY_TWO,
     EMAIL,
-    EMAIL_TWO,
+    EMAIL_TWO,  # Core PR 5
     ENTRY_ID,
     OWN_DEVICE,
     OWN_DEVICE_TWO,  # Core PR 5
@@ -34,7 +34,7 @@ from . import (
 )
 from .factories import (
     DEVICE_A,
-    DEVICE_B,
+    DEVICE_B,  # Core PR 5
     at,
     volume,
 )
@@ -112,6 +112,7 @@ def server() -> FakeServer:
     return server
 
 
+# Core PR 5
 @pytest.fixture
 def second_server() -> FakeServer:
     """A second account's service, with one phone that has logged for a third baby."""
@@ -129,15 +130,21 @@ def second_server() -> FakeServer:
 
 
 @pytest.fixture(autouse=True)
-def mock_baby_tracker_client(server: FakeServer, second_server: FakeServer) -> Iterator[FakeServer]:
+def mock_baby_tracker_client(
+    server: FakeServer,
+    second_server: FakeServer,  # Core PR 5
+) -> Iterator[FakeServer]:
     """Replace the library's client everywhere the integration builds one.
 
-    The second account (``EMAIL_TWO``) signs in to ``second_server``, every other one to
-    ``server``. It is autouse so that no test can reach the real service by accident.
+    It is autouse so that no test can reach the real service by accident.
     """
 
     def factory(email: str, *args: Any, **kwargs: Any) -> FakeClient:
-        return FakeClient(second_server if email == EMAIL_TWO else server, email, *args, **kwargs)
+        # The second account signs in to its own service, every other one to the first.
+        return FakeClient(  # Core PR 5
+            second_server if email == EMAIL_TWO else server, email, *args, **kwargs
+        )
+        # Core: return FakeClient(server, email, *args, **kwargs)
 
     with (
         patch("custom_components.baby_tracker.BabyTrackerClient", factory),
@@ -230,7 +237,7 @@ def populated_server(server: FakeServer) -> FakeServer:
         baby=BABY_TWO,
         duration=0,
     )
-    server.add_pump(
+    server.add_pump(  # Core PR 5
         DEVICE_A, "F0000000-0000-4000-8000-000000000006", when=at(150), amount=volume(5)
     )
     return server

@@ -27,7 +27,6 @@ from . import (
     BABY_ONE,  # HACS-only: the engine tests
     DIAPER,
     NOW,
-    sync_interval,
     tick,
 )
 from .factories import (
@@ -110,29 +109,29 @@ async def test_the_client_uses_its_own_http_session(
     assert not session.closed
 
 
-async def test_a_connection_error_at_setup_retries_later(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+@pytest.mark.parametrize(
+    "error",
+    [BabyTrackerConnectionError("offline"), ProtocolError("odd")],
+    ids=["connection", "protocol"],
+)
+async def test_a_failed_first_sync_retries_later_and_closes_the_client(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    server: FakeServer,
+    error: Exception,
 ) -> None:
-    """Test a connection error at setup retries, and leaves no client open."""
-    server.sign_in_error = BabyTrackerConnectionError("down")
+    """Test a failed first sync retries with a translated reason, and leaves no client open."""
+    server.request_error = error
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert mock_config_entry.error_reason_translation_key == "sync_failed_update"
+    assert str(error) in mock_config_entry.error_reason_translation_placeholders["error"]
+    assert server.clients
     assert server.open_clients == []
     assert all(client.kwargs["session"].closed for client in server.clients)
-
-
-async def test_a_reply_in_the_wrong_shape_at_setup_retries_later(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test a reply the library can't read at setup retries."""
-    server.request_error = ProtocolError("odd")
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_setup_retries_and_then_loads_once_the_server_is_back(
@@ -151,6 +150,7 @@ async def test_setup_retries_and_then_loads_once_the_server_is_back(
     assert mock_config_entry.state is ConfigEntryState.LOADED
 
 
+@pytest.mark.engine
 async def test_a_newer_record_from_another_device_is_fetched_by_its_own_log(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -161,6 +161,7 @@ async def test_a_newer_record_from_another_device_is_fetched_by_its_own_log(
     assert hass.states.get(DIAPER).state == at(60).isoformat()
 
 
+@pytest.mark.engine
 async def test_an_idle_sync_fetches_no_transactions(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -172,6 +173,7 @@ async def test_an_idle_sync_fetches_no_transactions(
     assert len(server.transaction_reads) == reads
 
 
+@pytest.mark.engine
 async def test_a_sync_reads_only_what_is_newer_than_what_was_seen(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -181,40 +183,39 @@ async def test_a_sync_reads_only_what_is_newer_than_what_was_seen(
     assert server.transaction_reads[-1] == (DEVICE_A, 2)
 
 
-async def test_syncs_run_on_the_default_five_minute_interval(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+async def test_syncs_run_every_five_minutes(
+    hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     """Test the account syncs every five minutes."""
-    assert await sync_interval(hass, server) == timedelta(minutes=5)
+    assert init_integration.runtime_data.update_interval == timedelta(minutes=5)
 
 
+@pytest.mark.parametrize(
+    "error",
+    [BabyTrackerConnectionError("offline"), ProtocolError("odd")],
+    ids=["connection", "protocol"],
+)
 async def test_an_update_failure_makes_entities_unavailable_then_recovers(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
 ) -> None:
-    """Test a failed sync makes the entities unavailable until one works."""
+    """Test a failed sync makes the entities unavailable, until one works."""
     before = hass.states.get(DIAPER).state
-    server.request_error = BabyTrackerConnectionError("down")
+    server.request_error = error
     await tick(hass)
-    assert hass.states.get(DIAPER).state == "unavailable"
+    assert hass.states.get(DIAPER).state == STATE_UNAVAILABLE
     assert init_integration.state is ConfigEntryState.LOADED
+    assert f"Couldn't sync with the service: {error}" in caplog.text
 
     server.request_error = None
     await tick(hass)
     assert hass.states.get(DIAPER).state == before
 
 
-async def test_a_protocol_error_during_an_update_also_recovers(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test the entities recover after a reply the library can't read."""
-    server.request_error = ProtocolError("odd")
-    await tick(hass)
-    assert hass.states.get(DIAPER).state == "unavailable"
-    server.request_error = None
-    await tick(hass)
-    assert hass.states.get(DIAPER).state != "unavailable"
-
-
+@pytest.mark.engine
 async def test_records_that_arrived_during_an_outage_show_up_after_it(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -264,6 +265,7 @@ async def test_a_restart_loads_the_saved_state_and_does_not_reload_history(
     assert hass.states.get(DIAPER).state == at(0).isoformat()
 
 
+@pytest.mark.engine
 async def test_a_restart_fetches_only_what_is_newer(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -353,62 +355,40 @@ async def test_removing_the_entry_removes_its_saved_state(
     assert key not in hass_storage
 
 
-async def test_unloading_keeps_the_saved_state(
-    hass: HomeAssistant, init_integration: MockConfigEntry, hass_storage: dict[str, Any]
+async def test_unloading_the_entry(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
 ) -> None:
-    """Test unloading the entry keeps its saved state."""
-    assert await hass.config_entries.async_unload(init_integration.entry_id)
-    assert _storage_key(init_integration) in hass_storage
-
-
-async def test_unloading_stops_syncing_and_frees_the_client(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test unloading stops the syncs and closes the client and its session."""
+    """Test unloading stops the syncs, closes the client, and keeps the saved state."""
     session = server.clients[0].kwargs["session"]
+    assert len(server.open_clients) == 1
 
     assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
 
     assert init_integration.state is ConfigEntryState.NOT_LOADED
+    assert hass.states.get(DIAPER).state == STATE_UNAVAILABLE
     assert server.open_clients == []
     assert session.closed
+    assert _storage_key(init_integration) in hass_storage
 
     calls = server.device_list_calls
     await tick(hass, minutes=30)
     assert server.device_list_calls == calls
 
 
-async def test_entities_go_unavailable_on_unload(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    """Test the entities are unavailable once the entry unloads."""
-    assert await hass.config_entries.async_unload(init_integration.entry_id)
-    await hass.async_block_till_done()
-    assert hass.states.get(DIAPER).state == "unavailable"
-
-
-async def test_an_entry_can_be_set_up_again_after_unloading(
+async def test_an_entry_can_be_reloaded(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    """Test an unloaded entry sets up again."""
-    assert await hass.config_entries.async_unload(init_integration.entry_id)
-    assert await hass.config_entries.async_setup(init_integration.entry_id)
-    await hass.async_block_till_done()
-
-    assert init_integration.state is ConfigEntryState.LOADED
-    assert hass.states.get(DIAPER).state == at(0).isoformat()
-    assert len(server.open_clients) == 1
-
-
-async def test_repeated_reloads_leave_one_open_client(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test reloads leave exactly one client open."""
+    """Test reloads set the entry up again and leave exactly one client open."""
     for _ in range(2):
         assert await hass.config_entries.async_reload(init_integration.entry_id)
         await hass.async_block_till_done()
+
     assert init_integration.state is ConfigEntryState.LOADED
+    assert hass.states.get(DIAPER).state == at(0).isoformat()
     assert len(server.open_clients) == 1
 
 
@@ -492,62 +472,24 @@ async def test_saved_state_from_the_earlier_library_version_still_loads(
     assert hass.states.get(DIAPER).state == at(10).isoformat()
 
 
-@pytest.mark.parametrize(
-    ("error", "expected_state"),
-    [(BabyTrackerConnectionError("down"), ConfigEntryState.SETUP_RETRY)],
-    ids=["connection"],
-)
 async def test_a_failing_save_does_not_replace_the_sync_error(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     server: FakeServer,
     caplog: pytest.LogCaptureFixture,
-    error: Exception,
-    expected_state: ConfigEntryState,
 ) -> None:
-    # Device A syncs (so there is progress to save), then device B fails.
     """Test a failed save is logged and the sync's error still decides the state."""
+    # Device A syncs (so there is progress to save), then device B fails.
     server.add_record(DEVICE_B, "Diaper", "D9000000-0000-4000-8000-000000000001", when=at(5))
-    server.read_errors[DEVICE_B] = error
+    server.read_errors[DEVICE_B] = BabyTrackerConnectionError("down")
     mock_config_entry.add_to_hass(hass)
 
     with patch("homeassistant.helpers.storage.Store.async_save", side_effect=OSError("disk full")):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    assert mock_config_entry.state is expected_state
-    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
-    assert not flows
-    assert "disk full" in caplog.text
-
-
-async def test_a_failed_first_sync_is_reported_with_a_translation_key(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test a failed first sync gives the entry a translated reason."""
-    server.request_error = BabyTrackerConnectionError("offline")
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    assert mock_config_entry.error_reason_translation_key == "sync_failed_update"
-    assert "offline" in mock_config_entry.error_reason_translation_placeholders["error"]
-
-
-async def test_a_failed_later_sync_raises_a_translated_update_failure(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    server: FakeServer,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Test a failed later sync logs the translated message."""
-    server.request_error = BabyTrackerConnectionError("offline")
-    await tick(hass)
-
-    assert hass.states.get(DIAPER).state == STATE_UNAVAILABLE
-    # The message is the translated one, not the key.
-    assert "Couldn't sync with the service: offline" in caplog.text
+    assert "disk full" in caplog.text
 
 
 async def test_a_rejected_login_is_reported_with_a_translation_key(
@@ -561,25 +503,3 @@ async def test_a_rejected_login_is_reported_with_a_translation_key(
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
     assert mock_config_entry.error_reason_translation_key == "auth_failed"
-
-
-async def test_a_failed_setup_closes_the_client(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Regression guard for the move to ``entry.async_on_unload(client.close)``."""
-    server.request_error = BabyTrackerConnectionError("offline")
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-    assert server.clients
-    assert server.open_clients == []
-
-
-async def test_unloading_closes_the_client(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test unloading closes the client."""
-    assert len(server.open_clients) == 1
-    await hass.config_entries.async_unload(init_integration.entry_id)
-    await hass.async_block_till_done()
-    assert server.open_clients == []

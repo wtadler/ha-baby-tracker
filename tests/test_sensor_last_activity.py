@@ -69,6 +69,7 @@ async def test_the_last_diaper_shows_when_it_happened(
     assert _sensor_state(hass, "baby_two", "last_diaper").state == at(10).isoformat()
 
 
+# HACS-only: the last diaper test already shows two babies with different records
 async def test_babies_do_not_share_records(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:

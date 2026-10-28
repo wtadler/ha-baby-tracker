@@ -79,6 +79,7 @@ async def test_a_baby_without_a_name_gets_a_translated_device_name(
     assert state.attributes["friendly_name"] == "Baby Last diaper"
 
 
+# HACS-only: the snapshot covers this in core
 @pytest.mark.usefixtures("init_integration")
 async def test_the_sensors_are_named_after_the_baby_and_the_activity(hass: HomeAssistant) -> None:
     """Test the sensor names combine the baby's name and the activity."""
@@ -89,6 +90,7 @@ async def test_the_sensors_are_named_after_the_baby_and_the_activity(hass: HomeA
             assert state.attributes["friendly_name"] == f"{name} {label}"
 
 
+# HACS-only: the snapshot covers this in core
 async def test_unique_ids_are_built_from_the_baby_id(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,
@@ -101,6 +103,7 @@ async def test_unique_ids_are_built_from_the_baby_id(
     assert {f"{baby_id}_{key}" for baby_id, _, _ in BABIES for key in KEYS} <= set(unique_ids)
 
 
+# HACS-only: the snapshot covers this in core
 @pytest.mark.usefixtures("init_integration")
 async def test_the_sensors_are_timestamps(hass: HomeAssistant) -> None:
     """Test the last-activity sensors are timestamps."""
