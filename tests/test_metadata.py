@@ -469,7 +469,6 @@ def test_the_readme_offers_the_install_and_setup_links() -> None:
         "https://my.home-assistant.io/redirect/hacs_repository/"
         "?owner=wtadler&repository=ha-baby-tracker&category=integration"
     ) in readme
-    assert "marketplace_repository" in readme
     assert (
         "https://my.home-assistant.io/redirect/config_flow_start/?domain=baby_tracker"
     ) in readme

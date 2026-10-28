@@ -35,20 +35,20 @@ restart.
 
 ## Installation
 
-It needs Home Assistant 2026.10.0 or later. Install it from the Marketplace (**Settings >
-Marketplace**, Home Assistant 2026.11 and later) or from HACS. This link opens the repository in
-whichever your Home Assistant has:
+It needs Home Assistant 2026.10.0 or later. The integration isn't in the HACS catalog yet, so add
+this repository as a custom repository first. The button does that for you: it opens HACS (or the
+Marketplace, on Home Assistant 2026.11 and later) and offers to add the repository.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=wtadler&repository=ha-baby-tracker&category=integration)
 
-The integration isn't in the catalog yet, so the link first offers to add the repository. Confirm,
-download **Baby Tracker (Nighp)**, and restart Home Assistant. On 2026.11 and later,
-[this link](https://my.home-assistant.io/redirect/marketplace_repository/?owner=wtadler&repository=ha-baby-tracker&category=integration)
-opens it in the Marketplace directly.
+Or add it by hand:
 
-To install by hand instead, copy `custom_components/baby_tracker` from this repository to
-`<config>/custom_components/baby_tracker/` and restart. Either way, Home Assistant installs the
-`pybabytracker` library from PyPI when it loads the integration.
+1. In HACS, open the ⋮ menu and choose **Custom repositories**.
+2. Add `https://github.com/wtadler/ha-baby-tracker` with the type **Integration**.
+3. Search for **Baby Tracker (Nighp)**, download it, and restart Home Assistant.
+
+Home Assistant installs the `pybabytracker` library from PyPI when it loads the integration. Without
+HACS, copy `custom_components/baby_tracker` into `<config>/custom_components/` and restart.
 
 ## Configuration
 
