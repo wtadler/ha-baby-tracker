@@ -222,15 +222,15 @@ def test_exempt_rules_are_ones_the_rule_text_allows() -> None:
 def test_the_manifest_leaves_out_categories_until_the_published_hassfest_accepts_them() -> None:
     # The hassfest image the CI action runs (ghcr.io/home-assistant/hassfest) still rejects the
     # key: "not a valid option at 'categories'", seen on pull request 55. Core's dev branch accepts
-    # it, and requires it for a core integration, so the README lists it for core submission. Add it
-    # when the 2026.11 hassfest image ships (the first release cut after core's change).
+    # it, and requires it for a core integration, so CONTRIBUTING.md lists it for core submission.
+    # Add it when the 2026.11 hassfest image ships (the first release cut after core's change).
     assert "categories" not in _manifest()
 
 
-def test_the_category_the_readme_names_for_core_submission_is_one_core_lists() -> None:
+def test_the_category_contributing_names_for_core_submission_is_one_core_lists() -> None:
     from .helpers import ROOT
 
-    section = (ROOT / "README.md").read_text().split("## Core submission", 1)[1]
+    section = (ROOT / "CONTRIBUTING.md").read_text().split("## Core submission", 1)[1]
     section = section.split("\n## ", 1)[0]
     named = re.search(r"`categories` is added as `\[\"(\w+)\"\]`", section)
     assert named is not None
@@ -271,10 +271,10 @@ def test_the_custom_only_keys_stay_for_the_repository() -> None:
     assert manifest["version"]
 
 
-def test_the_readme_lists_what_changes_in_the_manifest_at_core_submission() -> None:
+def test_contributing_lists_what_changes_in_the_manifest_at_core_submission() -> None:
     from .helpers import ROOT
 
-    readme = (ROOT / "README.md").read_text()
+    readme = (ROOT / "CONTRIBUTING.md").read_text()
     section = readme.split("## Core submission", 1)[1].split("\n## ", 1)[0]
     for key in (
         "documentation",
