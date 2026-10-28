@@ -12,7 +12,7 @@ This integration is not made or supported by Nighp, the maker of Baby Tracker. F
 issue in this repository; please don't contact Nighp.
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="A Home Assistant dashboard for a baby named Homer: last diaper 43 minutes ago, last feed 2 hours ago, asleep, 5 diapers and 4 feeds today, buttons to log a diaper or bottle, sleep and nursing timer switches, and the account's last pump" width="760">
+  <img src="docs/images/dashboard.png" alt="A Home Assistant dashboard titled Baby Tracker, in three sections. Diapers: wet, dirty, and mixed buttons, last diaper 53 minutes ago, 5 diapers today. Feeding: nursing left and right switches, a bottle button, last feed 2 hours ago, 4 feeds today, 7.5 fl. oz. bottle volume, and pumping 3 hours ago. Sleeping: a sleep tile, on, started 53 minutes ago" width="765">
 </p>
 
 ## What you get
