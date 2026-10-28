@@ -29,13 +29,14 @@ Each baby in the account becomes a device with:
 | **Nursing left time**, **Nursing right time**, **Discard nursing** | The running nursing session's minutes per side, and a way to drop it. |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
 
-Each account becomes a device with **Last pump** and a **Pump timer** switch, because the app
-stores pumps on the account, not on a baby. Babies added to the account later show up without a
+Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
+sensor showing when it started, because the app stores pumps on the account, not on a baby. Babies added to the account later show up without a
 restart.
 
 ## Installation
 
-The integration isn't in HACS yet, so install it by copying:
+It needs Home Assistant 2026.10.0 or later. The integration isn't in HACS yet, so install it by
+copying:
 
 1. Copy `custom_components/baby_tracker` from this repository to
    `<config>/custom_components/baby_tracker/`.
@@ -62,7 +63,7 @@ If the password changes, Home Assistant asks you to sign in again.
 
 - **Sleep** is on while the baby's newest sleep is running, wherever it started. Turn it on to
   start a sleep and off to end it, even one a phone started. The app syncs a running sleep, so the
-  phones see it at once.
+  phones see it at their next sync.
 - **Nursing left** and **Nursing right** work like the app's side buttons. Turn a side on to
   start, turn the other side on to switch, and turn the lit side off to stop and log the session.
   The app doesn't sync a running nursing timer, so these show only Home Assistant's own timer, and
@@ -75,7 +76,7 @@ Nursing and pump timers survive a restart. One left running for over an hour rai
 ## Actions
 
 A baby's actions take the baby's device as `device_id`. The account's actions take
-`config_entry_id`. **Developer tools > Actions** shows every field.
+`config_entry_id`, and `undo` takes either. **Developer tools > Actions** shows every field.
 
 | Action | What it does |
 |---|---|
@@ -89,8 +90,9 @@ A baby's actions take the baby's device as `device_id`. The account's actions ta
 | `baby_tracker.start_pump`, `baby_tracker.stop_pump` | Run the account's pump timer. `stop_pump` takes an optional `amount`. |
 | `baby_tracker.undo` | Delete the newest record Home Assistant wrote, or one by `object_id`. |
 
-Times default to now. The `log_*` actions and `start_sleep` take an optional `object_id`; reuse it
-to retry a write safely, and the record is added once.
+Times default to now, except for `log_sleep`, which needs a start and an end. The `log_*` actions
+and `start_sleep` take an optional `object_id`; reuse it to retry a write safely, and the record is
+added once.
 
 ## Live activity on your iPhone
 
@@ -168,6 +170,8 @@ entities.
 
 1. Under **Settings > Devices & services**, open **Baby Tracker (Nighp)** and choose **Delete**.
 2. Delete `custom_components/baby_tracker` and restart Home Assistant.
+
+The "Home Assistant" device stays in the app's device list.
 
 ## Contributing
 
