@@ -3,7 +3,7 @@
 from datetime import timedelta
 from enum import StrEnum  # Core PR 9
 
-DOMAIN = "nighp_baby_tracker"
+DOMAIN = "baby_tracker"
 
 # HACS-only: the config entry's minor version (1.2 is the migration in ``__init__.py``).
 CONFIG_ENTRY_MINOR_VERSION = 2

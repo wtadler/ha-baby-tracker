@@ -6,7 +6,7 @@
 
 prs: 22
 
-# Files of custom_components/nighp_baby_tracker/. strings.json, icons.json, services.yaml,
+# Files of custom_components/baby_tracker/. strings.json, icons.json, services.yaml,
 # manifest.json, and quality_scale.yaml are generated, so they aren't listed.
 integration_files:
   __init__.py: 1
@@ -39,11 +39,11 @@ test_files:
   factories.py: 1
   fake_server.py: 1
   helpers.py: 2
-  components/nighp_baby_tracker/fixtures/baby.json: 1
-  components/nighp_baby_tracker/fixtures/record.json: 1
-  components/nighp_baby_tracker/fixtures/volume.json: 1
-  components/nighp_baby_tracker/fixtures/wire.json: 1
-  components/nighp_baby_tracker/fixtures/captured_payloads.json: 9
+  components/baby_tracker/fixtures/baby.json: 1
+  components/baby_tracker/fixtures/record.json: 1
+  components/baby_tracker/fixtures/volume.json: 1
+  components/baby_tracker/fixtures/wire.json: 1
+  components/baby_tracker/fixtures/captured_payloads.json: 9
   snapshots/test_sensor.ambr: 1
   snapshots/test_diagnostics.ambr: 3
   snapshots/test_binary_sensor.ambr: 8
@@ -160,7 +160,7 @@ overrides:
     text: "The service rejected the email or password. Remove the entry and add the account again with its current password."
 
 manifest:
-  documentation: https://www.home-assistant.io/integrations/nighp_baby_tracker
+  documentation: https://www.home-assistant.io/integrations/baby_tracker
   loggers: [pybabytracker]
   categories: [health_wellbeing]
   # The tier each PR declares. PR 22 raises it, with a core team member's approval.
@@ -177,7 +177,7 @@ quality_scale:
     appropriate-polling:
       1: {status: done, comment: "Polls every 5 minutes, fixed (no option changes it)."}
     brands:
-      1: {status: done, comment: "The icon and logo are in the brands repository, under core_integrations/nighp_baby_tracker."}
+      1: {status: done, comment: "The icon and logo are in the brands repository, under core_integrations/baby_tracker."}
     common-modules:
       1: done
     config-flow-test-coverage:

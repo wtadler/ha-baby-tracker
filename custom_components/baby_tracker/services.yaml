@@ -5,7 +5,7 @@ log_diaper:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     type:
       required: true
       example: wet
@@ -38,7 +38,7 @@ log_bottle:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     kind:
       required: true
       example: formula
@@ -86,7 +86,7 @@ log_nursing:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     left_minutes:
       required: false
       example: 10
@@ -136,7 +136,7 @@ log_sleep:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     start:
       required: true
       selector:
@@ -162,7 +162,7 @@ log_pump:
       required: true
       selector:
         config_entry:
-          integration: nighp_baby_tracker
+          integration: baby_tracker
     amount:
       required: false
       example: 5
@@ -252,7 +252,7 @@ start_pump:
       required: true
       selector:
         config_entry:
-          integration: nighp_baby_tracker
+          integration: baby_tracker
 
 stop_pump:
   fields:
@@ -260,7 +260,7 @@ stop_pump:
       required: true
       selector:
         config_entry:
-          integration: nighp_baby_tracker
+          integration: baby_tracker
     amount:
       required: false
       example: 4.5
@@ -289,13 +289,13 @@ undo:
       required: false
       selector:
         config_entry:
-          integration: nighp_baby_tracker
+          integration: baby_tracker
     device_id:
       required: false
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     object_id:
       required: false
       example: 6F1C2A3E-0000-4000-8000-000000000001
@@ -309,7 +309,7 @@ start_sleep:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     start:
       required: false
       selector:
@@ -332,7 +332,7 @@ stop_sleep:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     end:
       required: false
       selector:
@@ -345,7 +345,7 @@ start_nursing:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     side:
       required: true
       example: left
@@ -363,7 +363,7 @@ switch_nursing_side:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
 
 stop_nursing:
   fields:
@@ -372,7 +372,7 @@ stop_nursing:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker
     note:
       required: false
       example: Fell asleep at the end
@@ -386,4 +386,4 @@ discard_nursing:
       selector:
         device:
           filter:
-            - integration: nighp_baby_tracker
+            - integration: baby_tracker

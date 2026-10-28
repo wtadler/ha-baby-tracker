@@ -18,8 +18,8 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.nighp_baby_tracker.const import account_identifier
-from custom_components.nighp_baby_tracker.pybabytracker import SyncEngine
+from custom_components.baby_tracker.const import account_identifier
+from custom_components.baby_tracker.pybabytracker import SyncEngine
 
 from . import BABY_TWO, get_baby_device, tick
 from .factories import (

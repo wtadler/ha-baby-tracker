@@ -7,10 +7,10 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["custom_components.nighp_baby_tracker"]
+source = ["custom_components.baby_tracker"]
 branch = true
 # The vendored library is tested in its own repo.
-omit = ["custom_components/nighp_baby_tracker/pybabytracker/*"]
+omit = ["custom_components/baby_tracker/pybabytracker/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -22,7 +22,7 @@ fail_under = 97
 target-version = "py314"
 line-length = 100
 # The vendored library is linted in its own repo.
-extend-exclude = ["custom_components/nighp_baby_tracker/pybabytracker"]
+extend-exclude = ["custom_components/baby_tracker/pybabytracker"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "D", "SLF"]
@@ -38,17 +38,17 @@ python_version = "3.14"
 strict = true
 # Core requires @override on every overriding method.
 enable_error_code = ["explicit-override"]
-files = ["custom_components/nighp_baby_tracker"]
+files = ["custom_components/baby_tracker"]
 # The vendored library is checked in its own repo.
-exclude = ["custom_components/nighp_baby_tracker/pybabytracker/"]
+exclude = ["custom_components/baby_tracker/pybabytracker/"]
 
 [[tool.mypy.overrides]]
-module = "custom_components.nighp_baby_tracker.pybabytracker.*"
+module = "custom_components.baby_tracker.pybabytracker.*"
 follow_imports = "skip"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 # Run on the folder, mypy names the vendored library without custom_components. The library is
 # checked in its own repo, which has no @override rule yet.
-module = "nighp_baby_tracker.pybabytracker.*"
+module = "baby_tracker.pybabytracker.*"
 disable_error_code = ["explicit-override"]

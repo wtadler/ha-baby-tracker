@@ -41,7 +41,7 @@ async def test_buttons(
     populated_server: FakeServer,
 ) -> None:
     freezer.move_to(at(180))
-    with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.BUTTON]):
+    with patch("custom_components.baby_tracker.PLATFORMS", [Platform.BUTTON]):
         await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)

@@ -1,5 +1,5 @@
 {
-  "domain": "nighp_baby_tracker",
+  "domain": "baby_tracker",
   "name": "Baby Tracker (Nighp)",
   "codeowners": ["@wtadler"],
   "config_flow": true,
@@ -7,7 +7,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/wtadler/ha-baby-tracker/issues",
-  "loggers": ["custom_components.nighp_baby_tracker.pybabytracker"],
+  "loggers": ["custom_components.baby_tracker.pybabytracker"],
   "requirements": [],
   "version": "0.1.0"
 }

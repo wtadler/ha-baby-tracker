@@ -9,11 +9,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     CONF_DEVICE_UUID,
     DOMAIN,
 )
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     AuthenticationError,
     BabyTrackerConnectionError,
     ProtocolError,

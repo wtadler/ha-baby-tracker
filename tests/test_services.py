@@ -14,10 +14,10 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry, load_json_array_fixture
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     DOMAIN,
 )
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     OP_ADD,
     BabyTrackerConnectionError,
     SyncEngine,
@@ -587,7 +587,7 @@ async def test_a_failed_write_raises_a_translated_error_and_changes_no_sensor(
 
 
 async def test_setting_up_the_actions_registers_every_one_of_them(hass: HomeAssistant) -> None:
-    from custom_components.nighp_baby_tracker.services import async_setup_services
+    from custom_components.baby_tracker.services import async_setup_services
 
     async_setup_services(hass)
 
@@ -595,8 +595,8 @@ async def test_setting_up_the_actions_registers_every_one_of_them(hass: HomeAssi
 
 
 async def test_every_registered_action_name_is_a_service_member(hass: HomeAssistant) -> None:
-    from custom_components.nighp_baby_tracker.const import BabyTrackerService
-    from custom_components.nighp_baby_tracker.services import async_setup_services
+    from custom_components.baby_tracker.const import BabyTrackerService
+    from custom_components.baby_tracker.services import async_setup_services
 
     async_setup_services(hass)
 
@@ -606,7 +606,7 @@ async def test_every_registered_action_name_is_a_service_member(hass: HomeAssist
 
 
 def test_the_coordinator_has_no_timer_forwarding_methods() -> None:
-    from custom_components.nighp_baby_tracker.coordinator import BabyTrackerCoordinator
+    from custom_components.baby_tracker.coordinator import BabyTrackerCoordinator
 
     forwarding = {"nursing", "pump", "async_set_nursing", "async_set_pump"}
 
@@ -614,7 +614,7 @@ def test_the_coordinator_has_no_timer_forwarding_methods() -> None:
 
 
 async def test_every_schema_field_is_an_argument_member(hass: HomeAssistant) -> None:
-    from custom_components.nighp_baby_tracker.services import (
+    from custom_components.baby_tracker.services import (
         BabyTrackerServiceArgument,
         async_setup_services,
     )

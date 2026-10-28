@@ -39,7 +39,7 @@ async def test_sensors(
 ) -> None:
     """Test the sensor entities and their states."""
     freezer.move_to(at(180))
-    with patch("custom_components.nighp_baby_tracker.PLATFORMS", [Platform.SENSOR]):
+    with patch("custom_components.baby_tracker.PLATFORMS", [Platform.SENSOR]):
         await setup_integration(hass, mock_config_entry)
 
     await snapshot_platform(hass, entity_registry, snapshot, mock_config_entry.entry_id)

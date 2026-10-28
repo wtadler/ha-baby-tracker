@@ -14,10 +14,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "core_cut.py"
-INTEGRATION = ROOT / "custom_components" / "nighp_baby_tracker"
+INTEGRATION = ROOT / "custom_components" / "baby_tracker"
 CORE_PREP = ROOT / "core-prep"
-COMPONENT = Path("homeassistant/components/nighp_baby_tracker")
-TESTS = Path("tests/components/nighp_baby_tracker")
+COMPONENT = Path("homeassistant/components/baby_tracker")
+TESTS = Path("tests/components/baby_tracker")
 
 PR1_INTEGRATION = {
     "__init__.py",
@@ -80,12 +80,12 @@ def _files(root: Path) -> set[str]:
 
 def test_imports_of_the_integration_point_at_core(core_cut: ModuleType) -> None:
     source = (
-        "from custom_components.nighp_baby_tracker.const import DOMAIN\n"
-        'patch("custom_components.nighp_baby_tracker.coordinator.SCAN_INTERVAL")\n'
+        "from custom_components.baby_tracker.const import DOMAIN\n"
+        'patch("custom_components.baby_tracker.coordinator.SCAN_INTERVAL")\n'
     )
     assert core_cut.rewrite_imports(source) == (
-        "from homeassistant.components.nighp_baby_tracker.const import DOMAIN\n"
-        'patch("homeassistant.components.nighp_baby_tracker.coordinator.SCAN_INTERVAL")\n'
+        "from homeassistant.components.baby_tracker.const import DOMAIN\n"
+        'patch("homeassistant.components.baby_tracker.coordinator.SCAN_INTERVAL")\n'
     )
 
 
@@ -93,7 +93,7 @@ def test_imports_of_the_integration_point_at_core(core_cut: ModuleType) -> None:
     "source",
     [
         "from .pybabytracker import Record\n",
-        "from custom_components.nighp_baby_tracker.pybabytracker import Record\n",
+        "from custom_components.baby_tracker.pybabytracker import Record\n",
     ],
     ids=["relative", "absolute"],
 )
@@ -259,9 +259,7 @@ def test_the_manifest_is_reshaped_for_core(core_cut: ModuleType) -> None:
     assert list(manifest)[2:] == sorted(list(manifest)[2:])
     assert "version" not in manifest
     assert "issue_tracker" not in manifest
-    assert manifest["documentation"] == (
-        "https://www.home-assistant.io/integrations/nighp_baby_tracker"
-    )
+    assert manifest["documentation"] == ("https://www.home-assistant.io/integrations/baby_tracker")
     assert manifest["loggers"] == ["pybabytracker"]
     assert manifest["quality_scale"] == "bronze"
     assert manifest["categories"] == ["health_wellbeing"]
@@ -485,7 +483,7 @@ def test_strict_typing_adds_the_integration_once_in_order(core_cut: ModuleType, 
     core_cut.cut(1, core, ruff=None)
     assert (core / ".strict-typing").read_text() == (
         "homeassistant.components.a_first.*\n"
-        "homeassistant.components.nighp_baby_tracker.*\n"
+        "homeassistant.components.baby_tracker.*\n"
         "homeassistant.components.zz_last.*\n"
     )
 

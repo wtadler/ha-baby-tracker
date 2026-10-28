@@ -1,4 +1,4 @@
-"""Builders for the invented sync-format payloads in ``components/nighp_baby_tracker/fixtures/``.
+"""Builders for the invented sync-format payloads in ``components/baby_tracker/fixtures/``.
 
 The JSON files hold each payload's shape. A builder fills in the fields a test varies.
 Nothing here comes from a real account.
@@ -12,7 +12,7 @@ from typing import Any
 
 from pytest_homeassistant_custom_component.common import load_json_object_fixture
 
-from custom_components.nighp_baby_tracker.const import DOMAIN
+from custom_components.baby_tracker.const import DOMAIN
 
 BABY_ONE_ID = "11111111-AAAA-4AAA-8AAA-000000000001"
 BABY_TWO_ID = "22222222-BBBB-4BBB-8BBB-000000000002"

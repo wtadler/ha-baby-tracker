@@ -14,7 +14,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     DOMAIN,
 )
 

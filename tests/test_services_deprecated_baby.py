@@ -14,10 +14,10 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     DOMAIN,
 )
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     Pump,
 )
 
@@ -92,7 +92,7 @@ async def _two_diapers(
 
 
 def _deleted(server: FakeServer) -> list[str]:
-    from custom_components.nighp_baby_tracker.pybabytracker import OP_DELETE
+    from custom_components.baby_tracker.pybabytracker import OP_DELETE
 
     return [record.object_id for _, op, record in posted(server) if op == OP_DELETE]
 

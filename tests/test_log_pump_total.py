@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.pybabytracker import OP_ADD, Pump, Volume
+from custom_components.baby_tracker.pybabytracker import OP_ADD, Pump, Volume
 
 from . import NOW
 from .fake_server import FakeServer

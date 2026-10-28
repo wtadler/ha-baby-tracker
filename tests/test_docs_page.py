@@ -1,7 +1,7 @@
 """HACS only: the home-assistant.io page draft, its frontmatter, sections, and the scope of the
 first core PR. The page itself goes to the docs repository, not to core.
 
-The page lives at ``docs/home-assistant-io/nighp_baby_tracker.markdown`` and is copied into
+The page lives at ``docs/home-assistant-io/baby_tracker.markdown`` and is copied into
 ``source/_integrations/`` of the docs repository when the core PR opens. These tests check the
 parts a docs reviewer or the docs build would reject, and that the page stays inside what the first
 core PR ships: the user config flow, the coordinator, and the Last diaper, Last feed, and Last
@@ -17,7 +17,7 @@ import yaml
 
 from .helpers import INTEGRATION, ROOT
 
-PAGE = ROOT / "docs" / "home-assistant-io" / "nighp_baby_tracker.markdown"
+PAGE = ROOT / "docs" / "home-assistant-io" / "baby_tracker.markdown"
 
 # The manifest spells the IoT class in snake case; the docs page spells it out.
 IOT_CLASSES = {
@@ -296,7 +296,7 @@ def test_the_removal_section_says_what_is_deleted() -> None:
 
 
 def test_the_data_updates_section_states_the_interval_in_the_code() -> None:
-    from custom_components.nighp_baby_tracker.const import SCAN_INTERVAL
+    from custom_components.baby_tracker.const import SCAN_INTERVAL
 
     _, body = _split()
     section = body.split("## Data updates", 1)[-1].split("\n## ", 1)[0]

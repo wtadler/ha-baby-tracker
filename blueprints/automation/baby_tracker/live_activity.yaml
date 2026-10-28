@@ -6,7 +6,7 @@ blueprint:
     nursing switches sides, and ends when the timer stops. Create one automation per baby.
     Needs Home Assistant 2026.7.0 or later and a Companion app with Live Activity support.
   domain: automation
-  source_url: https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/nighp_baby_tracker/live_activity.yaml
+  source_url: https://github.com/wtadler/ha-baby-tracker/blob/main/blueprints/automation/baby_tracker/live_activity.yaml
   input:
     sleep_timer:
       name: Sleep timer
@@ -14,7 +14,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: nighp_baby_tracker
+          integration: baby_tracker
           device_class: timestamp
     nursing_timer:
       name: Nursing timer
@@ -22,7 +22,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: nighp_baby_tracker
+          integration: baby_tracker
           device_class: timestamp
     notify_service:
       name: Notify service

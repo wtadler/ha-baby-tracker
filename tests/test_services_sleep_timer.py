@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     OP_ADD,
     OP_DELETE,
     OP_UPDATE,

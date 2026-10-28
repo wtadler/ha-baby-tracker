@@ -23,8 +23,8 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.nighp_baby_tracker.const import DOMAIN
-from custom_components.nighp_baby_tracker.pybabytracker import BabyTrackerConnectionError
+from custom_components.baby_tracker.const import DOMAIN
+from custom_components.baby_tracker.pybabytracker import BabyTrackerConnectionError
 
 from . import BABY_TWO, NOW, sync_interval, tick
 from .factories import BABY_ONE_ID, BABY_TWO_ID, DEVICE_B, OP_DELETE

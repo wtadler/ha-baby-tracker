@@ -14,11 +14,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.nighp_baby_tracker.const import (
+from custom_components.baby_tracker.const import (
     CONF_DEVICE_UUID,
     DOMAIN,
 )
-from custom_components.nighp_baby_tracker.pybabytracker import (
+from custom_components.baby_tracker.pybabytracker import (
     BabyTrackerConnectionError,
     ProtocolError,
 )

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 import yaml
 
-from custom_components.nighp_baby_tracker import pybabytracker
+from custom_components.baby_tracker import pybabytracker
 
 from .helpers import INTEGRATION
 
@@ -239,7 +239,7 @@ def test_the_category_the_readme_names_for_core_submission_is_one_core_lists() -
 
 def test_the_manifest_names_the_bundled_librarys_loggers() -> None:
     loggers = _manifest()["loggers"]
-    assert loggers == ["custom_components.nighp_baby_tracker.pybabytracker"]
+    assert loggers == ["custom_components.baby_tracker.pybabytracker"]
     for module in pkgutil.iter_modules(pybabytracker.__path__):
         name = f"{pybabytracker.__name__}.{module.name}"
         if module.name in {"__main__", "cli"}:

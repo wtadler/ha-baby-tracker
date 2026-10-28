@@ -11,18 +11,18 @@ from homeassistant.helpers.entity_platform import DATA_DOMAIN_ENTITIES
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.nighp_baby_tracker import entity as entity_module
-from custom_components.nighp_baby_tracker.binary_sensor import BabyTrackerAsleepSensor
-from custom_components.nighp_baby_tracker.button import BabyTrackerButton
-from custom_components.nighp_baby_tracker.const import DOMAIN
-from custom_components.nighp_baby_tracker.sensor import (
+from custom_components.baby_tracker import entity as entity_module
+from custom_components.baby_tracker.binary_sensor import BabyTrackerAsleepSensor
+from custom_components.baby_tracker.button import BabyTrackerButton
+from custom_components.baby_tracker.const import DOMAIN
+from custom_components.baby_tracker.sensor import (
     BabyTrackerLastPumpSensor,
     BabyTrackerNursingTimeSensor,
     BabyTrackerSensor,
     BabyTrackerTimerSensor,
     BabyTrackerTodaySensor,
 )
-from custom_components.nighp_baby_tracker.switch import BabyTrackerSwitch
+from custom_components.baby_tracker.switch import BabyTrackerSwitch
 
 from . import DIAPER
 from .factories import BABY_ONE_ID, at, baby_payload
