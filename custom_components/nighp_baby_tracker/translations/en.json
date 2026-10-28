@@ -88,10 +88,12 @@
     },
     "sensor": {
       "diapers_today": {
-        "name": "Diapers today"
+        "name": "Diapers today",
+        "unit_of_measurement": "diapers"
       },
       "feeds_today": {
-        "name": "Feeds today"
+        "name": "Feeds today",
+        "unit_of_measurement": "feeds"
       },
       "bottle_volume_today": {
         "name": "Bottle volume today"

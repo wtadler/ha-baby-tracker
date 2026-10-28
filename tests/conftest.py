@@ -42,6 +42,36 @@ from .fake_server import FakeClient, FakeServer
 from .helpers import LOCAL_NOW  # Core PR 2
 
 
+# HACS-only: core's tests run in core's environment, where the recorder fixtures work as they are
+@pytest.fixture
+def recorder_db_url() -> str:
+    """An in-memory database for the recorder.
+
+    The plugin's own fixture refuses to run once ``hass`` exists, and this suite's autouse
+    fixtures create ``hass`` first. The in-memory URL is what it would return anyway.
+    """
+    return "sqlite://"
+
+
+# HACS-only: see recorder_db_url
+@pytest.fixture(autouse=True)
+def recorder_annotations(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the recorder's annotations resolvable on Python 3.14.
+
+    Core imports ``Recorder`` and ``Session`` in these modules only for type checking, and the
+    plugin inspects their signatures when it patches them. Python 3.14 evaluates annotations
+    lazily, so the missing names raise a ``NameError`` unless they are defined.
+    """
+    from homeassistant.components.recorder import Recorder
+    from homeassistant.components.recorder import migration as recorder_migration
+    from homeassistant.helpers import recorder as recorder_helpers
+    from sqlalchemy.orm import Session
+
+    monkeypatch.setattr(recorder_migration, "Recorder", Recorder, raising=False)
+    monkeypatch.setattr(recorder_migration, "Session", Session, raising=False)
+    monkeypatch.setattr(recorder_helpers, "Session", Session, raising=False)
+
+
 # HACS-only: core's tests load core's integrations
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterator[None]:
