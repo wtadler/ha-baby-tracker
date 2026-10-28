@@ -6,6 +6,7 @@ Companion app's notify service is a recorder, so the assertions are on the paylo
 documented Live Activity API would receive.
 """
 
+import asyncio
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -19,8 +20,9 @@ from homeassistant.components.blueprint import (
 )
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
 from homeassistant.util import yaml as yaml_util
-from pytest_homeassistant_custom_component.common import async_mock_service
+from pytest_homeassistant_custom_component.common import async_fire_time_changed, async_mock_service
 
 BLUEPRINT = (
     Path(__file__).parent.parent
@@ -36,6 +38,7 @@ NURSING = "sensor.baby_one_nursing_timer"
 TWO_SLEEP = "sensor.baby_two_sleep_timer"
 TWO_NURSING = "sensor.baby_two_nursing_timer"
 NOTIFY = "notify.mobile_app_test_phone"
+DETAIL = "sensor.bassinet_state"
 
 STARTED = datetime(2026, 10, 1, 3, 0, tzinfo=UTC)
 TAG_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
@@ -458,3 +461,436 @@ async def test_a_nursing_start_while_sleeping_is_independent_of_the_sleep_activi
 
     assert len(calls) == 2
     assert "right" in calls[1].data["message"].lower()
+
+
+# --- icons, colors, tap link, silent updates ---------------------------------------------------
+
+
+def test_the_new_inputs_are_optional_and_the_old_ones_still_validate() -> None:
+    blueprint = load_blueprint()
+    for name in (
+        "sleep_icon",
+        "nursing_icon",
+        "sleep_color",
+        "nursing_color",
+        "tap_link",
+        "sleep_detail",
+    ):
+        assert name in blueprint.inputs
+        assert "default" in blueprint.inputs[name]
+    old = BlueprintInputs(
+        blueprint,
+        {
+            "use_blueprint": {
+                "path": BLUEPRINT_PATH,
+                "input": {
+                    "sleep_timer": SLEEP,
+                    "nursing_timer": NURSING,
+                    "notify_service": NOTIFY,
+                    "sleep_title": "Sleeping",
+                    "nursing_title": "Nursing",
+                },
+            }
+        },
+    )
+    old.validate()
+
+
+async def test_the_default_icons_and_colors_ride_on_each_start(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon"] == "mdi:sleep"
+    assert payload(calls[0])["notification_icon_color"] == "#7E57C2"
+    assert payload(calls[1])["notification_icon"] == "mdi:mother-nurse"
+    assert payload(calls[1])["notification_icon_color"] == "#EC407A"
+
+
+async def test_chosen_icons_and_colors_replace_the_defaults(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(
+        hass,
+        inputs(
+            sleep_icon="mdi:weather-night",
+            sleep_color="#112233",
+            nursing_icon="mdi:baby-bottle",
+            nursing_color="#445566",
+        ),
+    )
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon"] == "mdi:weather-night"
+    assert payload(calls[0])["notification_icon_color"] == "#112233"
+    assert payload(calls[1])["notification_icon"] == "mdi:baby-bottle"
+    assert payload(calls[1])["notification_icon_color"] == "#445566"
+
+
+async def test_a_side_switch_keeps_the_nursing_icon_and_color(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("right", left=300))
+
+    assert payload(calls[1])["notification_icon"] == "mdi:mother-nurse"
+    assert payload(calls[1])["notification_icon_color"] == "#EC407A"
+
+
+async def test_a_tap_link_rides_on_every_start_and_update(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs(tap_link="/lovelace/baby"))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("right", left=300))
+
+    assert len(calls) == 3
+    assert [payload(c)["url"] for c in calls] == ["/lovelace/baby"] * 3
+
+
+async def test_with_no_tap_link_no_payload_has_a_url_key(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("right", left=300))
+    await set_state(hass, SLEEP, "unknown")
+
+    assert len(calls) == 4
+    assert all("url" not in payload(c) for c in calls)
+
+
+async def test_a_start_alerts_and_a_side_switch_is_silent(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("right", left=300))
+
+    assert payload(calls[0]).get("silent") is not True
+    assert payload(calls[1]).get("silent") is not True
+    assert payload(calls[2])["silent"] is True
+
+
+async def test_clears_never_carry_the_new_keys(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs(tap_link="/lovelace/baby", sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    await set_state(hass, SLEEP, "unknown")
+    await set_state(hass, NURSING, "unknown")
+
+    clears = [c for c in calls if c.data["message"] == "clear_notification"]
+    assert len(clears) == 2
+    for clear in clears:
+        assert set(payload(clear)) == {"tag"}
+
+
+async def test_an_automation_from_only_the_old_inputs_runs_unchanged(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs(sleep_title="Sleeping", nursing_title="Nursing"))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, SLEEP, "unknown")
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
+    assert payload(calls[0])["when"] == STARTED.timestamp()
+    assert "url" not in payload(calls[0])
+
+
+# --- the sleep detail entity -------------------------------------------------------------------
+
+
+async def advance(hass: HomeAssistant, seconds: float) -> None:
+    """Move time on without waiting for runs that are still holding.
+
+    A run waiting out the 15 seconds is a running task, so ``async_block_till_done`` would wait
+    for it in real time; yield to the loop instead, so the run reaches its timer first.
+    """
+    for _ in range(20):
+        await asyncio.sleep(0)
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=seconds))
+    for _ in range(20):
+        await asyncio.sleep(0)
+
+
+async def hold(hass: HomeAssistant, seconds: float) -> None:
+    """Move time on, then wait for every run to finish."""
+    await advance(hass, seconds)
+    await hass.async_block_till_done()
+
+
+async def settle(hass: HomeAssistant) -> None:
+    """Let every pending change play out so no timer outlives the test."""
+    await hold(hass, 30)
+    await hold(hass, 30)
+
+
+async def test_without_a_detail_entity_the_sleep_message_stays_asleep(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+    hass.states.async_set(DETAIL, "in_bassinet")
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    hass.states.async_set(DETAIL, "out_of_bassinet")
+    await hold(hass, 60)
+
+    assert [c.data["message"] for c in calls] == ["Asleep"]
+
+
+async def test_a_detail_change_held_fifteen_seconds_while_asleep_updates_silently(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL, tap_link="/lovelace/baby"))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await hold(hass, 15)
+
+    assert len(calls) == 2
+    first, update = calls
+    assert update.data["message"] == "rocking"
+    assert update.data["title"] == first.data["title"]
+    data = payload(update)
+    assert data["silent"] is True
+    assert data["tag"] == payload(first)["tag"]
+    assert data["when"] == STARTED.timestamp()
+    assert data["live_update"] is True
+    assert data["chronometer"] is True
+    assert data["notification_icon"] == "mdi:sleep"
+    assert data["url"] == "/lovelace/baby"
+
+
+async def test_the_start_message_is_asleep_even_with_a_detail_entity(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert calls[0].data["message"] == "Asleep"
+
+
+async def test_a_detail_change_held_less_than_fifteen_seconds_sends_nothing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await advance(hass, 10)
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await advance(hass, 10)
+
+    assert len(calls) == 1
+    await settle(hass)
+
+
+async def test_a_flap_that_never_settles_sends_nothing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "a")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    for state in ("b", "c", "b", "c"):
+        hass.states.async_set(DETAIL, state)
+        await advance(hass, 5)
+
+    assert len(calls) == 1
+    await settle(hass)
+
+
+async def test_a_detail_change_while_awake_sends_nothing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+
+    hass.states.async_set(DETAIL, "out_of_bassinet")
+    await hold(hass, 30)
+
+    assert calls == []
+
+
+async def test_a_detail_change_after_the_sleep_ends_sends_nothing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, SLEEP, "unknown")
+
+    hass.states.async_set(DETAIL, "out_of_bassinet")
+    await hold(hass, 30)
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
+
+
+async def test_a_detail_attribute_only_change_sends_nothing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "in_bassinet", {"battery": 80})
+    await hold(hass, 30)
+
+    assert len(calls) == 1
+
+
+async def test_a_detail_going_unavailable_does_not_replace_the_message(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "unavailable")
+    await hold(hass, 30)
+
+    assert len(calls) == 1
+
+
+async def test_a_detail_entity_does_not_affect_nursing(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+    hass.states.async_set(DETAIL, "rocking")
+    await hold(hass, 30)
+
+    assert len(calls) == 1
+    assert "left" in calls[0].data["message"].lower()
+
+
+EMPTY_DETAIL_FORMS = [None, "", "  ", [], [""], [None]]
+
+
+@pytest.mark.parametrize("empty", EMPTY_DETAIL_FORMS, ids=repr)
+async def test_every_empty_form_of_the_detail_input_loads_and_runs_a_sleep(
+    hass: HomeAssistant, calls: list[ServiceCall], empty: Any
+) -> None:
+    await install(hass, inputs(sleep_detail=empty))
+
+    assert hass.states.get("automation.live_activity_0").state == "on"
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, SLEEP, "unknown")
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
+
+
+async def test_an_omitted_detail_input_loads_and_runs_a_sleep(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    await install(hass, inputs())
+
+    assert hass.states.get("automation.live_activity_0").state == "on"
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert [c.data["message"] for c in calls] == ["Asleep"]
+
+
+async def test_a_detail_entity_given_as_a_one_item_list_works(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=[DETAIL]))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await hold(hass, 15)
+
+    assert calls[1].data["message"] == "rocking"
+
+
+@pytest.mark.parametrize("blank", [None, "", "  "], ids=repr)
+async def test_blank_icons_fall_back_to_the_defaults(
+    hass: HomeAssistant, calls: list[ServiceCall], blank: Any
+) -> None:
+    await install(hass, inputs(sleep_icon=blank, nursing_icon=blank))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon"] == "mdi:sleep"
+    assert payload(calls[1])["notification_icon"] == "mdi:mother-nurse"
+
+
+@pytest.mark.parametrize(
+    "bad", [None, "", "  ", "red", "7E57C2", "#12", "#12345", "#1234567", "#GGGGGG"], ids=repr
+)
+async def test_blank_or_invalid_colors_fall_back_to_the_defaults(
+    hass: HomeAssistant, calls: list[ServiceCall], bad: Any
+) -> None:
+    await install(hass, inputs(sleep_color=bad, nursing_color=bad))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+    await set_state(hass, NURSING, STARTED.isoformat(), nursing_attributes("left"))
+
+    assert payload(calls[0])["notification_icon_color"] == "#7E57C2"
+    assert payload(calls[1])["notification_icon_color"] == "#EC407A"
+
+
+@pytest.mark.parametrize("good", ["#abc", "#ABC", "#a1b2c3", "#A1B2C3"], ids=repr)
+async def test_short_and_long_hex_colors_are_sent_as_given(
+    hass: HomeAssistant, calls: list[ServiceCall], good: str
+) -> None:
+    await install(hass, inputs(sleep_color=good))
+
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    assert payload(calls[0])["notification_icon_color"] == good
+
+
+async def test_a_pending_detail_change_is_dropped_when_the_sleep_stops(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    hass.states.async_set(DETAIL, "in_bassinet")
+    await install(hass, inputs(sleep_detail=DETAIL))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(DETAIL, "rocking")
+    await advance(hass, 5)
+    await set_state(hass, SLEEP, "unknown")
+    await hold(hass, 30)
+
+    assert [c.data["message"] for c in calls] == ["Asleep", "clear_notification"]
+
+
+async def test_the_detail_message_is_the_entitys_displayed_state(
+    hass: HomeAssistant, calls: list[ServiceCall]
+) -> None:
+    assert await async_setup_component(hass, "binary_sensor", {})
+    occupancy = "binary_sensor.bassinet_occupancy"
+    hass.states.async_set(occupancy, "off", {"device_class": "occupancy"})
+    await install(hass, inputs(sleep_detail=occupancy))
+    await set_state(hass, SLEEP, STARTED.isoformat())
+
+    hass.states.async_set(occupancy, "on", {"device_class": "occupancy"})
+    await hold(hass, 15)
+
+    assert calls[1].data["message"] == "Detected"
