@@ -48,4 +48,5 @@ Python files are cut by comments, described at the top of `scripts/core_cut.py`:
 - `# HACS-only` (or `# HACS only`) works the same way for code that never goes to core. So does a docstring whose summary line starts `HACS-only:`, and a test marked `@pytest.mark.engine`.
 - A marker can't mark an `elif`, `else`, `except`, `finally`, or `case` clause; mark the statements inside it.
 - `# Core: <code>` is a line core needs instead: on its own line it becomes `<code>`, and as a trailing comment it replaces its line. It's for core APIs newer than the oldest Home Assistant this repository supports.
+- `# Core before PR N: <code>` is the same for the cuts of PRs before N only. From PR N on, a trailing one leaves its line as it is and one on its own line is dropped. It's for code that changes at a later PR, such as the exception raised for a rejected password.
 - A test module's docstring starts with `Core PR N` or `HACS only`, which places the whole file.
