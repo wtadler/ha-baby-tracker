@@ -32,6 +32,8 @@ A statement for a later PR, or for HACS only, is left out. Markers left in are r
 Where core needs a line of its own (core's API has moved past the oldest Home Assistant this
 repository supports), a ``# Core: <code>`` comment gives it: as a line of its own it becomes
 ``<code>``, and as a trailing comment it replaces its line. Pair it with a ``HACS-only`` line.
+``# Core before PR N: <code>`` is the same, for the cuts of PRs before N only: from PR N on, a
+trailing one leaves its line as it is, and one of its own is dropped.
 """
 
 import argparse
@@ -64,7 +66,7 @@ HACS = "hacs"
 MARKER = re.compile(r"#\s*(?:Core PR (?P<pr>\d+)\b|(?P<hacs>HACS[- ]only)\b)")
 DOCSTRING_HACS = re.compile(r"\s*HACS[- ]only:")
 CLAUSE = re.compile(r"(elif|else|except|finally|case)\b(?!\s*[=.,)\]])")
-CORE_LINE = re.compile(r"#\s*Core:\s?(?P<code>.*)$")
+CORE_LINE = re.compile(r"#\s*Core(?: before PR (?P<before>\d+))?:\s?(?P<code>.*)$")
 MODULE_DOCSTRING_PR = re.compile(r'^(?P<quote>"""|\'\'\')Core PRs? [^:]*: ')
 IMPORT_REWRITES = (
     ("custom_components.baby_tracker", "homeassistant.components.baby_tracker"),
@@ -170,6 +172,12 @@ def cut_python(text: str, pr: int) -> str:
 
     for line, column, comment in _comments(text):
         if core := CORE_LINE.match(comment):
+            if core["before"] and pr >= int(core["before"]):
+                if full_line_comment(line) and lines[line - 1].lstrip() == lines[line - 1][column:]:
+                    dropped.add(line)
+                else:
+                    edits[line] = lines[line - 1][:column].rstrip() + "\n"
+                continue
             text_line = lines[line - 1]
             indent = text_line[: len(text_line) - len(text_line.lstrip())]
             edits[line] = f"{indent}{core['code'].rstrip()}\n"

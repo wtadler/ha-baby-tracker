@@ -258,6 +258,20 @@ def test_a_core_line_stays_a_comment_in_the_repository(core_cut: ModuleType) -> 
     assert core_cut.cut_python(source, 2) == "def f() -> None:\n    core_only()\n"
 
 
+def test_a_core_line_before_a_pr_stops_replacing_from_that_pr(core_cut: ModuleType) -> None:
+    source = "def f() -> None:\n    raise Strong()  # Core before PR 3: raise Weak()\n"
+    assert core_cut.cut_python(source, 2) == "def f() -> None:\n    raise Weak()\n"
+    assert core_cut.cut_python(source, 3) == "def f() -> None:\n    raise Strong()\n"
+
+
+def test_a_core_comment_line_before_a_pr_is_dropped_from_that_pr(core_cut: ModuleType) -> None:
+    source = (
+        "def f() -> None:\n    # Core before PR 3: weak()\n    strong()  # HACS-only\n    rest()\n"
+    )
+    assert core_cut.cut_python(source, 2) == "def f() -> None:\n    weak()\n    rest()\n"
+    assert core_cut.cut_python(source, 3) == "def f() -> None:\n    rest()\n"
+
+
 def test_a_test_module_docstring_drops_its_pr_label(core_cut: ModuleType) -> None:
     source = '"""Core PR 1: the config flow\'s user step."""\n\nA = 1\n'
     assert (
@@ -506,6 +520,52 @@ def test_the_pr1_cut_has_no_trace_of_the_hacs_repository(core_cut: ModuleType, c
         for name, text in _tree(root).items():
             for trace in ("custom_components", "HACS", "Core PR", "# Core:", "_custom_component"):
                 assert trace not in text, (name, trace)
+
+
+def _cut_coordinator(core_cut: ModuleType, core: Path, number: int) -> str:
+    core_cut.cut(number, core, ruff=None)
+    return (core / COMPONENT / "coordinator.py").read_text()
+
+
+def test_pr1_fails_setup_with_a_config_entry_error_on_a_rejected_password(
+    core_cut: ModuleType, core: Path
+) -> None:
+    """PR 1 has no reauthentication step, so a reauth flow could never be completed."""
+    source = _cut_coordinator(core_cut, core, 1)
+    assert "raise ConfigEntryError(" in source
+    assert "ConfigEntryAuthFailed" not in source
+    assert 'translation_key="auth_failed"' in source
+
+
+@pytest.mark.parametrize("number", range(2, 23))
+def test_pr2_onward_raises_config_entry_auth_failed_on_a_rejected_password(
+    core_cut: ModuleType, core: Path, number: int
+) -> None:
+    source = _cut_coordinator(core_cut, core, number)
+    assert "raise ConfigEntryAuthFailed(" in source
+    assert "ConfigEntryError" not in source
+    assert 'translation_key="auth_failed"' in source
+
+
+def test_pr2_brings_the_reauth_tests_with_it(core_cut: ModuleType, core: Path) -> None:
+    core_cut.cut(1, core, ruff=None)
+    assert not (core / TESTS / "test_init_reauth.py").exists()
+    core_cut.cut(2, core, ruff=None)
+    assert "starts_reauth" in (core / TESTS / "test_init_reauth.py").read_text()
+
+
+def test_the_repository_still_raises_config_entry_auth_failed() -> None:
+    tree = ast.parse((INTEGRATION / "coordinator.py").read_text())
+    raised = {
+        node.exc.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Raise)
+        and isinstance(node.exc, ast.Call)
+        and isinstance(node.exc.func, ast.Name)
+    }
+    assert "ConfigEntryAuthFailed" in raised
+    assert "ConfigEntryError" not in raised
+    assert "ConfigEntryError" not in {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
 
 
 def test_the_pr1_cut_leaves_out_later_features(core_cut: ModuleType, core: Path) -> None:

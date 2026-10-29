@@ -13,7 +13,10 @@ from homeassistant.core import (
     HomeAssistant,
     callback,  # Core PR 7
 )
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,  # Core before PR 2: ConfigEntryError,
+    HomeAssistantError,
+)
 from homeassistant.helpers import device_registry as dr  # Core PR 6
 from homeassistant.helpers.event import async_track_time_change  # Core PR 7
 from homeassistant.helpers.storage import Store
@@ -169,7 +172,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         try:
             await self.engine.sync(self.client)
         except AuthenticationError as err:
-            raise ConfigEntryAuthFailed(
+            raise ConfigEntryAuthFailed(  # Core before PR 2: raise ConfigEntryError(
                 translation_domain=DOMAIN, translation_key="auth_failed"
             ) from err
         except BabyTrackerError as err:
