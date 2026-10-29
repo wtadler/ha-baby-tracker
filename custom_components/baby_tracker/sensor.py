@@ -29,7 +29,17 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval  # Core PR 19
 from homeassistant.util import dt as dt_util  # Core PR 19
 from homeassistant.util.unit_conversion import VolumeConverter  # Core PR 7
-from pybabytracker import Diaper, Formula, Nursing, Pump, Pumped, Record, Sleep
+from pybabytracker import (
+    DayTotals,  # Core PR 7
+    Diaper,
+    Formula,
+    Nursing,
+    Pump,
+    Pumped,
+    Record,
+    Sleep,
+)
+from pybabytracker.timers import LEFT, RIGHT  # Core PR 19
 
 from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .entity import (
@@ -37,8 +47,6 @@ from .entity import (
     BabyTrackerBabyEntity,
 )
 from .helpers import volume_parts  # Core PR 4
-from .timers import LEFT, RIGHT  # Core PR 19
-from .totals import DayTotals  # Core PR 7
 
 PARALLEL_UPDATES = 0
 

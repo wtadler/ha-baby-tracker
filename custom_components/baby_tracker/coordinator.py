@@ -23,9 +23,13 @@ from pybabytracker import (
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
+    DayTotals,  # Core PR 7
+    NursingTimer,  # Core PR 18
+    PumpTimer,  # Core PR 21
     Record,
     Sleep,  # Core PR 8
     SyncEngine,
+    day_totals,  # Core PR 7
 )
 
 from .const import (
@@ -37,11 +41,6 @@ from .const import (
 )
 from .guard import TimerGuard  # Core PR 18
 from .timer_state import TimerState  # Core PR 18
-from .timers import (  # Core PR 18
-    NursingTimer,
-    PumpTimer,  # Core PR 21
-)
-from .totals import DayTotals, day_totals  # Core PR 7
 
 _LOGGER = logging.getLogger(__name__)
 

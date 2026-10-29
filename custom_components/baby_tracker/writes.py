@@ -32,8 +32,10 @@ from pybabytracker import (
     InvalidAmountError,
     MinutesTooLongError,
     NotOwnRecordError,
+    NursingTimer,
     ObjectIdInUseError,
     ProtocolError,
+    PumpTimer,
     RecordNotFoundError,
     Sleep,
     SleepStartOutOfRangeError,
@@ -46,6 +48,7 @@ from pybabytracker import (
     WriteOutcomeUnknownError,
     WrongRecordTypeError,
 )
+from pybabytracker.timers import SIDES, other_side
 from pybabytracker.times import standard_offset_seconds
 from pybabytracker.validation import (
     check_amount,
@@ -59,7 +62,6 @@ from pybabytracker.validation import (
 from .bottle import BOTTLE_KINDS, OUNCES, VOLUME_UNITS, configured_bottle
 from .const import DOMAIN
 from .coordinator import BabyTrackerCoordinator, SyncBeforeWriteError
-from .timers import SIDES, NursingTimer, PumpTimer, other_side
 
 _LOGGER = logging.getLogger(__name__)
 
