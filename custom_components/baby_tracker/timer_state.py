@@ -8,12 +8,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
+from pybabytracker import NursingTimer, PumpTimer
 
 from .const import (
     DOMAIN,
     STORAGE_VERSION,
 )
-from .timers import NursingTimer, PumpTimer, load_pump_timer, load_timers
+from .timers import load_pump_timer, load_timers
 
 _LOGGER = logging.getLogger(__name__)
 

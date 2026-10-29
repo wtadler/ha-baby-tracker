@@ -17,7 +17,6 @@ integration_files:
   config_flow.py: 1
   diagnostics.py: 3
   helpers.py: 4
-  totals.py: 7
   binary_sensor.py: 8
   services.py: 9
   writes.py: 9

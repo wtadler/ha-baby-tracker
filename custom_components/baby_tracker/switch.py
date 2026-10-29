@@ -23,6 +23,7 @@ from typing import Any, override
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from pybabytracker.timers import LEFT, RIGHT
 
 from .coordinator import (
     BabyData,
@@ -31,7 +32,6 @@ from .coordinator import (
     BabyTrackerData,
 )
 from .entity import BabyTrackerAccountEntity, BabyTrackerBabyEntity
-from .timers import LEFT, RIGHT
 from .writes import (
     async_start_nursing,
     async_start_pump,

@@ -284,6 +284,67 @@ def test_the_integration_makes_no_getattr_call_of_two_or_three_arguments() -> No
     assert offenders == []
 
 
+def _library_imports(tree: ast.Module) -> set[str]:
+    """Names a module imports from pybabytracker or one of its submodules."""
+    return {
+        alias.asname or alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.level == 0
+        and node.module is not None
+        and (node.module == "pybabytracker" or node.module.startswith("pybabytracker."))
+        for alias in node.names
+    }
+
+
+def _dunder_all(tree: ast.Module) -> set[str]:
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets)
+            and isinstance(node.value, ast.List | ast.Tuple)
+        ):
+            return {
+                el.value
+                for el in node.value.elts
+                if isinstance(el, ast.Constant) and isinstance(el.value, str)
+            }
+    return set()
+
+
+def test_no_integration_module_only_re_exports_library_names() -> None:
+    # A reviewer reads such a module as a shim: callers import from pybabytracker directly.
+    shims = []
+    for path in sorted(INTEGRATION.glob("*.py")):
+        tree = ast.parse(path.read_text())
+        if not _library_imports(tree):
+            continue
+        # Anything but a docstring, imports, and __all__ is the module's own logic.
+        own = [
+            node
+            for node in tree.body
+            if not isinstance(node, ast.Import | ast.ImportFrom)
+            and not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant))
+            and not (
+                isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets)
+            )
+        ]
+        if not own:
+            shims.append(path.name)
+    assert shims == []
+
+
+def test_no_integration_module_lists_a_library_name_in_its_all() -> None:
+    offenders = {}
+    for path in sorted(INTEGRATION.glob("*.py")):
+        tree = ast.parse(path.read_text())
+        reexported = sorted(_dunder_all(tree) & _library_imports(tree))
+        if reexported:
+            offenders[path.name] = reexported
+    assert offenders == {}
+
+
 def test_the_custom_only_keys_stay_for_the_repository() -> None:
     manifest = _manifest()
     assert manifest["documentation"].startswith("https://github.com/wtadler/ha-baby-tracker")
