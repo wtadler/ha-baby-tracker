@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/wtadler/ha-baby-tracker/issues",
   "loggers": ["pybabytracker"],
   "requirements": ["pybabytracker==0.2.0"],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
