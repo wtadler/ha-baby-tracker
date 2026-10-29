@@ -92,6 +92,13 @@ def test_the_titles_are_optional_with_defaults() -> None:
         assert blueprint.inputs[name]["default"]
 
 
+def test_the_color_descriptions_keep_their_example_color() -> None:
+    # An unquoted " #" starts a YAML comment, which would cut the example off.
+    blueprint = load_blueprint()
+    assert blueprint.inputs["sleep_color"]["description"].endswith("#7E57C2.")
+    assert blueprint.inputs["nursing_color"]["description"].endswith("#EC407A.")
+
+
 def test_the_blueprint_runs_queued_so_one_timers_events_stay_in_order() -> None:
     raw = yaml_util.load_yaml(str(BLUEPRINT))
     assert raw["mode"] == "queued"
