@@ -35,13 +35,18 @@ restart.
 
 ## Installation
 
-It needs Home Assistant 2026.10.0 or later. The integration isn't in the HACS catalog yet, so add
-this repository as a custom repository first. The button does that for you: it opens HACS (or the
-Marketplace, on Home Assistant 2026.11 and later) and offers to add the repository.
+It needs Home Assistant 2026.10.0 or later, and it's in the HACS catalog:
+
+1. In HACS (the Marketplace, on Home Assistant 2026.11 and later), search for
+   **Baby Tracker (Nighp)**.
+2. Download it and restart Home Assistant.
+
+The button opens its page in HACS for you:
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=wtadler&repository=ha-baby-tracker&category=integration)
 
-Or add it by hand:
+If the search doesn't find it, HACS may not have refreshed its catalog yet. Add the repository by
+hand instead:
 
 1. In HACS, open the ⋮ menu and choose **Custom repositories**.
 2. Add `https://github.com/wtadler/ha-baby-tracker` with the type **Integration**.
