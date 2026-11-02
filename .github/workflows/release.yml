@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    # HACS offers updates by release tag, but Home Assistant shows the manifest's version, so the
+    # two must agree. v0.1.2 went out with manifest.json still at 0.1.1.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag matches manifest version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(jq -r .version custom_components/baby_tracker/manifest.json)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error file=custom_components/baby_tracker/manifest.json::Release $TAG, but manifest.json says $version. Bump the version first, then release a new tag."
+            exit 1
+          fi
