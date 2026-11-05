@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="custom_components/baby_tracker/brand/icon.png" alt="Baby Tracker icon" width="128">
+  <img src="https://raw.githubusercontent.com/wtadler/ha-baby-tracker/main/custom_components/baby_tracker/brand/icon.png" alt="Baby Tracker icon" width="128">
 </p>
 
 # Baby Tracker (Nighp) for Home Assistant
+
+[![Integration usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.baby_tracker.total)](https://analytics.home-assistant.io/custom_integrations)
 
 A custom integration for the [Baby Tracker](https://apps.apple.com/us/app/baby-tracker-newborn-log/id779656557)
 app by [Nighp](https://nighp.com). Home Assistant signs in to your account's sync service, shows
@@ -12,7 +14,7 @@ This integration is not made or supported by Nighp, the maker of Baby Tracker. F
 issue in this repository; please don't contact Nighp.
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="A Home Assistant dashboard titled Baby Tracker, in three sections. Diapers: wet, dirty, and mixed buttons, last diaper 53 minutes ago, 5 diapers today. Feeding: nursing left and right switches, a bottle button, last feed 2 hours ago, 4 feeds today, 7.5 fl. oz. bottle volume, and pumping 3 hours ago. Sleeping: a sleep tile, on, started 53 minutes ago" width="765">
+  <img src="https://raw.githubusercontent.com/wtadler/ha-baby-tracker/main/docs/images/dashboard.png" alt="A Home Assistant dashboard titled Baby Tracker, in three sections. Diapers: wet, dirty, and mixed buttons, last diaper 53 minutes ago, 5 diapers today. Feeding: nursing left and right switches, a bottle button, last feed 2 hours ago, 4 feeds today, 7.5 fl. oz. bottle volume, and pumping 3 hours ago. Sleeping: a sleep tile, on, started 53 minutes ago" width="765">
 </p>
 
 ## What you get
