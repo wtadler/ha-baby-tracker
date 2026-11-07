@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from pybabytracker import (
     OP_ADD,
     SIDE_LEFT,
-    SIDE_NOT_SET,
+    SIDE_NONE,
     SIDE_RIGHT,
     Diaper,
     Formula,
@@ -40,7 +40,7 @@ def _id(number: int) -> str:
 
 def test_the_side_labels_follow_the_library_constants() -> None:
     assert SIDES == {SIDE_LEFT: "left", SIDE_RIGHT: "right"}
-    assert SIDE_NOT_SET not in SIDES
+    assert SIDE_NONE not in SIDES
 
 
 @pytest.mark.parametrize(
