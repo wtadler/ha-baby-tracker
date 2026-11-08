@@ -655,7 +655,7 @@ class BabyTrackerNextMedicineDoseSensor(BabyTrackerBabyEntity, SensorEntity):
         """Return the newest dose's medicine, and when each medicine can be given again."""
         baby = self._baby
         record = _medicine_record(baby)
-        doses = baby.medicine_doses if baby is not None else {}
+        doses = (baby.medicine_doses if baby is not None else None) or {}
         names = {key: _text(dose.medicine_name) or key for key, dose in doses.items()}
         counts = Counter(names.values())
         medicines: dict[str, str | None] = {}

@@ -3,10 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable  # Core PR 9
-from dataclasses import (
-    dataclass,
-    field,  # Core PR 26
-)
+from dataclasses import dataclass
 from datetime import datetime, timedelta  # Core PR 7
 from typing import TYPE_CHECKING, Any, override
 
@@ -89,7 +86,7 @@ class BabyData:
     # Core PR 26
     # The newest dose of each medicine, by the medicine's ID (or its name when it has none), so
     # the next dose of every medicine is known when two of them alternate.
-    medicine_doses: dict[str, Medication] = field(default_factory=dict)
+    medicine_doses: dict[str, Medication] | None = None
 
     # Core PR 8
     @property

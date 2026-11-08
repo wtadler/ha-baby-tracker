@@ -76,7 +76,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default:
     status: done
-    comment: No entity starts disabled. The timer sensors drive the live activity blueprint, the diaper buttons and timer switches are the integration's main use, so none is a less popular entity.
+    comment: Latest picture starts disabled, because it can show any entry's picture, a diaper's included. No other entity does. The timer sensors drive the live activity blueprint, the diaper buttons and timer switches are the integration's main use, so none is a less popular entity.
   entity-translations: done
   exception-translations: done
   icon-translations: done

@@ -542,6 +542,8 @@
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Next medicine dose',
       'medicine': None,
+      'medicines': dict({
+      }),
     }),
     'context': <ANY>,
     'entity_id': 'sensor.baby_one_next_medicine_dose',
@@ -1416,6 +1418,8 @@
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Next medicine dose',
       'medicine': None,
+      'medicines': dict({
+      }),
     }),
     'context': <ANY>,
     'entity_id': 'sensor.baby_two_next_medicine_dose',

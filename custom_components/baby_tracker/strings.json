@@ -226,6 +226,9 @@
         "state_attributes": {
           "medicine": {
             "name": "Medicine"
+          },
+          "medicines": {
+            "name": "Next dose by medicine"
           }
         }
       }

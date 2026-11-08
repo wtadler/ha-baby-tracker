@@ -239,6 +239,16 @@ def entity_ids_on(hass: HomeAssistant, device: dr.DeviceEntry) -> set[str]:
     }
 
 
+def enabled(hass: HomeAssistant, entity_ids: set[str]) -> set[str]:
+    """The entities that aren't disabled, so have a state."""
+    registry = er.async_get(hass)
+    return {
+        entity_id
+        for entity_id in entity_ids
+        if (entry := registry.async_get(entity_id)) is not None and entry.disabled_by is None
+    }
+
+
 async def test_a_deleted_babys_device_and_entities_are_gone_after_the_next_refresh(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -267,7 +277,7 @@ async def test_a_present_baby_keeps_its_device_and_entities(
 
     assert baby_device(hass, BABY_ONE_ID).id == device.id
     assert entity_ids_on(hass, device) == entity_ids
-    assert all(hass.states.get(entity_id) is not None for entity_id in entity_ids)
+    assert all(hass.states.get(entity_id) is not None for entity_id in enabled(hass, entity_ids))
 
 
 async def test_a_refresh_with_no_deletion_removes_nothing(
@@ -322,7 +332,7 @@ async def test_a_baby_added_again_gets_its_device_and_entities_back(
     device = baby_device(hass, BABY_TWO_ID)
     assert device.identifiers == {(init_integration.domain, BABY_TWO_ID)}
     assert entity_ids_on(hass, device) == before
-    assert all(hass.states.get(entity_id) is not None for entity_id in before)
+    assert all(hass.states.get(entity_id) is not None for entity_id in enabled(hass, before))
 
 
 async def test_a_deleted_baby_is_removed_on_a_write_sync_too(

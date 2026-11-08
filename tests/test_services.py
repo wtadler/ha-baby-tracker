@@ -706,3 +706,22 @@ async def test_a_write_at_the_exact_dst_transition_sends_the_same_offset_on_both
     await log_diaper(hass, BABY_ONE_ID, "wet", time=time)
 
     assert only_record(server).timezone == -18000
+
+
+@pytest.mark.parametrize("note", [" ", "   ", "\t\n"], ids=repr)
+async def test_a_note_of_only_spaces_is_written_as_the_default(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, note: str
+) -> None:
+    await call(hass, "log_diaper", type="wet", note=note)
+
+    [(_, _, record)] = posted(server)
+    assert record.note == "Added from Home Assistant"
+
+
+async def test_a_note_with_text_is_written_as_given(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    await call(hass, "log_diaper", type="wet", note=" a note ")
+
+    [(_, _, record)] = posted(server)
+    assert record.note == " a note "

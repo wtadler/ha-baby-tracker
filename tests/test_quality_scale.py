@@ -386,10 +386,12 @@ def test_a_docs_rule_is_done_only_with_its_section_in_the_readme(rule: str, head
     assert _status(_rules()[rule]) == "done"
 
 
-def test_no_entity_starts_disabled_so_the_default_rule_is_done_with_its_reason() -> None:
+def test_only_the_latest_picture_starts_disabled_and_the_rule_says_so() -> None:
     entry = _rules()["entity-disabled-by-default"]
     assert isinstance(entry, dict)
     assert entry["status"] == "done"
     assert entry["comment"].strip().endswith(".")
+    assert "Latest picture" in entry["comment"]
     for path in (INTEGRATION).glob("*.py"):
-        assert "entity_registry_enabled_default" not in path.read_text(), path.name
+        uses = path.read_text().count("entity_registry_enabled_default")
+        assert uses == (1 if path.name == "image.py" else 0), path.name
