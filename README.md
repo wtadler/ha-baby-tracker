@@ -31,9 +31,13 @@ Each baby in the account becomes a device with:
 | **Nursing left time**, **Nursing right time**, **Discard nursing** | The running nursing session's minutes per side, and a way to drop it. |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
 
-Each account becomes a device with **Last pump**, **Last breast**, a **Pump timer** switch, and a **Pump timer**
-sensor showing when it started, because the app stores pumps on the account, not on a baby. **Last breast** is the side the newest nursing (any baby) or pump started on, not the side it ended on and not the side to use next, so a session that started left and ended right reads "Started left". Babies added to the account later show up without a
-restart.
+Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
+sensor showing when it started, because the app stores pumps on the account, not on a baby. The
+account also has **Last breast**: the side the newest nursing (of any baby) or pump started on.
+That's not the side it ended on or the side to use next, so a session that started left and ended
+right reads "Started left". A two-sided session logged from Home Assistant still records the side it
+ended on ([#123](https://github.com/wtadler/ha-baby-tracker/issues/123)). Babies added to the
+account later show up without a restart.
 
 ## Installation
 

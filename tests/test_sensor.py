@@ -38,7 +38,7 @@ async def test_sensors(
     mock_config_entry: MockConfigEntry,
     populated_server: FakeServer,
 ) -> None:
-    """Test every sensor entity and its state, with the ones that start disabled enabled."""
+    """Test the sensor entities and their states."""
     freezer.move_to(at(180))
     with patch("custom_components.baby_tracker.PLATFORMS", [Platform.SENSOR]):
         await setup_integration(hass, mock_config_entry)
