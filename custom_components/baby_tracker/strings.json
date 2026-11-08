@@ -577,6 +577,15 @@
     "sleep_start_out_of_range": {
       "message": "A sleep can't start in the future or more than 24 hours ago."
     },
+    "invalid_selection_name": {
+      "message": "Give the name or the ID of an entry."
+    },
+    "ambiguous_selection": {
+      "message": "More than one entry has that name. Use its ID instead."
+    },
+    "no_usual_dose": {
+      "message": "This medicine has no usual dose, so give an amount."
+    },
     "not_a_sleep": {
       "message": "That record isn't a sleep, so it has no timer to stop."
     },

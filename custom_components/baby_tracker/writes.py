@@ -24,14 +24,17 @@ from pybabytracker import (
     DIAPER_WET,
     SIDE_LEFT,
     SIDE_RIGHT,
+    AmbiguousSelectionError,  # HACS-only
     AmountTooSmallError,
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
     EndBeforeStartError,
     InvalidAmountError,
+    InvalidSelectionNameError,  # HACS-only
     MinutesTooLongError,
     NotOwnRecordError,
+    NoUsualDoseError,  # HACS-only
     NursingTimer,
     ObjectIdInUseError,
     ProtocolError,
@@ -89,6 +92,10 @@ VALIDATION_KEYS: dict[type[ValidationError], str] = {
     EndBeforeStartError: "end_before_start",
     SleepTooLongError: "sleep_too_long",
     SleepStartOutOfRangeError: "sleep_start_out_of_range",
+    # The pick-list and dose errors come with the medicine service, which isn't planned yet.
+    InvalidSelectionNameError: "invalid_selection_name",  # HACS-only
+    AmbiguousSelectionError: "ambiguous_selection",  # HACS-only
+    NoUsualDoseError: "no_usual_dose",  # HACS-only
 }
 
 

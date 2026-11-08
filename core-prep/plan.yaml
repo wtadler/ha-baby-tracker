@@ -128,6 +128,9 @@ keys:
   exceptions.no_running_sleep: 16
   exceptions.sleep_already_running: 16
   exceptions.sleep_start_out_of_range: 16
+  exceptions.invalid_selection_name: hacs
+  exceptions.ambiguous_selection: hacs
+  exceptions.no_usual_dose: hacs
   exceptions.not_a_sleep: 16
   exceptions.no_nursing_timer: 18
   exceptions.nursing_not_saved: 18
