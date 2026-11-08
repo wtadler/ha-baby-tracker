@@ -386,14 +386,14 @@ def test_every_key_belongs_to_a_planned_pr(core_cut: ModuleType, name: str) -> N
     data = json.loads((INTEGRATION / name).read_text())
     for leaf in _leaves(data):
         owner = core_cut.key_owner(leaf.rstrip("."))
-        assert owner == "hacs" or 1 <= owner <= 22, leaf
+        assert owner == "hacs" or 1 <= owner <= core_cut.PLAN["prs"], leaf
 
 
 def test_every_action_belongs_to_a_planned_pr(core_cut: ModuleType) -> None:
     services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
     for action in services:
         owner = core_cut.key_owner(f"services.{action}")
-        assert owner == "hacs" or 1 <= owner <= 22, action
+        assert owner == "hacs" or 1 <= owner <= core_cut.PLAN["prs"], action
 
 
 def test_every_entry_in_the_plan_names_a_real_key(core_cut: ModuleType) -> None:
@@ -416,12 +416,12 @@ def test_every_file_belongs_to_a_planned_pr(core_cut: ModuleType) -> None:
         if path.name == "__pycache__" or path.name in core_cut.GENERATED:
             continue
         owner = core_cut.integration_file_owner(path.name)
-        assert owner == "hacs" or 1 <= owner <= 22, path.name
+        assert owner == "hacs" or 1 <= owner <= core_cut.PLAN["prs"], path.name
     for path in (ROOT / "tests").rglob("*"):
         if path.is_dir() or "__pycache__" in path.parts:
             continue
         owner = core_cut.test_file_owner(path.relative_to(ROOT / "tests"))
-        assert owner == "hacs" or 1 <= owner <= 22, path
+        assert owner == "hacs" or 1 <= owner <= core_cut.PLAN["prs"], path
 
 
 # The quality scale
@@ -429,15 +429,15 @@ def test_every_file_belongs_to_a_planned_pr(core_cut: ModuleType) -> None:
 
 def test_each_pr_has_an_up_to_date_quality_scale(core_cut: ModuleType) -> None:
     written = sorted(path.name for path in (CORE_PREP / "quality_scale").iterdir())
-    assert written == [f"pr{number:02d}.yaml" for number in range(1, 23)]
-    for number in range(1, 23):
+    assert written == [f"pr{number:02d}.yaml" for number in range(1, core_cut.PLAN["prs"] + 1)]
+    for number in range(1, core_cut.PLAN["prs"] + 1):
         expected = core_cut.quality_scale_yaml(number)
         assert (CORE_PREP / "quality_scale" / f"pr{number:02d}.yaml").read_text() == expected
 
 
 def test_each_quality_scale_lists_the_same_rules_as_the_repository(core_cut: ModuleType) -> None:
     hacs = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
-    for number in range(1, 23):
+    for number in range(1, core_cut.PLAN["prs"] + 1):
         rules = yaml.safe_load(core_cut.quality_scale_yaml(number))["rules"]
         assert set(rules) == set(hacs), number
 
@@ -460,7 +460,7 @@ def test_pr1_meets_bronze_and_defers_what_the_first_pr_may_not_have(
 
 def test_the_last_pr_reaches_the_repositorys_statuses(core_cut: ModuleType) -> None:
     hacs = yaml.safe_load((INTEGRATION / "quality_scale.yaml").read_text())["rules"]
-    rules = yaml.safe_load(core_cut.quality_scale_yaml(22))["rules"]
+    rules = yaml.safe_load(core_cut.quality_scale_yaml(core_cut.PLAN["prs"]))["rules"]
 
     def status(value: Any) -> str:
         return value if isinstance(value, str) else value["status"]

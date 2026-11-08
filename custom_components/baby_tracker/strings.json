@@ -86,6 +86,25 @@
         "name": "Discard nursing"
       }
     },
+    "image": {
+      "latest_picture": {
+        "name": "Latest picture",
+        "state_attributes": {
+          "record_id": {
+            "name": "Entry ID"
+          },
+          "record_type": {
+            "name": "Entry type"
+          },
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "photo": {
+        "name": "Photo"
+      }
+    },
     "sensor": {
       "diapers_today": {
         "name": "Diapers today",
@@ -147,6 +166,68 @@
       },
       "pump_timer": {
         "name": "Pump timer"
+      },
+      "last_milestone": {
+        "name": "Last milestone",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "description": {
+            "name": "Description"
+          },
+          "milestone_id": {
+            "name": "Milestone ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "last_vaccine": {
+        "name": "Last vaccine",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "description": {
+            "name": "Description"
+          },
+          "vaccine_id": {
+            "name": "Vaccine ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "last_medicine": {
+        "name": "Last medicine",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "amount": {
+            "name": "Amount"
+          },
+          "unit": {
+            "name": "Unit"
+          },
+          "medicine_id": {
+            "name": "Medicine ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "next_medicine_dose": {
+        "name": "Next medicine dose",
+        "state_attributes": {
+          "medicine": {
+            "name": "Medicine"
+          }
+        }
       }
     },
     "switch": {
@@ -472,6 +553,88 @@
           "description": "An optional note to save with the pump."
         }
       }
+    },
+    "log_milestone": {
+      "name": "Log milestone",
+      "description": "Adds a milestone a baby reached, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "milestone": {
+          "name": "Milestone",
+          "description": "The milestone's name as the app shows it, such as First smile, or one added in the app. Case doesn't matter."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the milestone."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new milestone each time."
+        }
+      }
+    },
+    "log_vaccine": {
+      "name": "Log vaccine",
+      "description": "Adds a vaccine a baby was given, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the vaccine."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new vaccine each time."
+        },
+        "vaccine": {
+          "name": "Vaccine",
+          "description": "The vaccine's name as the app shows it, such as DTaP, or one added in the app. Case doesn't matter."
+        }
+      }
+    },
+    "log_medicine": {
+      "name": "Log medicine",
+      "description": "Adds a dose of a medicine a baby was given, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the dose."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new dose each time."
+        },
+        "medicine": {
+          "name": "Medicine",
+          "description": "The medicine's name as the app shows it. It must be one the account has used or added in the app."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "How much was given, in the medicine's own unit. Defaults to its usual dose."
+        }
+      }
     }
   },
   "selector": {
@@ -600,6 +763,18 @@
     },
     "minutes_with_sides": {
       "message": "Give the minutes or the minutes for each side, not both."
+    },
+    "unknown_milestone": {
+      "message": "Milestone {milestone} isn't one of the app's, or one added in the app for this baby. Check the name as the app shows it."
+    },
+    "unknown_vaccine": {
+      "message": "Vaccine {vaccine} isn't one of the app's, or one added in the app. Check the name as the app shows it."
+    },
+    "unknown_medicine": {
+      "message": "Medicine {medicine} isn't one the account has used or added in the app. Check the name as the app shows it."
+    },
+    "medicine_needs_amount": {
+      "message": "{medicine} has no usual dose in the app, so give an amount."
     }
   },
   "issues": {

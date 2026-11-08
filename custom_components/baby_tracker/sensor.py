@@ -35,11 +35,14 @@ from pybabytracker import (
     DayTotals,  # Core PR 7
     Diaper,  # Core PR 4
     Formula,  # Core PR 4
+    Medication,  # Core PR 26
+    Milestone,  # Core PR 24
     Nursing,  # Core PR 4
     Pump,  # Core PR 5
     Pumped,  # Core PR 4
     Record,
     Sleep,  # Core PR 4
+    Vaccine,  # Core PR 25
     numeric_code,  # Core PR 4
 )
 from pybabytracker.timers import LEFT, RIGHT  # Core PR 19
@@ -459,6 +462,178 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
         return round(seconds / 60, 1)
 
 
+# Core PR 24
+def _milestone_sentence(baby: BabyData | None, description: object) -> str | None:
+    """Return the milestone as the app words it: the baby's name, then its description.
+
+    The app's descriptions start where the name ends (" came home", "'s first smile"), so
+    "Everly" and "'s first smile" read "Everly's first smile". Runs of spaces are tidied.
+    """
+    if not isinstance(description, str) or not description.strip():
+        return None
+    name = baby.name if baby is not None and baby.name else ""
+    return " ".join(f"{name}{description}".split())
+
+
+# Core PR 24
+LAST_MILESTONE = SensorEntityDescription(key="last_milestone", translation_key="last_milestone")
+
+
+# Core PR 24
+class BabyTrackerLastMilestoneSensor(BabyTrackerBabyEntity, SensorEntity):
+    """The name of the newest milestone the baby reached, with when it was."""
+
+    @property
+    def _milestone(self) -> Milestone | None:
+        baby = self._baby
+        record = baby.milestone if baby is not None else None
+        return record if isinstance(record, Milestone) else None
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the newest milestone's name, or None before the first."""
+        milestone = self._milestone
+        return milestone.milestone_name if milestone is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when the newest milestone was, how the app words it, its ID, and its note."""
+        milestone = self._milestone
+        time = milestone.time if milestone is not None else None
+        selection = milestone.milestone_type if milestone is not None else None
+        description = selection.get("desc") if isinstance(selection, dict) else None
+        milestone_id = selection.get("objectID") if isinstance(selection, dict) else None
+        return {
+            "time": time.isoformat() if time else None,
+            "description": _milestone_sentence(self._baby, description),
+            "milestone_id": milestone_id if isinstance(milestone_id, str) else None,
+            "note": _note(milestone),
+        }
+
+
+# Core PR 25
+LAST_VACCINE = SensorEntityDescription(key="last_vaccine", translation_key="last_vaccine")
+
+
+# Core PR 25
+class BabyTrackerLastVaccineSensor(BabyTrackerBabyEntity, SensorEntity):
+    """The name of the newest vaccine the baby was given, with when it was."""
+
+    @property
+    def _vaccine(self) -> Vaccine | None:
+        baby = self._baby
+        record = baby.vaccine if baby is not None else None
+        return record if isinstance(record, Vaccine) else None
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the newest vaccine's name, or None before the first."""
+        vaccine = self._vaccine
+        return vaccine.vaccine_name if vaccine is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when the newest vaccine was, its full name, its ID, and its note."""
+        vaccine = self._vaccine
+        time = vaccine.time if vaccine is not None else None
+        selection = vaccine.vaccine_type if vaccine is not None else None
+        description = selection.get("desc") if isinstance(selection, dict) else None
+        vaccine_id = selection.get("objectID") if isinstance(selection, dict) else None
+        return {
+            "time": time.isoformat() if time else None,
+            "description": description if isinstance(description, str) and description else None,
+            "vaccine_id": vaccine_id if isinstance(vaccine_id, str) else None,
+            "note": _note(vaccine),
+        }
+
+
+# Core PR 26
+def _medicine_record(baby: BabyData | None) -> Medication | None:
+    record = baby.medicine if baby is not None else None
+    return record if isinstance(record, Medication) else None
+
+
+# Core PR 26
+def _medicine_field(record: Medication | None, key: str) -> object:
+    selection = record.medication_selection if record is not None else None
+    return selection.get(key) if isinstance(selection, dict) else None
+
+
+# Core PR 26
+LAST_MEDICINE = SensorEntityDescription(key="last_medicine", translation_key="last_medicine")
+
+
+# Core PR 26
+class BabyTrackerLastMedicineSensor(BabyTrackerBabyEntity, SensorEntity):
+    """The name of the newest medicine the baby was given, with the dose and when it was."""
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the newest dose's medicine, or None before the first."""
+        record = _medicine_record(self._baby)
+        return record.medicine_name if record is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when the newest dose was, its amount and unit, the medicine's ID, and its note."""
+        record = _medicine_record(self._baby)
+        time = record.time if record is not None else None
+        amount: object = record.amount if record is not None else None
+        unit = _medicine_field(record, "unit")
+        medicine_id = _medicine_field(record, "objectID")
+        return {
+            "time": time.isoformat() if time else None,
+            "amount": amount
+            if isinstance(amount, int | float) and not isinstance(amount, bool)
+            else None,
+            "unit": unit if isinstance(unit, str) and unit else None,
+            "medicine_id": medicine_id if isinstance(medicine_id, str) else None,
+            "note": _note(record),
+        }
+
+
+# Core PR 26
+NEXT_MEDICINE_DOSE = SensorEntityDescription(
+    key="next_medicine_dose",
+    translation_key="next_medicine_dose",
+    device_class=SensorDeviceClass.TIMESTAMP,
+)
+
+
+# Core PR 26
+class BabyTrackerNextMedicineDoseSensor(BabyTrackerBabyEntity, SensorEntity):
+    """When the newest dose's medicine can be given again.
+
+    That's the dose's time plus the medicine's interval (minutes, as the app stores it). It's
+    unknown when the medicine has no interval.
+    """
+
+    @property
+    @override
+    def native_value(self) -> datetime | None:
+        """Return when the next dose is due, or None without a dose or an interval."""
+        record = _medicine_record(self._baby)
+        interval = _medicine_field(record, "interval")
+        if record is None or record.time is None:
+            return None
+        if isinstance(interval, bool) or not isinstance(interval, int | float) or interval <= 0:
+            return None
+        return record.time + timedelta(minutes=interval)
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return which medicine the next dose is of."""
+        record = _medicine_record(self._baby)
+        return {"medicine": record.medicine_name if record is not None else None}
+
+
 # One row per kind of sensor: its descriptions and the entity class built from each.
 # Core PR 5
 ACCOUNT_SENSORS: tuple[
@@ -475,6 +650,10 @@ BABY_SENSORS: tuple[
     ((SLEEP_TIMER,), BabyTrackerTimerSensor),  # Core PR 8
     ((NURSING_TIMER,), BabyTrackerTimerSensor),  # Core PR 19
     (NURSING_TIME_SENSORS, BabyTrackerNursingTimeSensor),  # Core PR 19
+    ((LAST_MILESTONE,), BabyTrackerLastMilestoneSensor),  # Core PR 24
+    ((LAST_VACCINE,), BabyTrackerLastVaccineSensor),  # Core PR 25
+    ((LAST_MEDICINE,), BabyTrackerLastMedicineSensor),  # Core PR 26
+    ((NEXT_MEDICINE_DOSE,), BabyTrackerNextMedicineDoseSensor),  # Core PR 26
 )
 
 

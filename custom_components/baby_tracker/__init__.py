@@ -34,6 +34,7 @@ from .writes import forget_gap  # Core PR 11
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,  # Core PR 8
     Platform.BUTTON,  # Core PR 14
+    Platform.IMAGE,  # Core PR 23
     Platform.SENSOR,
     Platform.SWITCH,  # Core PR 17
 ]

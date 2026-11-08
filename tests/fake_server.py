@@ -54,6 +54,11 @@ class FakeServer:
         self.before_post: list[Any] = []  # Core PR 9
         self.active_posts = 0  # Core PR 9
         self.max_active_posts = 0  # Core PR 9
+        # Core PR 23
+        # Picture files the service has, the errors a download of one raises, and every request.
+        self.pictures: dict[str, bytes] = {}
+        self.picture_errors: dict[str, Exception] = {}  # Core PR 23
+        self.picture_requests: list[str] = []  # Core PR 23
 
     def add_record(
         self,
@@ -197,6 +202,15 @@ class FakeClient:
         return [
             RawTransaction(e["SyncID"], e["OPCode"], e["Transaction"]) for e in entries[:PAGE_SIZE]
         ]
+
+    # Core PR 23
+    async def get_picture(self, file_name: str) -> bytes | None:
+        """Download a picture file, or None when the service doesn't have it."""
+        await self._ensure_session()
+        self.server.picture_requests.append(file_name)
+        if file_name in self.server.picture_errors:
+            raise self.server.picture_errors[file_name]
+        return self.server.pictures.get(file_name)
 
     # Core PR 9
     async def post_transaction(self, op_code: int, sync_id: int, transaction: str) -> None:
