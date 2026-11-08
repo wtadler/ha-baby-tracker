@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -19,9 +21,11 @@ from pybabytracker import (
 _LOGGER = logging.getLogger(__name__)
 
 # A file the service doesn't have isn't asked for again until this has passed: a phone may
-# upload it later.
+# upload it later. A failed download waits less, as the cause is likelier to pass.
 MISSING_RETRY = timedelta(hours=6)
 FAILED_RETRY = timedelta(minutes=30)
+# How many downloaded files are held at once.
+MAX_FILES = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +44,7 @@ def newest_attached_picture(records: Iterable[Record], baby_id: str) -> Attached
     A record's time decides which is newest. A photo is shown as itself, and a video by its
     thumbnail, since an image entity can't play one.
     """
-    newest: tuple[float, AttachedPicture] | None = None
+    newest: tuple[tuple[float, str], AttachedPicture] | None = None
     for record in records:
         if record.baby_id != baby_id or record.time is None:
             continue
@@ -51,7 +55,8 @@ def newest_attached_picture(records: Iterable[Record], baby_id: str) -> Attached
                 file = picture.thumbnail_file
             else:
                 continue
-            key = record.time.timestamp()
+            # Records at one time go to the larger ID, so a reload shows the same picture.
+            key = (record.time.timestamp(), record.object_id)
             if newest is None or key > newest[0]:
                 attached = AttachedPicture(file, record.record_type, record.object_id, record.time)
                 newest = (key, attached)
@@ -59,49 +64,72 @@ def newest_attached_picture(records: Iterable[Record], baby_id: str) -> Attached
 
 
 class PictureCache:
-    """The bytes of the picture files the entities show, downloaded once per file.
+    """The bytes of picture files, downloaded when an image entity is asked for one.
 
-    Only files still wanted are kept, so a replaced photo is dropped. A failed download is tried
-    again at the next sync, and a file the service doesn't have after ``MISSING_RETRY``.
+    A file is downloaded once, on its first request, and not while the coordinator's lock is held,
+    so a slow picture host can't delay a sync or a write. Only the last few files are kept. Two
+    requests for one file share a download. A file the service doesn't have is not asked for again
+    for ``MISSING_RETRY``, and a failed download for ``FAILED_RETRY``. A failure is logged at
+    warning level once per file, not at every attempt.
     """
 
     def __init__(self, client: BabyTrackerClient) -> None:
         """Start with no files."""
         self._client = client
-        self._files: dict[str, bytes] = {}
-        self._missing: dict[str, datetime] = {}
-
-    def get(self, file: str | None) -> bytes | None:
-        """Return a downloaded file's bytes, or None when it isn't downloaded."""
-        return self._files.get(file) if file is not None else None
+        self._files: OrderedDict[str, bytes] = OrderedDict()
+        self._retry_after: dict[str, datetime] = {}
+        self._warned: set[str] = set()
+        self._locks: dict[str, asyncio.Lock] = {}
 
     @property
     def files(self) -> Mapping[str, bytes]:
-        """Every downloaded file, by name."""
+        """Every file held, by name."""
         return self._files
 
-    async def async_get(self, file: str | None) -> bytes | None:
-        """Stub."""
-        return None
+    def _cached(self, file: str) -> bytes | None:
+        content = self._files.get(file)
+        if content is not None:
+            self._files.move_to_end(file)
+        return content
 
-    async def async_fetch(self, wanted: set[str]) -> None:
-        """Download the wanted files not downloaded yet, and forget the ones no longer wanted."""
-        for file in set(self._files) - wanted:
-            del self._files[file]
-        for file in set(self._missing) - wanted:
-            del self._missing[file]
+    async def async_get(self, file: str | None) -> bytes | None:
+        """Return a file's bytes, downloading it if it isn't held, or None when there are none."""
+        if file is None:
+            return None
+        if (content := self._cached(file)) is not None:
+            return content
+        lock = self._locks.setdefault(file, asyncio.Lock())
+        async with lock:
+            if (content := self._cached(file)) is not None:
+                return content
+            content = await self._download(file)
+        if not lock.locked():
+            self._locks.pop(file, None)
+        return content
+
+    async def _download(self, file: str) -> bytes | None:
         now = dt_util.utcnow()
-        for file in sorted(wanted - set(self._files)):
-            missed = self._missing.get(file)
-            if missed is not None and now - missed < MISSING_RETRY:
-                continue
-            try:
-                content = await self._client.get_picture(file)
-            except (BabyTrackerError, ValueError) as err:
-                _LOGGER.debug("Couldn't download picture %s: %s", file, err)
-                continue
-            if content is None:
-                self._missing[file] = now
-                continue
-            self._missing.pop(file, None)
-            self._files[file] = content
+        self._retry_after = {f: t for f, t in self._retry_after.items() if t > now}
+        if file in self._retry_after:
+            return None
+        try:
+            content = await self._client.get_picture(file)
+        except (BabyTrackerError, ValueError) as err:
+            self._retry_after[file] = now + FAILED_RETRY
+            if file not in self._warned:
+                self._warned.add(file)
+                _LOGGER.warning(
+                    "Couldn't download picture %s (%s); trying again in %d minutes",
+                    file,
+                    err,
+                    FAILED_RETRY.total_seconds() // 60,
+                )
+            return None
+        if not content:
+            self._retry_after[file] = now + MISSING_RETRY
+            return None
+        self._warned.discard(file)
+        self._files[file] = content
+        while len(self._files) > MAX_FILES:
+            self._files.popitem(last=False)
+        return content

@@ -102,9 +102,6 @@ class BabyTrackerData:
     # Core PR 21
     # Home Assistant's own pump timer, while it runs. It belongs to the account too.
     pump: PumpTimer | None = None
-    # Core PR 23
-    # The picture files downloaded so far, so a download that lands updates the images.
-    downloaded_pictures: frozenset[str] = frozenset()
 
 
 def storage_key(entry_id: str) -> str:
@@ -115,18 +112,6 @@ def storage_key(entry_id: str) -> str:
 # Core PR 23
 def _photo_file(baby: Baby | None) -> str | None:
     return baby.picture_file if baby is not None else None
-
-
-# Core PR 23
-def _wanted_pictures(data: BabyTrackerData) -> set[str]:
-    """Return the picture files the entities show: each baby's photo and newest picture."""
-    wanted: set[str] = set()
-    for baby in data.babies.values():
-        if baby.photo_file is not None:
-            wanted.add(baby.photo_file)
-        if baby.latest_picture is not None:
-            wanted.add(baby.latest_picture.file)
-    return wanted
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -226,10 +211,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             # Keep progress even when a later device failed.
             if dict(self.engine.last_seen) != before:
                 await self._async_save()
-        # Core PR 23
-        # Pictures download after the sync, so a slow or failed download never fails the sync,
-        # and before the data is built, so a picture that arrives is published with it.
-        await self.pictures.async_fetch(_wanted_pictures(self._snapshot()))
         return self._rebuild()
 
     async def _async_save(self) -> None:
@@ -275,7 +256,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             babies=babies,
             last_pump=self.engine.latest_pump(),  # Core PR 5
             pump=self.timers.pump,  # Core PR 21
-            downloaded_pictures=frozenset(self.pictures.files),  # Core PR 23
         )
 
     # Core PR 23

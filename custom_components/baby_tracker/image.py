@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, override
 
 from homeassistant.components.image import ImageEntity, ImageEntityDescription
@@ -44,6 +43,8 @@ IMAGES: tuple[BabyTrackerImageDescription, ...] = (
     BabyTrackerImageDescription(
         key="latest_picture",
         translation_key="latest_picture",
+        # It can show any entry's picture, a diaper's included, so it is opt-in.
+        entity_registry_enabled_default=False,
         file_fn=lambda baby: baby.latest_picture.file if baby.latest_picture else None,
         attributes_fn=_latest_attributes,
     ),
@@ -76,10 +77,14 @@ async def async_setup_entry(
 
 
 class BabyTrackerImage(BabyTrackerBabyEntity, ImageEntity):
-    """A picture of a baby from the service, downloaded at sync.
+    """A picture of a baby from the service, downloaded when the frontend asks for it.
 
-    The picture shown changes when its file does, or when a file that failed to download comes
-    in, so the frontend asks for it again only then.
+    The picture's time moves when its file name does (and at start-up, so it moves after every
+    restart or reload), so the frontend asks for it again only then. Nothing is downloaded at sync
+    or setup: ``async_image`` asks the coordinator's picture cache, which downloads a file once.
+
+    The latest picture shows the newest picture on any of the baby's entries, such as a diaper's,
+    so it is disabled by default.
     """
 
     entity_description: BabyTrackerImageDescription
@@ -94,7 +99,7 @@ class BabyTrackerImage(BabyTrackerBabyEntity, ImageEntity):
         """Set up an image for one baby."""
         BabyTrackerBabyEntity.__init__(self, coordinator, description, baby_id)
         ImageEntity.__init__(self, coordinator.hass)
-        self._shown: tuple[str, bool] | None = None
+        self._shown: str | None = None
         self._note_change()
 
     def _file(self) -> str | None:
@@ -102,16 +107,11 @@ class BabyTrackerImage(BabyTrackerBabyEntity, ImageEntity):
         return self.entity_description.file_fn(baby) if baby is not None else None
 
     def _note_change(self) -> None:
-        """Move the image's time when the file or whether it's downloaded changes.
-
-        A file that isn't downloaded (the service doesn't have it, or the download failed) has no
-        time, so the entity is unknown rather than showing a broken image.
-        """
+        """Move the image's time when the file it shows changes, and clear it with no file."""
         file = self._file()
-        shown = (file, self.coordinator.pictures.get(file) is not None) if file else None
-        if shown != self._shown:
-            self._shown = shown
-            self._attr_image_last_updated = dt_util.utcnow() if shown and shown[1] else None
+        if file != self._shown:
+            self._shown = file
+            self._attr_image_last_updated = dt_util.utcnow() if file else None
 
     @callback
     @override
@@ -119,16 +119,10 @@ class BabyTrackerImage(BabyTrackerBabyEntity, ImageEntity):
         self._note_change()
         super()._handle_coordinator_update()
 
-    @property
-    @override
-    def image_last_updated(self) -> datetime | None:
-        """Return when the picture last changed, or None when there's none to show."""
-        return self._attr_image_last_updated
-
     @override
     async def async_image(self) -> bytes | None:
-        """Return the downloaded picture, or None when there's none."""
-        return self.coordinator.pictures.get(self._file())
+        """Return the picture, downloading it if it's the first request, or None when none."""
+        return await self.coordinator.pictures.async_get(self._file())
 
     @property
     @override
