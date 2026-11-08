@@ -105,8 +105,6 @@ keys:
   services.discard_nursing: 18
   services.start_pump: 21
   services.stop_pump: 21
-  services.log_milestone: 24
-  services.log_vaccine: 25
   services.log_medicine: 26
   selector.diaper_type: 9
   selector.bottle_kind: 10
@@ -139,19 +137,16 @@ keys:
   exceptions.no_running_sleep: 16
   exceptions.sleep_already_running: 16
   exceptions.sleep_start_out_of_range: 16
-  exceptions.invalid_selection_name: hacs
-  exceptions.ambiguous_selection: hacs
-  exceptions.no_usual_dose: hacs
   exceptions.not_a_sleep: 16
   exceptions.no_nursing_timer: 18
   exceptions.nursing_not_saved: 18
   exceptions.pump_already_running: 21
   exceptions.no_pump_timer: 21
   exceptions.pump_not_saved: 21
-  exceptions.unknown_milestone: 24
-  exceptions.unknown_vaccine: 25
   exceptions.unknown_medicine: 26
-  exceptions.medicine_needs_amount: 26
+  exceptions.invalid_selection_name: 26
+  exceptions.ambiguous_selection: 26
+  exceptions.no_usual_dose: 26
   issues.own_log_gap: 11
   issues.nursing_timer_long: 18
   issues.pump_timer_long: 21
@@ -293,6 +288,7 @@ quality_scale:
       1: done
     entity-disabled-by-default:
       1: {status: done, comment: "No entity starts disabled. Each is one of the integration's main readings or controls."}
+      23: {status: done, comment: "Latest picture starts disabled, because it can show any entry's picture, a diaper's included. Every other entity is one of the integration's main readings or controls."}
     entity-translations:
       1: done
     exception-translations:

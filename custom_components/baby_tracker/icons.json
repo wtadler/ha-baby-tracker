@@ -158,12 +158,6 @@
     "stop_pump": {
       "service": "mdi:timer-stop"
     },
-    "log_milestone": {
-      "service": "mdi:star"
-    },
-    "log_vaccine": {
-      "service": "mdi:needle"
-    },
     "log_medicine": {
       "service": "mdi:pill"
     }

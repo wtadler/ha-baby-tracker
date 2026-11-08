@@ -3,7 +3,10 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable  # Core PR 9
-from dataclasses import dataclass
+from dataclasses import (
+    dataclass,
+    field,  # Core PR 26
+)
 from datetime import datetime, timedelta  # Core PR 7
 from typing import TYPE_CHECKING, Any, override
 
@@ -29,6 +32,7 @@ from pybabytracker import (
     BabyTrackerError,
     DayTotals,  # Core PR 7
     Formula,
+    Medication,  # Core PR 26
     Nursing,
     NursingTimer,  # Core PR 18
     Pumped,
@@ -82,6 +86,10 @@ class BabyData:
     milestone: Record | None = None  # Core PR 24
     vaccine: Record | None = None  # Core PR 25
     medicine: Record | None = None  # Core PR 26
+    # Core PR 26
+    # The newest dose of each medicine, by the medicine's ID (or its name when it has none), so
+    # the next dose of every medicine is known when two of them alternate.
+    medicine_doses: dict[str, Medication] = field(default_factory=dict)
 
     # Core PR 8
     @property
@@ -112,6 +120,23 @@ def storage_key(entry_id: str) -> str:
 # Core PR 23
 def _photo_file(baby: Baby | None) -> str | None:
     return baby.picture_file if baby is not None else None
+
+
+# Core PR 26
+def medicine_key(dose: Medication) -> str | None:
+    """Return what tells a dose's medicine from the others: its ID, or else its name."""
+    selection = dose.medication_selection
+    object_id = selection.get("objectID") if isinstance(selection, dict) else None
+    if isinstance(object_id, str) and object_id.strip():
+        return object_id
+    name = dose.medicine_name
+    return name if name is not None and name.strip() else None
+
+
+# Core PR 26
+def _dose_order(dose: Medication) -> tuple[float, str]:
+    """Order doses by time, then by record ID, so equal times give the same answer every time."""
+    return (dose.time.timestamp() if dose.time is not None else 0.0, dose.object_id)
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -251,6 +276,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 milestone=latest.get("Milestone"),  # Core PR 24
                 vaccine=latest.get("Vaccine"),  # Core PR 25
                 medicine=latest.get("Medication"),  # Core PR 26
+                medicine_doses=self._medicine_doses(baby_id),  # Core PR 26
             )
         return BabyTrackerData(
             babies=babies,
@@ -261,6 +287,21 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     # Core PR 23
     def _latest_picture(self, baby_id: str) -> AttachedPicture | None:
         return newest_attached_picture(self.engine.records.values(), baby_id)
+
+    # Core PR 26
+    def _medicine_doses(self, baby_id: str) -> dict[str, Medication]:
+        """Return the newest dose of each medicine the baby was given."""
+        newest: dict[str, Medication] = {}
+        for record in self.engine.records.values():
+            if not isinstance(record, Medication) or record.baby_id != baby_id:
+                continue
+            key = medicine_key(record)
+            if key is None or record.time is None:
+                continue
+            kept = newest.get(key)
+            if kept is None or _dose_order(record) > _dose_order(kept):
+                newest[key] = record
+        return newest
 
     def _rebuild(self) -> BabyTrackerData:
         """Build the data, then do what a new snapshot calls for.

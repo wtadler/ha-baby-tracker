@@ -388,96 +388,6 @@ discard_nursing:
           filter:
             - integration: baby_tracker
 
-log_milestone:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          filter:
-            - integration: baby_tracker
-    milestone:
-      required: true
-      example: First smile
-      selector:
-        select:
-          custom_value: true
-          options:
-            - "Back home"
-            - "Recognizes caregiver’s voice"
-            - "Recognizes familiar faces"
-            - "First smile"
-            - "Raise head"
-            - "Claps Hand"
-            - "Slept through the night"
-            - "Laughs out loud"
-            - "Babbles"
-            - "Holds head steady"
-            - "Responds to own name"
-            - "Rolls over"
-            - "Sits up"
-            - "First tooth"
-            - "Says mama"
-            - "Says dada"
-            - "First word"
-            - "Waves Bye-Bye"
-            - "Stands up"
-            - "First steps"
-    time:
-      required: false
-      selector:
-        datetime:
-    note:
-      required: false
-      example: At grandma's
-      selector:
-        text:
-    object_id:
-      required: false
-      example: 6F1C2A3E-0000-4000-8000-000000000002
-      selector:
-        text:
-
-log_vaccine:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          filter:
-            - integration: baby_tracker
-    vaccine:
-      required: true
-      example: DTaP
-      selector:
-        select:
-          custom_value: true
-          options:
-            - "HepB"
-            - "RV"
-            - "DTaP"
-            - "Hib"
-            - "PCV"
-            - "IPV"
-            - "Influenza"
-            - "MMR"
-            - "Varicella"
-            - "Hep A"
-    time:
-      required: false
-      selector:
-        datetime:
-    note:
-      required: false
-      example: 2-month visit
-      selector:
-        text:
-    object_id:
-      required: false
-      example: 6F1C2A3E-0000-4000-8000-000000000002
-      selector:
-        text:
-
 log_medicine:
   fields:
     device_id:
@@ -488,12 +398,12 @@ log_medicine:
             - integration: baby_tracker
     medicine:
       required: true
-      example: Tylenol
+      example: Pain reliever drops
       selector:
         text:
     amount:
       required: false
-      example: 3.75
+      example: 2.5
       selector:
         number:
           min: 0

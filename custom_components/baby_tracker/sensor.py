@@ -1,5 +1,6 @@
 """Sensors for Baby Tracker (Nighp)."""
 
+from collections import Counter  # Core PR 26
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import (
@@ -463,16 +464,68 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
 
 
 # Core PR 24
+def _text(value: object) -> str | None:
+    """Return ``value`` when it's text with something in it."""
+    return value if isinstance(value, str) and value.strip() else None
+
+
+# Core PR 24
+def _selection_field(selection: object, key: str) -> object:
+    """Return one field of an embedded pick-list entry, or None when it isn't a mapping."""
+    return selection.get(key) if isinstance(selection, dict) else None
+
+
+# Core PR 24
 def _milestone_sentence(baby: BabyData | None, description: object) -> str | None:
     """Return the milestone as the app words it: the baby's name, then its description.
 
     The app's descriptions start where the name ends (" came home", "'s first smile"), so
-    "Everly" and "'s first smile" read "Everly's first smile". Runs of spaces are tidied.
+    "Homer" and "'s first smile" read "Homer's first smile". Runs of spaces are tidied.
     """
-    if not isinstance(description, str) or not description.strip():
+    if _text(description) is None:
         return None
     name = baby.name if baby is not None and baby.name else ""
     return " ".join(f"{name}{description}".split())
+
+
+# Core PR 24
+class BabyTrackerLastSelectionSensor(BabyTrackerBabyEntity, SensorEntity):
+    """The name of the newest record of a pick-list kind (a milestone, a vaccine), and when.
+
+    The state is the embedded entry's name. The attributes are the time, the entry's description
+    and ID, and the note, each None when the record doesn't carry a usable one.
+    """
+
+    _id_attribute: str
+
+    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
+        """Return the baby's newest record of the kind, and the entry embedded in it."""
+        raise NotImplementedError
+
+    def _description(self, description: object) -> str | None:
+        return _text(description)
+
+    @property
+    @override
+    def native_value(self) -> str | None:
+        """Return the newest entry's name, or None before the first."""
+        baby = self._baby
+        record, selection = self._selection(baby) if baby is not None else (None, None)
+        return _text(_selection_field(selection, "name")) if record is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when the newest one was, its description, its ID, and its note."""
+        baby = self._baby
+        record, selection = self._selection(baby) if baby is not None else (None, None)
+        time = record.time if record is not None else None
+        return {
+            "time": time.isoformat() if time else None,
+            "description": self._description(_selection_field(selection, "desc")),
+            self._id_attribute: _text(_selection_field(selection, "objectID")),
+            "note": _note(record),
+        }
 
 
 # Core PR 24
@@ -480,37 +533,19 @@ LAST_MILESTONE = SensorEntityDescription(key="last_milestone", translation_key="
 
 
 # Core PR 24
-class BabyTrackerLastMilestoneSensor(BabyTrackerBabyEntity, SensorEntity):
-    """The name of the newest milestone the baby reached, with when it was."""
+class BabyTrackerLastMilestoneSensor(BabyTrackerLastSelectionSensor):
+    """The newest milestone the baby reached."""
 
-    @property
-    def _milestone(self) -> Milestone | None:
-        baby = self._baby
-        record = baby.milestone if baby is not None else None
-        return record if isinstance(record, Milestone) else None
+    _id_attribute = "milestone_id"
 
-    @property
     @override
-    def native_value(self) -> str | None:
-        """Return the newest milestone's name, or None before the first."""
-        milestone = self._milestone
-        return milestone.milestone_name if milestone is not None else None
+    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
+        record = baby.milestone if isinstance(baby.milestone, Milestone) else None
+        return record, record.milestone_type if record is not None else None
 
-    @property
     @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return when the newest milestone was, how the app words it, its ID, and its note."""
-        milestone = self._milestone
-        time = milestone.time if milestone is not None else None
-        selection = milestone.milestone_type if milestone is not None else None
-        description = selection.get("desc") if isinstance(selection, dict) else None
-        milestone_id = selection.get("objectID") if isinstance(selection, dict) else None
-        return {
-            "time": time.isoformat() if time else None,
-            "description": _milestone_sentence(self._baby, description),
-            "milestone_id": milestone_id if isinstance(milestone_id, str) else None,
-            "note": _note(milestone),
-        }
+    def _description(self, description: object) -> str | None:
+        return _milestone_sentence(self._baby, description)
 
 
 # Core PR 25
@@ -518,49 +553,21 @@ LAST_VACCINE = SensorEntityDescription(key="last_vaccine", translation_key="last
 
 
 # Core PR 25
-class BabyTrackerLastVaccineSensor(BabyTrackerBabyEntity, SensorEntity):
-    """The name of the newest vaccine the baby was given, with when it was."""
+class BabyTrackerLastVaccineSensor(BabyTrackerLastSelectionSensor):
+    """The newest vaccine the baby was given."""
 
-    @property
-    def _vaccine(self) -> Vaccine | None:
-        baby = self._baby
-        record = baby.vaccine if baby is not None else None
-        return record if isinstance(record, Vaccine) else None
+    _id_attribute = "vaccine_id"
 
-    @property
     @override
-    def native_value(self) -> str | None:
-        """Return the newest vaccine's name, or None before the first."""
-        vaccine = self._vaccine
-        return vaccine.vaccine_name if vaccine is not None else None
-
-    @property
-    @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return when the newest vaccine was, its full name, its ID, and its note."""
-        vaccine = self._vaccine
-        time = vaccine.time if vaccine is not None else None
-        selection = vaccine.vaccine_type if vaccine is not None else None
-        description = selection.get("desc") if isinstance(selection, dict) else None
-        vaccine_id = selection.get("objectID") if isinstance(selection, dict) else None
-        return {
-            "time": time.isoformat() if time else None,
-            "description": description if isinstance(description, str) and description else None,
-            "vaccine_id": vaccine_id if isinstance(vaccine_id, str) else None,
-            "note": _note(vaccine),
-        }
+    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
+        record = baby.vaccine if isinstance(baby.vaccine, Vaccine) else None
+        return record, record.vaccine_type if record is not None else None
 
 
 # Core PR 26
 def _medicine_record(baby: BabyData | None) -> Medication | None:
     record = baby.medicine if baby is not None else None
     return record if isinstance(record, Medication) else None
-
-
-# Core PR 26
-def _medicine_field(record: Medication | None, key: str) -> object:
-    selection = record.medication_selection if record is not None else None
-    return selection.get(key) if isinstance(selection, dict) else None
 
 
 # Core PR 26
@@ -576,7 +583,7 @@ class BabyTrackerLastMedicineSensor(BabyTrackerBabyEntity, SensorEntity):
     def native_value(self) -> str | None:
         """Return the newest dose's medicine, or None before the first."""
         record = _medicine_record(self._baby)
-        return record.medicine_name if record is not None else None
+        return _text(record.medicine_name) if record is not None else None
 
     @property
     @override
@@ -584,18 +591,37 @@ class BabyTrackerLastMedicineSensor(BabyTrackerBabyEntity, SensorEntity):
         """Return when the newest dose was, its amount and unit, the medicine's ID, and its note."""
         record = _medicine_record(self._baby)
         time = record.time if record is not None else None
+        selection = record.medication_selection if record is not None else None
         amount: object = record.amount if record is not None else None
-        unit = _medicine_field(record, "unit")
-        medicine_id = _medicine_field(record, "objectID")
         return {
             "time": time.isoformat() if time else None,
             "amount": amount
             if isinstance(amount, int | float) and not isinstance(amount, bool)
             else None,
-            "unit": unit if isinstance(unit, str) and unit else None,
-            "medicine_id": medicine_id if isinstance(medicine_id, str) else None,
+            "unit": _text(_selection_field(selection, "unit")),
+            "medicine_id": _text(_selection_field(selection, "objectID")),
             "note": _note(record),
         }
+
+
+# Core PR 26
+# The longest interval that counts: a year, in minutes. A larger one is a typo, not a medicine.
+MAX_INTERVAL_MINUTES = 525_600
+
+
+# Core PR 26
+def next_dose(dose: Medication) -> datetime | None:
+    """Return when the dose's medicine can be given again: its time plus the medicine's interval.
+
+    The interval is in minutes (as iOS syncs it, seen). A medicine without one, or with one that
+    isn't a number above zero and at most a year, has no next dose.
+    """
+    interval = _selection_field(dose.medication_selection, "interval")
+    if dose.time is None or isinstance(interval, bool) or not isinstance(interval, int | float):
+        return None
+    if not 0 < interval <= MAX_INTERVAL_MINUTES:
+        return None
+    return dose.time + timedelta(minutes=interval)
 
 
 # Core PR 26
@@ -608,30 +634,39 @@ NEXT_MEDICINE_DOSE = SensorEntityDescription(
 
 # Core PR 26
 class BabyTrackerNextMedicineDoseSensor(BabyTrackerBabyEntity, SensorEntity):
-    """When the newest dose's medicine can be given again.
+    """When the medicine of the newest dose can be given again.
 
-    That's the dose's time plus the medicine's interval (minutes, as the app stores it). It's
-    unknown when the medicine has no interval.
+    When medicines alternate, the newest dose's medicine changes with each dose, so the
+    ``medicines`` attribute holds every medicine's own next time, by name (by name and ID when two
+    share a name). A time in the past means the medicine can be given now. The time comes from the
+    synced doses, so it can be a poll (a few minutes) behind a dose given on a phone.
     """
 
     @property
     @override
     def native_value(self) -> datetime | None:
-        """Return when the next dose is due, or None without a dose or an interval."""
+        """Return when the newest dose's medicine can be given again, or None."""
         record = _medicine_record(self._baby)
-        interval = _medicine_field(record, "interval")
-        if record is None or record.time is None:
-            return None
-        if isinstance(interval, bool) or not isinstance(interval, int | float) or interval <= 0:
-            return None
-        return record.time + timedelta(minutes=interval)
+        return next_dose(record) if record is not None else None
 
     @property
     @override
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return which medicine the next dose is of."""
-        record = _medicine_record(self._baby)
-        return {"medicine": record.medicine_name if record is not None else None}
+        """Return the newest dose's medicine, and when each medicine can be given again."""
+        baby = self._baby
+        record = _medicine_record(baby)
+        doses = baby.medicine_doses if baby is not None else {}
+        names = {key: _text(dose.medicine_name) or key for key, dose in doses.items()}
+        counts = Counter(names.values())
+        medicines: dict[str, str | None] = {}
+        for key, dose in doses.items():
+            label = names[key] if counts[names[key]] == 1 else f"{names[key]} ({key})"
+            due = next_dose(dose)
+            medicines[label] = due.isoformat() if due else None
+        return {
+            "medicine": _text(record.medicine_name) if record is not None else None,
+            "medicines": medicines,
+        }
 
 
 # One row per kind of sensor: its descriptions and the entity class built from each.
