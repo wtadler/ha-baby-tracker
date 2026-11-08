@@ -188,6 +188,16 @@ async def test_a_baby_service_given_the_account_device_is_a_validation_error(
     assert server.posted == []
 
 
+async def test_a_write_without_a_note_says_it_came_from_home_assistant(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    """Test an empty note is written as the default, so the app shows where the entry came from."""
+    await log_diaper(hass, BABY_ONE_ID, "wet")
+
+    [(_, _, record)] = posted(server)
+    assert record.note == "Added from Home Assistant"
+
+
 async def test_log_diaper_with_a_past_time_and_a_note(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

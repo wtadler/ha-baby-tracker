@@ -75,7 +75,7 @@ async def test_a_button_press_adds_that_kind_of_diaper_for_that_baby_now(
     assert record.baby.object_id == BABY_TWO_ID
     assert record.time == NOW
     assert record.timezone == -18000  # standard, though late October is daylight time
-    assert not record.note
+    assert record.note == "Added from Home Assistant"
     assert server.logs[OWN_DEVICE][0]["SyncID"] == 1
 
 

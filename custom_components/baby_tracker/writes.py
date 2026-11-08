@@ -211,6 +211,16 @@ def _checked_minutes(*minutes: int) -> None:
         check_minutes(*minutes)
 
 
+# The note on every record Home Assistant writes without one of its own, so the app's log shows
+# where an entry came from.
+DEFAULT_NOTE = "Added from Home Assistant"
+
+
+def _note(note: str) -> str:
+    """Return the note to write: the caller's, or the default when it's empty."""
+    return note or DEFAULT_NOTE
+
+
 async def _add(
     coordinator: BabyTrackerCoordinator,
     object_id: str | None,
@@ -256,7 +266,7 @@ async def async_log_diaper(
             DIAPER_STATUS[kind],
             time=moment,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -292,7 +302,7 @@ async def async_log_bottle(
             volume=volume,
             time=moment,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -337,7 +347,7 @@ async def async_log_nursing(
             finish_side=FINISH_SIDES[finish_side] if finish_side is not None else None,
             end_time=moment,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -369,7 +379,7 @@ async def async_log_sleep(
             start=begin,
             end=finish,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -433,7 +443,7 @@ async def async_log_pump(
             finish_side=FINISH_SIDES[finish_side] if finish_side is not None else None,
             time=moment,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -473,7 +483,12 @@ async def async_start_sleep(
         if running is not None and running.object_id != object_id:
             raise validation_error("sleep_already_running")
         return await engine.start_sleep(
-            client, baby_id, start=begin, timezone_offset=offset, note=note, object_id=object_id
+            client,
+            baby_id,
+            start=begin,
+            timezone_offset=offset,
+            note=_note(note),
+            object_id=object_id,
         )
 
     await _add(coordinator, object_id, add)
@@ -573,7 +588,7 @@ async def _stop_nursing_locked(
             finish_side=FINISH_SIDES[timer.side],
             start_time=start,
             timezone_offset=offset,
-            note=note,
+            note=_note(note),
             object_id=object_id,
         )
 
@@ -658,7 +673,7 @@ async def async_stop_pump(
                 right_minutes=length,
                 time=start,
                 timezone_offset=offset,
-                note=note,
+                note=_note(note),
                 object_id=object_id,
             )
 
