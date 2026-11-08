@@ -68,6 +68,8 @@ keys:
   entity.sensor.diapers_today: 7
   entity.sensor.feeds_today: 7
   entity.sensor.bottle_volume_today: 7
+  entity.sensor.nursing_minutes_today: 7
+  entity.sensor.last_breast: 7
   entity.binary_sensor.asleep: 8
   entity.sensor.sleep_timer: 8
   entity.button.wet_diaper: 14
@@ -83,6 +85,11 @@ keys:
   entity.button.discard_nursing: 20
   entity.sensor.pump_timer: 21
   entity.switch.pump: 21
+  entity.sensor.last_nursing: 4
+  entity.sensor.last_nursing_duration: 4
+  entity.sensor.last_nursing_left_time: 4
+  entity.sensor.last_nursing_right_time: 4
+  entity.sensor.last_sleep_duration: 4
   services.log_diaper: 9
   services.log_bottle: 10
   services.log_nursing: 10

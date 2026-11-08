@@ -28,6 +28,7 @@ from pybabytracker import (
     BabyTrackerError,
     DayTotals,  # Core PR 7
     Formula,
+    LastBreast,  # Core PR 7
     Nursing,
     NursingTimer,  # Core PR 18
     Pumped,
@@ -36,6 +37,7 @@ from pybabytracker import (
     Sleep,  # Core PR 8
     SyncEngine,
     day_totals,  # Core PR 7
+    last_breast,  # Core PR 7
 )
 
 from .const import (
@@ -67,6 +69,9 @@ class BabyData:
     sleep: Record | None = None
     today: DayTotals = DayTotals()  # Core PR 7
     nursing: NursingTimer | None = None  # Core PR 18
+    # Core PR 4
+    # The newest nursing, whatever feed came after it, so its minutes stay visible.
+    last_nursing: Record | None = None
 
     # Core PR 8
     @property
@@ -87,6 +92,9 @@ class BabyTrackerData:
     # Core PR 21
     # Home Assistant's own pump timer, while it runs. It belongs to the account too.
     pump: PumpTimer | None = None
+    # Core PR 7
+    # The newest nursing (any baby) or pump, and its side, as the app shows before the next.
+    last_breast: LastBreast | None = None
 
 
 def storage_key(entry_id: str) -> str:
@@ -225,12 +233,24 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 sleep=latest.get("Sleep"),
                 today=self._today(baby_id),  # Core PR 7
                 nursing=self.timers.nursing.get(baby_id),  # Core PR 18
+                last_nursing=self._last_nursing(latest),  # Core PR 4
             )
         return BabyTrackerData(
             babies=babies,
             last_pump=self.engine.latest_pump(),  # Core PR 5
             pump=self.timers.pump,  # Core PR 21
+            last_breast=last_breast(self.engine.records.values(), dt_util.utcnow()),  # Core PR 7
         )
+
+    # Core PR 4
+    def _last_nursing(self, latest: dict[str, Record]) -> Record | None:
+        """Return the newest nursing of any kind.
+
+        An iPhone's timer and a manual entry sync as ``Nursing``, but the Android app's timer
+        syncs as ``NursingSession`` (a ``Nursing`` subclass), and the app stores both as rows of
+        its one Nursing table. So the newest is picked by class, not by type name.
+        """
+        return _newest([record for record in latest.values() if isinstance(record, Nursing)])
 
     def _rebuild(self) -> BabyTrackerData:
         """Build the data, then do what a new snapshot calls for.

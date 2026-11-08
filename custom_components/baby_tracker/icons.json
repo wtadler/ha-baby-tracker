@@ -60,8 +60,29 @@
       "nursing_right_time": {
         "default": "mdi:timer-sand"
       },
+      "last_nursing": {
+        "default": "mdi:mother-nurse"
+      },
+      "last_nursing_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "last_nursing_left_time": {
+        "default": "mdi:timer-outline"
+      },
+      "last_nursing_right_time": {
+        "default": "mdi:timer-outline"
+      },
+      "last_sleep_duration": {
+        "default": "mdi:sleep"
+      },
       "pump_timer": {
         "default": "mdi:timer-sand"
+      },
+      "nursing_minutes_today": {
+        "default": "mdi:timer-outline"
+      },
+      "last_breast": {
+        "default": "mdi:mother-nurse"
       }
     },
     "switch": {

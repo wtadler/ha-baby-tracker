@@ -59,7 +59,7 @@ async def test_the_account_email_is_nowhere_in_the_entity_id_or_the_device(
     assert EMAIL not in str(device.name) + str(device.model) + str(device.configuration_url)
 
 
-async def test_the_account_device_holds_only_the_last_pump_and_pump_timer_sensors(
+async def test_the_account_device_holds_the_last_pump_pump_timer_and_last_breast_sensors(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
     device = account_device(hass, init_integration)
@@ -68,10 +68,11 @@ async def test_the_account_device_holds_only_the_last_pump_and_pump_timer_sensor
 
     sensors = [e for e in entries if e.domain == "sensor"]
     assert sorted(e.unique_id for e in sensors) == [
+        f"{init_integration.entry_id}_last_breast",  # Core PR 7
         f"{init_integration.entry_id}_last_pump",
         f"{init_integration.entry_id}_pump_timer",
     ]
-    assert {e.translation_key for e in sensors} == {"last_pump", "pump_timer"}
+    assert {e.translation_key for e in sensors} == {"last_pump", "pump_timer", "last_breast"}
 
 
 async def test_no_baby_has_a_last_pump_entity(
