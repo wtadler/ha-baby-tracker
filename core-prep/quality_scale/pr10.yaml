@@ -70,7 +70,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default:
     status: done
-    comment: No entity starts disabled. Each is one of the integration's main readings or controls.
+    comment: The three nursing minutes sensors (total, left, and right of the last nursing) start disabled. The last nursing time and the last sleep duration cover what most people need, and the minutes are a detail, so a less popular entity.
   entity-translations: done
   exception-translations: done
   icon-translations: done

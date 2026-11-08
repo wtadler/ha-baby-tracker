@@ -76,7 +76,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default:
     status: done
-    comment: No entity starts disabled. The timer sensors drive the live activity blueprint, the diaper buttons and timer switches are the integration's main use, so none is a less popular entity.
+    comment: The three nursing minutes sensors (total, left, and right of the last nursing) start disabled. The last nursing time and the last sleep duration cover what most people need, and the minutes are a detail, so a less popular entity. Every other entity is a main reading or control, which the timer sensors, diaper buttons, and timer switches are.
   entity-translations: done
   exception-translations: done
   icon-translations: done

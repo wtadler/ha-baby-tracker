@@ -689,7 +689,7 @@
     'object_id_base': 'Nursing minutes today',
     'options': dict({
       'sensor': dict({
-        'suggested_display_precision': 2,
+        'suggested_display_precision': 0,
       }),
     }),
     'original_device_class': <SensorDeviceClass.DURATION: 'duration'>,
@@ -1743,7 +1743,7 @@
     'object_id_base': 'Nursing minutes today',
     'options': dict({
       'sensor': dict({
-        'suggested_display_precision': 2,
+        'suggested_display_precision': 0,
       }),
     }),
     'original_device_class': <SensorDeviceClass.DURATION: 'duration'>,

@@ -219,13 +219,17 @@ LAST_BREAST = SensorEntityDescription(
     key="last_breast",
     translation_key="last_breast",
     device_class=SensorDeviceClass.ENUM,
-    options=["left", "right", "none"],
+    options=[*SIDES.values(), "none"],
 )
 
 
 # Core PR 7
 class BabyTrackerLastBreastSensor(BabyTrackerAccountEntity, SensorEntity):
-    """The side of the newest nursing (any baby) or pump, as the app shows before the next one.
+    """The side the newest nursing (any baby) or pump started on.
+
+    It is the side the session began on, as the app stores and shows it, not the side it ended on
+    and not the side to use next: a session that started left and ended right reads ``left``. A
+    two-sided session logged from Home Assistant stores the side it ended on instead.
 
     It's the account's, not a baby's: one mother nurses every baby and pumps. ``none`` is a
     session with no side; unknown is no session at all.
@@ -234,11 +238,11 @@ class BabyTrackerLastBreastSensor(BabyTrackerAccountEntity, SensorEntity):
     @property
     @override
     def native_value(self) -> str | None:
-        """Return left, right, or none, or None before the first nursing or pump."""
+        """Return the side it started on (left or right) or none, or None before any session."""
         last = self.coordinator.data.last_breast
         if last is None:
             return None
-        return {SIDE_LEFT: "left", SIDE_RIGHT: "right"}.get(last.side, "none")
+        return _label(SIDES, last.side) or "none"
 
     @property
     @override
@@ -317,6 +321,7 @@ TODAY_SENSORS: tuple[BabyTrackerTodaySensorDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=0,
         # An Android timer's NursingSession counts like any nursing.
         value_fn=lambda totals: totals.nursing_minutes,
         attributes_fn=lambda totals: {"nursings": totals.nursings},
@@ -508,9 +513,14 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
 
 # Core PR 4
 def _minutes(value: object) -> int | None:
-    """Return a duration in whole minutes, or None when the payload has none."""
+    """Return a duration in whole minutes, or None when the payload has none.
+
+    The library's day totals read minutes the same way: a digit string (Android) counts, and a
+    float, a bool, other text, or a negative number is no minutes.
+    """
     # The payload is unvalidated at runtime, so a string or list can arrive where an int is typed.
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
+    minutes = numeric_code(value)
+    return minutes if minutes is not None and minutes >= 0 else None
 
 
 # Core PR 4
@@ -583,6 +593,7 @@ LAST_DETAIL_SENSORS: tuple[BabyTrackerLastDetailSensorDescription, ...] = (
         translation_key="last_nursing_duration",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
+        entity_registry_enabled_default=False,
         value_fn=_nursing_minutes,
     ),
     BabyTrackerLastDetailSensorDescription(
@@ -590,6 +601,7 @@ LAST_DETAIL_SENSORS: tuple[BabyTrackerLastDetailSensorDescription, ...] = (
         translation_key="last_nursing_left_time",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
+        entity_registry_enabled_default=False,
         value_fn=_nursing_left_minutes,
     ),
     BabyTrackerLastDetailSensorDescription(
@@ -597,6 +609,7 @@ LAST_DETAIL_SENSORS: tuple[BabyTrackerLastDetailSensorDescription, ...] = (
         translation_key="last_nursing_right_time",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
+        entity_registry_enabled_default=False,
         value_fn=_nursing_right_minutes,
     ),
     BabyTrackerLastDetailSensorDescription(

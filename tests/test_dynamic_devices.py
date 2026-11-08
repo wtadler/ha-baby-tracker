@@ -183,7 +183,9 @@ async def test_a_baby_that_appears_later_is_added_without_a_reload(
     assert _sensor_state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
     device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
     assert device is not None
-    entries = er.async_entries_for_device(er.async_get(hass), device.id)
+    entries = er.async_entries_for_device(
+        er.async_get(hass), device.id, include_disabled_entities=True
+    )
     assert len([e for e in entries if e.domain in READINGS]) == PER_BABY
 
 

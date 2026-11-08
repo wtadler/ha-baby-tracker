@@ -22,15 +22,17 @@ Each baby in the account becomes a device with:
 | Entity | What it shows or does |
 |---|---|
 | **Last diaper**, **Last feed**, **Last sleep** | When it happened, with the details (type, amount, sides, note) as attributes. The newest of nursing, formula, and pumped milk is the last feed. |
+| **Last nursing**, **Last sleep duration** | When the baby's newest nursing happened, even if a bottle came after it, and how many minutes the newest finished sleep lasted. |
+| **Last nursing duration**, **Last nursing left time**, **Last nursing right time** | The newest nursing's minutes, in total and per side. They start disabled: enable the ones you want. |
 | **Asleep** | On while the baby's newest sleep is running, started from any device. |
-| **Diapers today**, **Feeds today**, **Bottle volume today** | Counts since local midnight. They chart and keep long-term statistics. |
+| **Diapers today**, **Feeds today**, **Bottle volume today**, **Nursing minutes today** | Counts and minutes since local midnight. They chart and keep long-term statistics. |
 | **Wet diaper**, **Dirty diaper**, **Mixed diaper**, **Bottle** buttons | Log that record now. The bottle is the one set in the options. |
 | **Sleep**, **Nursing left**, **Nursing right** switches | Start and stop timers. See [Timers](#timers). |
 | **Nursing left time**, **Nursing right time**, **Discard nursing** | The running nursing session's minutes per side, and a way to drop it. |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
 
-Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
-sensor showing when it started, because the app stores pumps on the account, not on a baby. Babies added to the account later show up without a
+Each account becomes a device with **Last pump**, **Last breast**, a **Pump timer** switch, and a **Pump timer**
+sensor showing when it started, because the app stores pumps on the account, not on a baby. **Last breast** is the side the newest nursing (any baby) or pump started on, not the side it ended on and not the side to use next, so a session that started left and ended right reads "Started left". Babies added to the account later show up without a
 restart.
 
 ## Installation

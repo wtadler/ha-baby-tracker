@@ -174,8 +174,8 @@
       "last_breast": {
         "name": "Last breast",
         "state": {
-          "left": "Left",
-          "right": "Right",
+          "left": "Started left",
+          "right": "Started right",
           "none": "No side"
         },
         "state_attributes": {

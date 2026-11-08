@@ -29,6 +29,7 @@ def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_sensors(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,
@@ -37,7 +38,7 @@ async def test_sensors(
     mock_config_entry: MockConfigEntry,
     populated_server: FakeServer,
 ) -> None:
-    """Test the sensor entities and their states."""
+    """Test every sensor entity and its state, with the ones that start disabled enabled."""
     freezer.move_to(at(180))
     with patch("custom_components.baby_tracker.PLATFORMS", [Platform.SENSOR]):
         await setup_integration(hass, mock_config_entry)
