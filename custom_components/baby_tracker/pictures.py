@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 # A file the service doesn't have isn't asked for again until this has passed: a phone may
 # upload it later.
 MISSING_RETRY = timedelta(hours=6)
+FAILED_RETRY = timedelta(minutes=30)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +79,10 @@ class PictureCache:
     def files(self) -> Mapping[str, bytes]:
         """Every downloaded file, by name."""
         return self._files
+
+    async def async_get(self, file: str | None) -> bytes | None:
+        """Stub."""
+        return None
 
     async def async_fetch(self, wanted: set[str]) -> None:
         """Download the wanted files not downloaded yet, and forget the ones no longer wanted."""

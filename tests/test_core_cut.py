@@ -21,6 +21,9 @@ CORE_PREP = ROOT / "core-prep"
 COMPONENT = Path("homeassistant/components/baby_tracker")
 TESTS = Path("tests/components/baby_tracker")
 
+# The last planned core PR, read from the plan so a new PR needs no edit here.
+LAST_PR: int = yaml.safe_load((CORE_PREP / "plan.yaml").read_text())["prs"]
+
 PR1_INTEGRATION = {
     "__init__.py",
     "config_flow.py",
@@ -181,7 +184,7 @@ def test_a_decorated_statement_drops_with_its_decorators(core_cut: ModuleType) -
     ids=["comment", "comment-with-space", "trailing", "docstring", "engine-test"],
 )
 def test_hacs_only_code_never_reaches_core(core_cut: ModuleType, source: str) -> None:
-    out = core_cut.cut_python(source, 22)
+    out = core_cut.cut_python(source, LAST_PR)
     assert "OLD" not in out
     assert "old" not in out
     assert out.strip().endswith("NEW = 2")
@@ -364,7 +367,7 @@ def _sorted_throughout(data: Any) -> bool:
     return list(data) == sorted(data) and all(_sorted_throughout(v) for v in data.values())
 
 
-@pytest.mark.parametrize("number", [1, 9, 22])
+@pytest.mark.parametrize("number", [1, 9, LAST_PR])
 def test_strings_and_icons_are_sorted_as_cores_formatter_sorts_them(
     core_cut: ModuleType, number: int
 ) -> None:
@@ -528,7 +531,7 @@ def _cut_coordinator(core_cut: ModuleType, core: Path, number: int) -> str:
     return (core / COMPONENT / "coordinator.py").read_text()
 
 
-@pytest.mark.parametrize("number", range(1, 23))
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_cut_raises_config_entry_auth_failed_on_a_rejected_password(
     core_cut: ModuleType, core: Path, number: int
 ) -> None:
@@ -594,14 +597,14 @@ def test_the_pr1_cut_leaves_out_later_features(core_cut: ModuleType, core: Path)
         assert later not in source, later
 
 
-@pytest.mark.parametrize("number", range(1, 23))
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_is_valid_python(core_cut: ModuleType, core: Path, number: int) -> None:
     core_cut.cut(number, core, ruff=None)
     for path in [*(core / COMPONENT).rglob("*.py"), *(core / TESTS).rglob("*.py")]:
         ast.parse(path.read_text(), filename=str(path))
 
 
-@pytest.mark.parametrize("number", range(1, 23))
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_leaves_no_unused_imports(
     core_cut: ModuleType, core: Path, number: int
 ) -> None:

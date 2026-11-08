@@ -301,8 +301,6 @@ BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {
     "switch_nursing_side": ({}, "switch.baby_one_nursing_left"),
     "stop_nursing": ({}, "switch.baby_one_nursing_left"),
     "discard_nursing": ({}, "switch.baby_one_nursing_left"),
-    "log_milestone": ({"milestone": "First smile"}, None),  # Core PR 24
-    "log_vaccine": ({"vaccine": "DTaP"}, None),  # Core PR 25
 }
 
 ACTION_IDS = list(BABY_ACTIONS)

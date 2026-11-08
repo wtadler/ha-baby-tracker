@@ -19,6 +19,7 @@ from pybabytracker import (
     Device,
     RawTransaction,
 )
+from pybabytracker.models import is_plain_file_name  # Core PR 23
 
 from . import BABY_ONE, PASSWORD
 from .factories import OP_ADD, record_payload, wire
@@ -59,6 +60,8 @@ class FakeServer:
         self.pictures: dict[str, bytes] = {}
         self.picture_errors: dict[str, Exception] = {}  # Core PR 23
         self.picture_requests: list[str] = []  # Core PR 23
+        # Holds a download until the test opens it.
+        self.picture_gate: asyncio.Event | None = None  # Core PR 23
 
     def add_record(
         self,
@@ -205,9 +208,16 @@ class FakeClient:
 
     # Core PR 23
     async def get_picture(self, file_name: str) -> bytes | None:
-        """Download a picture file, or None when the service doesn't have it."""
+        """Download a picture file, or None when the service doesn't have it.
+
+        Like the library, it refuses a name that isn't a plain file name before any request.
+        """
+        if not is_plain_file_name(file_name):
+            raise ValueError(f"not a picture file name: {file_name!r}")
         await self._ensure_session()
         self.server.picture_requests.append(file_name)
+        if self.server.picture_gate is not None:
+            await self.server.picture_gate.wait()
         if file_name in self.server.picture_errors:
             raise self.server.picture_errors[file_name]
         return self.server.pictures.get(file_name)

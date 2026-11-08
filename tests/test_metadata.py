@@ -112,8 +112,6 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "switch_nursing_side",
         "stop_nursing",
         "discard_nursing",
-        "log_milestone",
-        "log_vaccine",
         "log_medicine",
     }
     assert set(services["log_diaper"]["fields"]) == {
@@ -202,13 +200,9 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "switch_nursing_side",
         "stop_nursing",
         "discard_nursing",
-        "log_milestone",
-        "log_vaccine",
         "log_medicine",
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
-    assert fields["log_milestone"] == {"device_id", "milestone", "time", "note", "object_id"}
-    assert fields["log_vaccine"] == {"device_id", "vaccine", "time", "note", "object_id"}
     assert fields["log_medicine"] == {
         "device_id",
         "medicine",
