@@ -277,7 +277,9 @@ async def test_a_present_baby_keeps_its_device_and_entities(
 
     assert baby_device(hass, BABY_ONE_ID).id == device.id
     assert entity_ids_on(hass, device) == entity_ids
-    assert all(hass.states.get(entity_id) is not None for entity_id in enabled_ids(hass, entity_ids))
+    assert all(
+        hass.states.get(entity_id) is not None for entity_id in enabled_ids(hass, entity_ids)
+    )
 
 
 async def test_a_refresh_with_no_deletion_removes_nothing(
