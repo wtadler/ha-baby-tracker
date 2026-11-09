@@ -232,10 +232,9 @@ class BabyTrackerLastBreastSensor(BabyTrackerAccountEntity, SensorEntity):
     """The side the newest nursing (any baby) or pump started on.
 
     It is the side the session began on, as the app stores and shows it, not the side it ended on
-    and not the side to use next: a session that started left and ended right reads ``left``. A
-    two-sided session logged from Home Assistant stores the side it ended on instead.
+    and not the side to use next: a session that started left and ended right reads ``left``.
 
-    It's the account's, not a baby's: one mother nurses every baby and pumps. ``none`` is a
+    It's the account's, not a baby's: one parent nurses every baby and pumps. ``none`` is a
     session with no side; unknown is no session at all.
     """
 

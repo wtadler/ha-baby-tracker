@@ -397,7 +397,8 @@ async def async_log_nursing(
     """Add a finished nursing session.
 
     The record starts ``left + right`` minutes before ``end_time`` (default now);
-    ``finish_side`` (left or right) defaults to the last side used.
+    ``finish_side`` (left or right) is the side the session started on, which the app shows as
+    its start side. It defaults to the only side used, or no side when both were.
     """
     if left_minutes + right_minutes <= 0:
         raise validation_error("no_duration")
@@ -630,7 +631,7 @@ async def async_stop_nursing(
 ) -> None:
     """Stop the nursing timer and write one finished record.
 
-    The record has whole minutes per side, the side it ended on, and the start time. The minutes
+    The record has whole minutes per side, the side it started on, and the start time. The minutes
     count to when the lock is acquired. The timer is cleared only once the write succeeds, and
     the record's ID was fixed at the start, so stopping again after an error can't write twice.
     """
@@ -653,7 +654,7 @@ async def _stop_nursing_locked(
             baby_id,
             left_minutes=left,
             right_minutes=right,
-            finish_side=FINISH_SIDES[timer.side],
+            finish_side=FINISH_SIDES[timer.start_side],
             start_time=start,
             timezone_offset=offset,
             note=_note(note),

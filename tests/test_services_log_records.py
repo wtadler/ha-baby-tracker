@@ -11,6 +11,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM, UnitSystem
 from pybabytracker import (
     SIDE_LEFT,
+    SIDE_NONE,
     SIDE_RIGHT,
     Formula,
     Nursing,
@@ -149,6 +150,21 @@ async def test_log_nursing_with_only_one_side_writes_zero_for_the_other(
     assert isinstance(record, Nursing)
     assert (record.left_duration, record.right_duration, record.finish_side) == (12, 0, SIDE_LEFT)
     assert record.time.isoformat() == "2026-10-26T12:18:00+00:00"  # the start
+
+
+@pytest.mark.parametrize(("finish_side", "expected"), [(None, SIDE_NONE), ("left", SIDE_LEFT)])
+async def test_log_nursing_with_both_sides_writes_the_start_side_given_or_none(
+    finish_side: str | None,
+    expected: int,
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+) -> None:
+    side = {} if finish_side is None else {"finish_side": finish_side}
+    await call(hass, "log_nursing", left_minutes=5, right_minutes=6, **side)
+
+    # Which side came first can't be told from the minutes, so with none given there is none.
+    assert only_record(server).finish_side == expected
 
 
 async def test_log_nursing_without_an_end_time_ends_now(

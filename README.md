@@ -40,9 +40,9 @@ Each account becomes a device with **Last pump**, a **Pump timer** switch, and a
 sensor showing when it started, because the app stores pumps on the account, not on a baby. The
 account also has **Last breast**: the side the newest nursing (of any baby) or pump started on.
 That's not the side it ended on or the side to use next, so a session that started left and ended
-right reads "Started left". A two-sided session logged from Home Assistant still records the side it
-ended on ([#123](https://github.com/wtadler/ha-baby-tracker/issues/123)). Babies added to the
-account later show up without a restart.
+right reads "Started left". A nursing timer in Home Assistant records the side it started on, like
+the app. A session logged by hand with both sides and no start side records no side. Babies added
+to the account later show up without a restart.
 
 ## Installation
 

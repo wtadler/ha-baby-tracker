@@ -387,8 +387,8 @@
           "description": "Whole minutes on the right side."
         },
         "finish_side": {
-          "name": "Finished on",
-          "description": "The side the session ended on. Defaults to the last side used, or right when both were."
+          "name": "Start side",
+          "description": "The side the session started on, which the app shows as its start side. Defaults to the only side used, or no side when both were."
         },
         "end_time": {
           "name": "End time",
@@ -467,8 +467,8 @@
           "description": "Whole minutes on the right side."
         },
         "finish_side": {
-          "name": "Finished on",
-          "description": "The side the session ended on. Defaults to the last side used, or right when both were."
+          "name": "Side",
+          "description": "The side to record for the session. Defaults to the only side used, or no side when both were, as the app saves most two-sided pumps."
         },
         "time": {
           "name": "Start time",
@@ -546,7 +546,7 @@
     },
     "stop_nursing": {
       "name": "Stop nursing",
-      "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it ended on, and the start time.",
+      "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it started on, and the start time.",
       "fields": {
         "device_id": {
           "name": "Baby",

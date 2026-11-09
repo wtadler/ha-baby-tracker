@@ -6,7 +6,7 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from pybabytracker import SIDE_LEFT
+from pybabytracker import SIDE_RIGHT
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from . import NOW
@@ -50,7 +50,7 @@ async def test_start_switch_and_stop_nursing_actions(
     await call(hass, "stop_nursing", note="Sleepy")
 
     [record] = nursing_posts(server)
-    assert (record.left_duration, record.right_duration, record.finish_side) == (7, 3, SIDE_LEFT)
+    assert (record.left_duration, record.right_duration, record.finish_side) == (7, 3, SIDE_RIGHT)
     assert record.note == "Sleepy"
     assert record.time == NOW
 

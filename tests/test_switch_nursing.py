@@ -113,7 +113,7 @@ async def test_turning_off_the_running_side_stops_the_session_and_logs_both_side
 
     [record] = nursing_posts(server)
     assert len(posted(server)) == 1
-    assert (record.left_duration, record.right_duration, record.finish_side) == (5, 7, SIDE_RIGHT)
+    assert (record.left_duration, record.right_duration, record.finish_side) == (5, 7, SIDE_LEFT)
     assert record.time == NOW
     assert record.baby.object_id == BABY_ONE_ID
     assert state(hass, NURSE_LEFT).state == "off"
@@ -121,7 +121,7 @@ async def test_turning_off_the_running_side_stops_the_session_and_logs_both_side
     assert state(hass, NURSING_TIMER).state == "unknown"
 
 
-async def test_turning_off_the_left_side_ends_on_the_left(
+async def test_turning_off_the_left_side_records_the_side_it_started_on(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -135,7 +135,7 @@ async def test_turning_off_the_left_side_ends_on_the_left(
     await turn_off(hass, NURSE_LEFT)
 
     [record] = nursing_posts(server)
-    assert (record.left_duration, record.right_duration, record.finish_side) == (2, 4, SIDE_LEFT)
+    assert (record.left_duration, record.right_duration, record.finish_side) == (2, 4, SIDE_RIGHT)
 
 
 async def test_turning_on_the_side_already_running_does_nothing(
