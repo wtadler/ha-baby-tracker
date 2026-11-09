@@ -1,6 +1,7 @@
 """Core PR 27: a sync reset in the app stops syncing and raises a repair, and fixing it joins the
 new sync group from scratch."""
 
+import asyncio
 import json
 from typing import Any
 
@@ -285,3 +286,85 @@ async def test_diagnostics_still_work_while_the_group_is_changed(
     assert diagnostics["coordinator"]["last_update_success"] is False
     assert diagnostics["coordinator"]["babies"] == 2
     assert set(diagnostics) == {"entry", "coordinator", "engine", "babies"}
+
+
+@pytest.mark.parametrize(
+    ("action", "data", "running_first"),
+    [
+        ("start_nursing", {"side": "left"}, False),
+        ("switch_nursing_side", {}, True),
+        ("discard_nursing", {}, True),
+        ("start_pump", {}, False),
+    ],
+)
+async def test_a_timer_change_after_the_stop_is_refused_and_entities_stay_unavailable(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    action: str,
+    data: dict[str, Any],
+    running_first: bool,
+) -> None:
+    if running_first:
+        await call(hass, "start_nursing", side="left")
+    reset_sync(server)
+    await tick(hass)
+    assert hass.states.get(DIAPER).state == "unavailable"
+
+    with pytest.raises(HomeAssistantError) as raised:
+        await call(hass, action, **data)
+    await hass.async_block_till_done()
+
+    assert raised.value.translation_key == "account_changed"
+    assert hass.states.get(DIAPER).state == "unavailable"
+    assert init_integration.runtime_data.last_update_success is False
+
+
+async def test_a_write_after_the_stop_sends_nothing_and_does_not_sign_in(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    reset_sync(server)
+    await tick(hass)
+    signed_in = len(server.sign_ins)
+    reads = server.device_list_calls
+
+    with pytest.raises(HomeAssistantError) as raised:
+        await log_diaper(hass, BABY_ONE_ID)
+
+    assert raised.value.translation_key == "account_changed"
+    assert len(server.sign_ins) == signed_in
+    assert server.device_list_calls == reads
+    assert server.posted == []
+
+
+async def test_the_fix_waits_for_a_write_in_flight_before_it_deletes_the_state(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
+) -> None:
+    reset_sync(server, with_new_records=True)
+    await tick(hass)
+    old = init_integration.runtime_data
+    assert STORAGE_KEY in hass_storage
+    assert await async_setup_component(hass, "repairs", {})
+    manager = hass.data["repairs"]["flow_manager"]
+    opened = await manager.async_init(DOMAIN, data={"issue_id": ISSUE_ID})
+
+    async with old.exclusive():  # a write that started earlier, still holding the lock
+        confirming = hass.async_create_task(manager.async_configure(opened["flow_id"], {}))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        assert not confirming.done()
+        assert STORAGE_KEY in hass_storage
+        assert init_integration.runtime_data is old
+        # The write finishes by saving the old group's state, as every write does.
+        await old._async_save()  # noqa: SLF001
+
+    result = await confirming
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert OLD_RECORD not in saved_records(hass_storage)
+    assert hass_storage[STORAGE_KEY]["data"]["account_id"] == NEW_GROUP
+    assert init_integration.state is ConfigEntryState.LOADED

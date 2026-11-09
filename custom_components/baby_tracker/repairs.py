@@ -1,5 +1,7 @@
 """Repairs: starting over from a sync group that was reset in the app."""
 
+from contextlib import AbstractAsyncContextManager, nullcontext
+
 import probatio
 from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.config_entries import ConfigEntryState
@@ -32,7 +34,15 @@ class SyncGroupRepairFlow(RepairsFlow):
                 data_schema=probatio.Schema({}),
                 description_placeholders={"account": entry.title},
             )
-        await Store(self.hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
+        # A write that started before this finishes first: it saves the old state on its way out,
+        # and that must not come back after the delete.
+        lock: AbstractAsyncContextManager[object] = (
+            entry.runtime_data.exclusive()
+            if entry.state is ConfigEntryState.LOADED
+            else nullcontext()
+        )
+        async with lock:
+            await Store(self.hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
         await self.hass.config_entries.async_reload(entry.entry_id)
         if entry.state is not ConfigEntryState.LOADED:
             # The issue stays, and goes when a later sync works.

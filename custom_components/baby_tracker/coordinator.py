@@ -56,7 +56,11 @@ from .pictures import (  # Core PR 23
     PictureCache,
     newest_attached_picture,
 )
-from .sync_group import forget_group_change, stop_for_group_change  # Core PR 27
+from .sync_group import (  # Core PR 27
+    forget_group_change,
+    refuse_if_group_changed,
+    stop_for_group_change,
+)
 from .timer_state import TimerState  # Core PR 18
 
 _LOGGER = logging.getLogger(__name__)
@@ -450,6 +454,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
     async def _async_write_locked[T](
         self, operation: Callable[[SyncEngine, BabyTrackerClient], Awaitable[T]]
     ) -> T:
+        refuse_if_group_changed(self)  # Core PR 27
         try:
             try:
                 await self.engine.sync(self.client)
