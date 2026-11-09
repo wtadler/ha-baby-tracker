@@ -25,10 +25,10 @@ from . import NOW, sync_interval
 from .fake_server import FakeServer
 from .helpers import (
     LEGACY_INTERVAL,
-    SLEEP_SWITCH,
+    SLEEP_SWITCH,  # Core PR 17
     entry_with_options,
     set_options,
-    toggle,
+    toggle,  # Core PR 17
 )
 
 
@@ -265,6 +265,7 @@ async def test_saving_the_options_drops_a_legacy_interval(
     assert await sync_interval(hass, server) == timedelta(minutes=5)
 
 
+# Core PR 17
 async def test_an_options_change_leaves_a_running_timer_at_five_minutes(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

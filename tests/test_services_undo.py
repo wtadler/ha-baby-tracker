@@ -35,14 +35,12 @@ from .helpers import (
     LAST_DIAPER,
     LAST_FEED,
     OTHER_DEVICES_RECORD,
-    button,
     call,
     device_id,
     log_diaper,
     log_pump,
     only_record,
     posted,
-    press,
     sensor_states,
     state_of,
     undo,
@@ -129,9 +127,9 @@ async def _two_diapers(
 ) -> tuple[str, str]:
     """Write baby one's diaper, then baby two's. Returns their record IDs, oldest first."""
     freezer.move_to(NOW)
-    await press(hass, "button.baby_one_wet_diaper")
+    await log_diaper(hass, BABY_ONE_ID)
     freezer.tick(timedelta(minutes=1))
-    await press(hass, "button.baby_two_wet_diaper")
+    await log_diaper(hass, BABY_TWO_ID)
     first, second = (record.object_id for _, _, record in posted(server))
     return first, second
 
@@ -168,14 +166,14 @@ async def test_undo_for_a_baby_never_picks_a_pump(
     assert len(posted(server)) == 1
 
 
-async def test_undo_deletes_the_record_a_button_press_created(
+async def test_undo_deletes_the_record_a_logged_diaper_created(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
     freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "dirty"))
+    await log_diaper(hass, BABY_ONE_ID, "dirty")
     [(_, _, created)] = posted(server)
     assert hass.states.get(LAST_DIAPER).state == NOW.isoformat()
 
@@ -192,7 +190,7 @@ async def test_undo_deletes_the_record_a_button_press_created(
 async def test_undo_by_config_entry_id(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
 
     await undo(hass, config_entry_id=init_integration.entry_id)
 
@@ -206,9 +204,9 @@ async def test_undo_without_an_object_id_removes_the_most_recent_record_ha_creat
     freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     freezer.move_to(datetime(2026, 10, 26, 15, 0, 30, tzinfo=UTC))
-    await press(hass, button("baby_one", "dirty"))
+    await log_diaper(hass, BABY_ONE_ID, "dirty")
     newest = posted(server)[1][2].object_id
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
@@ -223,10 +221,10 @@ async def test_undo_with_a_baby_only_considers_that_babys_records(
     freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     first = posted(server)[0][2].object_id
     freezer.move_to(datetime(2026, 10, 26, 15, 0, 30, tzinfo=UTC))
-    await press(hass, button("baby_two", "wet"))
+    await log_diaper(hass, BABY_TWO_ID)
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
     assert posted(server)[2][2].object_id == first
@@ -235,7 +233,7 @@ async def test_undo_with_a_baby_only_considers_that_babys_records(
     assert posted(server)[3][2].baby.object_id == BABY_TWO_ID
 
 
-async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
+async def test_undo_removes_the_last_write_even_when_all_writes_share_a_second(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
@@ -243,7 +241,7 @@ async def test_undo_removes_the_last_write_even_when_all_presses_share_a_second(
 ) -> None:
     freezer.move_to(NOW)  # the clock never moves: every record has the same timestamp
     for _ in range(6):
-        await press(hass, button("baby_one", "wet"))
+        await log_diaper(hass, BABY_ONE_ID)
     ids = [record.object_id for _, _, record in posted(server)]
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
@@ -262,9 +260,9 @@ async def test_undo_deletes_the_newest_ha_write_even_after_a_phone_edited_it(
     scope: str,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "wet"))  # A
+    await log_diaper(hass, BABY_ONE_ID)  # A
     freezer.move_to(datetime(2026, 10, 26, 15, 5, 0, tzinfo=UTC))
-    await press(hass, button("baby_one", "wet"))  # B
+    await log_diaper(hass, BABY_ONE_ID)  # B
     first, second = (record.object_id for _, _, record in posted(server))
     # A phone edits B (wet to dirty), so B's current version came from the phone.
     server.add_record(
@@ -296,7 +294,7 @@ async def test_undo_follows_write_order_not_the_time_of_the_diaper(
     freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     # Written last, but its diaper happened days ago.
     await log_diaper(hass, BABY_ONE_ID, "dirty", time="2026-10-22T08:00:00+00:00")
     written_last = posted(server)[1][2].object_id
@@ -309,7 +307,7 @@ async def test_undo_follows_write_order_not_the_time_of_the_diaper(
 async def test_undo_accepts_an_object_id_in_any_case(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     created = posted(server)[0][2].object_id
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=created.lower())
@@ -321,7 +319,7 @@ async def test_undo_accepts_an_object_id_in_any_case(
 async def test_undo_with_a_baby_and_another_babys_record_id_is_a_validation_error(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, button("baby_two", "wet"))
+    await log_diaper(hass, BABY_TWO_ID)
     babys_two = posted(server)[0][2].object_id
 
     with pytest.raises(ServiceValidationError) as raised:
@@ -338,10 +336,10 @@ async def test_undo_with_an_object_id_removes_that_record(
     freezer: FrozenDateTimeFactory,
 ) -> None:
     freezer.move_to(NOW)
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     first = posted(server)[0][2].object_id
     freezer.move_to(datetime(2026, 10, 26, 15, 0, 30, tzinfo=UTC))
-    await press(hass, button("baby_one", "dirty"))
+    await log_diaper(hass, BABY_ONE_ID, "dirty")
 
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID), object_id=first)
 
@@ -384,7 +382,7 @@ async def test_undo_never_picks_another_devices_record_when_ha_created_none(
 async def test_undo_twice_deletes_once_and_then_refuses(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     created = posted(server)[0][2].object_id
     await undo(hass, device_id=device_id(hass, BABY_ONE_ID))
 
@@ -416,7 +414,7 @@ async def test_undo_with_an_unknown_config_entry_is_a_validation_error(
 async def test_a_failed_undo_raises_a_translated_error_and_keeps_the_record(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    await press(hass, button("baby_one", "wet"))
+    await log_diaper(hass, BABY_ONE_ID)
     before = sensor_states(hass)
     server.post_errors.append((BabyTrackerConnectionError("HTTP 500"), False))
 

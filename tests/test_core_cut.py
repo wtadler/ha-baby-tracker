@@ -1426,7 +1426,15 @@ def _service_call_domain(node: ast.AST) -> ast.expr | None:
     return node.args[0] if node.args else keywords.get("domain")
 
 
-def _platforms_used(files: dict[Path, str]) -> list[str]:
+def _repository_tests() -> dict[Path, str]:
+    """Every test module of the repository as it is written, by its path in a core cut."""
+    return {
+        TESTS / path.relative_to(ROOT / "tests"): path.read_text()
+        for path in sorted((ROOT / "tests").glob("*.py"))
+    }
+
+
+def _platforms_used(files: dict[Path, str], written: dict[Path, str] | None = None) -> list[str]:
     """Where a test of the cut works on a platform the cut doesn't have.
 
     A test works on a platform when it calls one of the platform's actions (``button.press``,
@@ -1436,10 +1444,21 @@ def _platforms_used(files: dict[Path, str]) -> list[str]:
     counts at the calls that name a platform for it. The platforms are the repository's own, so
     the calls to ``homeassistant`` or to another integration aren't looked at, and a platform is
     in the cut when its module is.
+
+    ``written`` is the tests as they are written, before the cut. A helper the cut leaves out is
+    still known by what it needs, so a test that calls it anyway counts too.
     """
     platforms = _platform_modules()
     missing = {name for name in platforms if COMPONENT / f"{name}.py" not in files}
     functions = [function for found in _test_functions(files).values() for function in found]
+    kept = {function.name for function in functions}
+    # What the cut dropped is still looked up by name, after what it kept.
+    functions += [
+        function
+        for found in _test_functions(written or {}).values()
+        for function in found
+        if function.name not in kept
+    ]
 
     def literal(node: ast.expr | None) -> str | None:
         ok = isinstance(node, ast.Constant) and isinstance(node.value, str)
@@ -1548,7 +1567,7 @@ def test_every_planned_cut_uses_only_platforms_it_has(
 ) -> None:
     # A test that presses a button or turns on a switch before that platform is planned fails in
     # core: the entity it works on doesn't exist yet.
-    assert _platforms_used(planned(number)) == []
+    assert _platforms_used(planned(number), _repository_tests()) == []
 
 
 def _platform_files(*platforms: str) -> dict[Path, str]:
@@ -1716,6 +1735,48 @@ def test_a_helper_marked_for_a_later_pr_leaves_no_platform_call_behind(
     )
     cut = core_cut.cut_python(helpers, 2)
     assert _platforms_used({**_platform_files("sensor"), TESTS / "helpers.py": cut}) == []
+
+
+def test_a_helper_the_cut_dropped_still_counts_for_the_tests_that_call_it() -> None:
+    helpers = (
+        "async def press(hass):\n"
+        "    await hass.services.async_call('button', 'press', {})\n"
+        "async def log(hass):\n"
+        "    await hass.services.async_call('sensor', 'x', {})\n"
+    )
+    test = (
+        "from .helpers import log, press\n"
+        "async def test_a(hass):\n"
+        "    await log(hass)\n"
+        "async def test_b(hass):\n"
+        "    await press(hass)\n"
+    )
+    # The cut leaves ``press`` out of the helpers but a test still calls it.
+    kept = "async def log(hass):\n    await hass.services.async_call('sensor', 'x', {})\n"
+    files = {**_platform_files("sensor"), TESTS / "helpers.py": kept, TESTS / "test_x.py": test}
+    written = {TESTS / "helpers.py": helpers, TESTS / "test_x.py": test}
+    assert _platforms_used(files) == []
+    assert _platforms_used(files, written) == [f"{TESTS / 'test_x.py'}:5: button"]
+    assert _platforms_used({**files, **_platform_files("button")}, written) == []
+
+
+def test_the_platform_check_sees_a_helper_passed_on_as_well_as_called() -> None:
+    helpers = (
+        "async def toggle(hass):\n"
+        "    await (turn_off if hass else turn_on)(hass)\n"
+        "async def turn_on(hass):\n"
+        "    await hass.services.async_call('switch', 'turn_on', {})\n"
+        "async def turn_off(hass):\n"
+        "    await hass.services.async_call('switch', 'turn_off', {})\n"
+    )
+    test = "from .helpers import toggle\nasync def test_a(hass):\n    await toggle(hass)\n"
+    files = {**_platform_files("sensor"), TESTS / "helpers.py": helpers, TESTS / "test_x.py": test}
+    assert _platforms_used(files) == [
+        f"{TESTS / 'helpers.py'}:2: switch",
+        f"{TESTS / 'helpers.py'}:4: switch",
+        f"{TESTS / 'helpers.py'}:6: switch",
+        f"{TESTS / 'test_x.py'}:3: switch",
+    ]
 
 
 def test_the_platforms_are_the_repositorys_platform_modules() -> None:

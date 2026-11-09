@@ -6,7 +6,7 @@ to appear.
 """
 
 from datetime import timedelta
-from typing import Any
+from typing import Any  # Core PR 18
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
@@ -18,21 +18,21 @@ from . import NOW, sync_interval, tick
 from .fake_server import FakeServer
 from .helpers import (
     ASLEEP,
-    LEGACY_INTERVAL,
-    NURSE_LEFT,
-    NURSE_RIGHT,
+    LEGACY_INTERVAL,  # Core PR 18
+    NURSE_LEFT,  # Core PR 18
+    NURSE_RIGHT,  # Core PR 18
     PHONE_SLEEP,
-    PUMP_SWITCH,
-    SLEEP_SWITCH,
-    entry_with_options,
-    minutes,
-    nurse,
+    PUMP_SWITCH,  # Core PR 21
+    SLEEP_SWITCH,  # Core PR 17
+    entry_with_options,  # Core PR 18
+    minutes,  # Core PR 17
+    nurse,  # Core PR 18
     phone_ends_sleep,
     phone_sleep,
     state,
-    toggle,
-    turn_off,
-    turn_on,
+    toggle,  # Core PR 17
+    turn_off,  # Core PR 21
+    turn_on,  # Core PR 21
 )
 
 FIVE_MINUTES = timedelta(minutes=5)
@@ -98,6 +98,7 @@ async def test_a_sleep_ended_on_a_phone_shows_up_at_the_next_five_minute_sync_no
     assert state(hass, ASLEEP).state == "off"
 
 
+# Core PR 18
 async def test_a_nursing_timer_keeps_the_interval_at_five_minutes_through_start_switch_and_stop(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -116,6 +117,7 @@ async def test_a_nursing_timer_keeps_the_interval_at_five_minutes_through_start_
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 17
 async def test_a_sleep_home_assistant_starts_keeps_the_interval_at_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -134,6 +136,7 @@ async def test_a_sleep_home_assistant_starts_keeps_the_interval_at_five_minutes(
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 21
 async def test_a_pump_timer_keeps_the_interval_at_five_minutes_through_start_and_stop(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -148,6 +151,7 @@ async def test_a_pump_timer_keeps_the_interval_at_five_minutes_through_start_and
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 21
 async def test_every_kind_of_timer_at_once_still_syncs_every_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -165,6 +169,7 @@ async def test_every_kind_of_timer_at_once_still_syncs_every_five_minutes(
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 18
 async def test_a_nursing_timer_past_its_guard_hour_still_syncs_every_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -181,6 +186,7 @@ async def test_a_nursing_timer_past_its_guard_hour_still_syncs_every_five_minute
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 18
 async def test_a_second_account_with_a_timer_leaves_both_accounts_at_five_minutes(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -197,6 +203,7 @@ async def test_a_second_account_with_a_timer_leaves_both_accounts_at_five_minute
     assert await sync_interval(hass, second_server) == FIVE_MINUTES
 
 
+# Core PR 18
 @pytest.mark.parametrize("options", [{}, {LEGACY_INTERVAL: 15}], ids=["new", "legacy"])
 @pytest.mark.parametrize("switch", [SLEEP_SWITCH, NURSE_RIGHT], ids=["sleep", "nursing"])
 async def test_a_running_timer_leaves_the_interval_at_five_minutes_whatever_an_old_install_saved(
@@ -218,6 +225,7 @@ async def test_a_running_timer_leaves_the_interval_at_five_minutes_whatever_an_o
     assert await sync_interval(hass, server) == FIVE_MINUTES
 
 
+# Core PR 17
 async def test_a_running_timer_syncs_on_the_five_minute_schedule_and_not_every_minute(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

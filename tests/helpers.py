@@ -6,13 +6,13 @@ from pathlib import Path  # HACS-only
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import pytest
+import pytest  # Core PR 11
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError  # Core PR 11
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
@@ -48,18 +48,22 @@ def button(baby: str, kind: str) -> str:
     return f"button.{baby}_{kind}_diaper"
 
 
+# Core PR 14
 async def press(hass: HomeAssistant, entity_id: str) -> None:
     await hass.services.async_call("button", "press", {"entity_id": entity_id}, blocking=True)
 
 
+# Core PR 17
 async def turn_on(hass: HomeAssistant, entity_id: str) -> None:
     await hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)
 
 
+# Core PR 17
 async def turn_off(hass: HomeAssistant, entity_id: str) -> None:
     await hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)
 
 
+# Core PR 17
 async def toggle(hass: HomeAssistant, entity_id: str) -> None:
     """Tap a switch the way a dashboard does: off if it reads on, else on."""
     found = hass.states.get(entity_id)
@@ -246,6 +250,7 @@ def nursing_posts(server: FakeServer) -> list[Nursing]:
     return [r for _, op, r in posted(server) if op == OP_ADD and isinstance(r, Nursing)]
 
 
+# Core PR 17
 async def nurse(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, *steps: tuple[float, str]
 ) -> None:
@@ -260,10 +265,11 @@ LAST_DIAPER = "sensor.baby_one_last_diaper"
 GAP_ISSUE = "own_log_gap_{}"
 
 
+# Core PR 11
 async def fail_to_write(hass: HomeAssistant) -> None:
-    """Press a button while the gap is on, and check the error it raises."""
+    """Log a diaper while the gap is on, and check the error it raises."""
     with pytest.raises(HomeAssistantError) as raised:
-        await press(hass, button("baby_one", "wet"))
+        await log_diaper(hass, BABY_ONE_ID)
     assert raised.value.translation_key == "own_log_gap"
 
 
