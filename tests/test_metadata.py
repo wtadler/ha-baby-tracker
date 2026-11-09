@@ -113,6 +113,7 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "stop_nursing",
         "discard_nursing",
         "log_medicine",
+        "log_activity",  # Core PR 28
     }
     assert set(services["log_diaper"]["fields"]) == {
         "device_id",
@@ -201,8 +202,18 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "stop_nursing",
         "discard_nursing",
         "log_medicine",
+        "log_activity",  # Core PR 28
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
+    # Core PR 28
+    assert fields["log_activity"] == {
+        "device_id",
+        "activity",
+        "minutes",
+        "time",
+        "note",
+        "object_id",
+    }
     assert fields["log_medicine"] == {
         "device_id",
         "medicine",
@@ -530,6 +541,7 @@ def test_every_sensor_has_a_translated_name() -> None:
         "last_vaccine": "Last vaccine",
         "last_medicine": "Last medicine",
         "next_medicine_dose": "Next medicine dose",
+        "last_activity": "Last {activity}",  # Core PR 28
     }
 
 
@@ -654,3 +666,15 @@ def test_the_sync_group_repair_and_its_error_are_translated() -> None:
         assert "{account}" in confirm["description"]
         assert "Nothing is lost" in confirm["description"]
         assert repair["fix_flow"]["abort"]["reload_failed"]
+
+
+# Core PR 28
+def test_the_activity_sensor_and_action_are_translated() -> None:
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    sensor = strings["entity"]["sensor"]["last_activity"]
+    assert set(sensor["state_attributes"]) == {"duration_minutes", "note"}
+    assert "{activity}" in strings["exceptions"]["unknown_activity"]["message"]
+    assert "bath" not in json.dumps(strings["exceptions"]["unknown_activity"]).lower()
+    icons = json.loads((INTEGRATION / "icons.json").read_text())
+    assert icons["entity"]["sensor"]["last_activity"]["default"].startswith("mdi:")
+    assert icons["services"]["log_activity"]["service"].startswith("mdi:")

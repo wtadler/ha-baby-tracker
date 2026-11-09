@@ -10,6 +10,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir  # HACS-only
 from homeassistant.helpers import service
+from pybabytracker import MAX_ACTIVITY_MINUTES  # Core PR 28
 
 from .bottle import BOTTLE_KINDS, MILLILITERS, OUNCES  # Core PR 10
 from .const import (
@@ -22,6 +23,7 @@ from .writes import (
     DIAPER_STATUS,
     FINISH_SIDES,  # Core PR 10
     async_discard_nursing,  # Core PR 18
+    async_log_activity,  # Core PR 28
     async_log_bottle,  # Core PR 10
     async_log_diaper,
     async_log_medicine,  # Core PR 26
@@ -65,6 +67,7 @@ class BabyTrackerServiceArgument(StrEnum):
     END = "end"  # Core PR 10
     SIDE = "side"  # Core PR 18
     MEDICINE = "medicine"  # Core PR 26
+    ACTIVITY = "activity"  # Core PR 28
 
 
 def _uuid_upper(value: object) -> str:
@@ -141,6 +144,22 @@ def _whole_minutes(value: object) -> int:
     if value < 0:
         raise probatio.Invalid("can't be negative")
     return int(value)
+
+
+# Core PR 28
+# The type is looked up in writes.py after the write's own sync, so a type first used on a phone
+# minutes ago is found and every refusal is translated.
+LOG_ACTIVITY_SCHEMA = _baby_schema(
+    {
+        probatio.Required(BabyTrackerServiceArgument.ACTIVITY): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.MINUTES, default=0): probatio.All(
+            _whole_minutes, probatio.Range(max=MAX_ACTIVITY_MINUTES)
+        ),
+        probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
+    }
+)
 
 
 # Core PR 10
@@ -392,6 +411,20 @@ async def _log_medicine(call: ServiceCall) -> None:
     )
 
 
+# Core PR 28
+async def _log_activity(call: ServiceCall) -> None:
+    coordinator, baby_id = _baby(call)
+    await async_log_activity(
+        coordinator,
+        baby_id,
+        call.data[BabyTrackerServiceArgument.ACTIVITY],
+        minutes=call.data[BabyTrackerServiceArgument.MINUTES],
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
+    )
+
+
 # Core PR 10
 async def _log_bottle(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
@@ -579,4 +612,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(  # Core PR 26
         DOMAIN, BabyTrackerService.LOG_MEDICINE, _log_medicine, schema=LOG_MEDICINE_SCHEMA
+    )
+    hass.services.async_register(  # Core PR 28
+        DOMAIN, BabyTrackerService.LOG_ACTIVITY, _log_activity, schema=LOG_ACTIVITY_SCHEMA
     )

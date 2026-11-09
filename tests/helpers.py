@@ -335,6 +335,9 @@ ALL_ACTIONS = [
 # Core PR 26
 # A dose needs a medicine the account has used, so log_medicine has its own tests.
 ALL_ACTIONS.append("log_medicine")
+# Core PR 28
+# An activity needs a type the account has, so log_activity has its own tests.
+ALL_ACTIONS.append("log_activity")
 
 
 # A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.

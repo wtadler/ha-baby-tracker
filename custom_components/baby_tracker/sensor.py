@@ -39,6 +39,7 @@ from pybabytracker import (
     Medication,  # Core PR 26
     Milestone,  # Core PR 24
     Nursing,  # Core PR 4
+    OtherActivity,  # Core PR 28
     Pump,  # Core PR 5
     Pumped,  # Core PR 4
     Record,
@@ -854,6 +855,52 @@ class BabyTrackerLastDetailSensor(BabyTrackerBabyEntity, SensorEntity):
         return self.entity_description.value_fn(baby) if baby is not None else None
 
 
+# Core PR 28
+LAST_ACTIVITY = SensorEntityDescription(
+    key="last_activity",
+    translation_key="last_activity",
+    device_class=SensorDeviceClass.TIMESTAMP,
+)
+
+
+# Core PR 28
+class BabyTrackerLastActivitySensor(BabyTrackerBabyEntity, SensorEntity):
+    """When the baby's newest activity of one type was, built in or added in the app.
+
+    One is added for each type the baby has an activity of. It is keyed on the type's ID, so a
+    type renamed in the app keeps its sensor, and named after the type.
+    """
+
+    def __init__(self, coordinator: BabyTrackerCoordinator, baby_id: str, type_id: str) -> None:
+        """Set up the sensor of one activity type for one baby."""
+        super().__init__(coordinator, LAST_ACTIVITY, baby_id)
+        self._type_id = type_id
+        self._attr_unique_id = f"{baby_id}_{LAST_ACTIVITY.key}_{type_id}"
+        names = coordinator.data.activity_names or {}
+        self._attr_translation_placeholders = {"activity": names.get(type_id, type_id)}
+
+    @property
+    def _activity(self) -> OtherActivity | None:
+        baby = self._baby
+        return (baby.activities or {}).get(self._type_id) if baby is not None else None
+
+    @property
+    @override
+    def native_value(self) -> datetime | None:
+        """Return when the newest activity of the type was."""
+        activity = self._activity
+        return activity.time if activity is not None else None
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the newest activity's minutes and note, each None when unset."""
+        activity = self._activity
+        duration: object = activity.duration if activity is not None else None
+        whole = isinstance(duration, int) and not isinstance(duration, bool)
+        return {"duration_minutes": duration if whole else None, "note": _note(activity)}
+
+
 # One row per kind of sensor: its descriptions and the entity class built from each.
 # Core PR 5
 ACCOUNT_SENSORS: tuple[
@@ -918,3 +965,27 @@ async def async_setup_entry(
         async_add_entities(_baby_sensors(coordinator, new))
 
     entry.async_on_unload(coordinator.async_add_listener(_add_new_babies))  # Core PR 6
+
+    # Core PR 28
+    # A baby's sensor for an activity type is added once the baby has an activity of that type.
+    activities: set[tuple[str, str]] = set()
+
+    # Core PR 28
+    @callback
+    def _add_new_activities() -> None:
+        babies = coordinator.data.babies
+        # A baby that left takes its sensors with its device, so they're new again if it's back.
+        activities.difference_update({key for key in activities if key[0] not in babies})
+        new = [
+            (baby_id, type_id)
+            for baby_id, baby in babies.items()
+            for type_id in baby.activities or {}
+            if (baby_id, type_id) not in activities
+        ]
+        activities.update(new)
+        async_add_entities(
+            BabyTrackerLastActivitySensor(coordinator, baby_id, type_id) for baby_id, type_id in new
+        )
+
+    _add_new_activities()  # Core PR 28
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_activities))  # Core PR 28

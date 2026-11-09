@@ -344,6 +344,65 @@ async def async_log_medicine(
     await _add(coordinator, object_id, add)
 
 
+# Core PR 28
+async def async_log_activity(
+    coordinator: BabyTrackerCoordinator,
+    baby_id: str,
+    activity: str,
+    *,
+    minutes: int = 0,
+    time: datetime | None = None,
+    note: str = "",
+    object_id: str | None = None,
+) -> None:
+    """Add an activity of a type the account has, built in or added in the app.
+
+    ``activity`` is the type's name as the app shows it, or its ID. ``minutes`` is how long it
+    lasted, 0 when it wasn't timed. The type is looked up by the library inside the write, after
+    the sync that precedes it, so one first used on a phone since the last poll is found. Each
+    library refusal is translated.
+    """
+    moment, offset = _in_home_assistant_time(time)
+
+    async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
+        try:
+            return await engine.add_activity(
+                client,
+                baby_id,
+                activity,
+                duration=minutes,
+                time=moment,
+                timezone_offset=offset,
+                note=_note(note),
+                object_id=object_id,
+            )
+        except ObjectIdInUseError:
+            raise
+        except UnknownSelectionError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_activity",
+                translation_placeholders={"activity": activity},
+            ) from err
+        except AmbiguousSelectionError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="ambiguous_selection",
+                translation_placeholders={
+                    "medicine": activity,
+                    "ids": ", ".join(err.object_ids),
+                },
+            ) from err
+        except ValidationError as err:
+            raise validation_error(VALIDATION_KEYS[type(err)]) from err
+        except ValueError as err:
+            # The action's schema checks the minutes, so what's left is not about them (the
+            # engine can't write, a time without a zone): a write error, as for any other.
+            raise _error("write_failed", error=str(err)) from err
+
+    await _add(coordinator, object_id, add)
+
+
 async def async_log_bottle(
     coordinator: BabyTrackerCoordinator,
     baby_id: str,

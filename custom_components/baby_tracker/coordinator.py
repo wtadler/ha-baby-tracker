@@ -34,6 +34,7 @@ from pybabytracker import (
     Medication,  # Core PR 26
     Nursing,
     NursingTimer,  # Core PR 18
+    OtherActivity,  # Core PR 28
     Pumped,
     PumpTimer,  # Core PR 21
     Record,
@@ -95,6 +96,9 @@ class BabyData:
     # The newest dose of each medicine, by the medicine's ID (or its name when it has none), so
     # the next dose of every medicine is known when two of them alternate.
     medicine_doses: dict[str, Medication] | None = None
+    # Core PR 28
+    # The newest activity of each activity type the baby has one of, by the type's ID.
+    activities: dict[str, OtherActivity] | None = None
     # Core PR 4
     # The newest nursing, whatever feed came after it, so its minutes stay visible.
     last_nursing: Record | None = None
@@ -121,6 +125,9 @@ class BabyTrackerData:
     # Core PR 7
     # The newest nursing (any baby) or pump, and its side, as the app shows before the next.
     last_breast: LastBreast | None = None
+    # Core PR 28
+    # The name of each activity type a baby has an activity of, by the type's ID.
+    activity_names: dict[str, str] | None = None
 
 
 def storage_key(entry_id: str) -> str:
@@ -148,6 +155,24 @@ def medicine_key(dose: Medication) -> str | None:
 def _dose_order(dose: Medication) -> tuple[float, str]:
     """Order doses by time, then by record ID, so equal times give the same answer every time."""
     return (dose.time.timestamp() if dose.time is not None else 0.0, dose.object_id)
+
+
+# Core PR 28
+def activity_type_id(activity: OtherActivity) -> str | None:
+    """Return the ID of an activity's type, which the activity embeds, or None without one."""
+    desc: object = activity.desc
+    type_id = desc.get("objectID") if isinstance(desc, dict) else None
+    return type_id if isinstance(type_id, str) and type_id.strip() else None
+
+
+# Core PR 28
+def _activity_order(activity: OtherActivity) -> tuple[float, float, str]:
+    """Order activities by time, then when they were saved, then by record ID."""
+    if TYPE_CHECKING:
+        # Only activities with a time are ordered.
+        assert activity.time is not None
+    stamp = activity.timestamp.timestamp() if activity.timestamp is not None else 0.0
+    return (activity.time.timestamp(), stamp, activity.object_id)
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -304,6 +329,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 vaccine=latest.get("Vaccine"),  # Core PR 25
                 medicine=latest.get("Medication"),  # Core PR 26
                 medicine_doses=self._medicine_doses(baby_id),  # Core PR 26
+                activities=self._activities(baby_id),  # Core PR 28
                 last_nursing=self._last_nursing(latest),  # Core PR 4
             )
         return BabyTrackerData(
@@ -311,11 +337,42 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             last_pump=self.engine.latest_pump(),  # Core PR 5
             pump=self.timers.pump,  # Core PR 21
             last_breast=last_breast(self.engine.records.values(), dt_util.utcnow()),  # Core PR 7
+            activity_names=self._activity_names(babies),  # Core PR 28
         )
 
     # Core PR 23
     def _latest_picture(self, baby_id: str) -> AttachedPicture | None:
         return newest_attached_picture(self.engine.records.values(), baby_id)
+
+    # Core PR 28
+    def _activities(self, baby_id: str) -> dict[str, OtherActivity]:
+        """Return the newest activity of each type the baby has one of."""
+        newest: dict[str, OtherActivity] = {}
+        for record in self.engine.records.values():
+            if not isinstance(record, OtherActivity) or record.baby_id != baby_id:
+                continue
+            type_id = activity_type_id(record)
+            if type_id is None or record.time is None:
+                continue
+            kept = newest.get(type_id)
+            if kept is None or _activity_order(record) > _activity_order(kept):
+                newest[type_id] = record
+        return newest
+
+    # Core PR 28
+    def _activity_names(self, babies: dict[str, BabyData]) -> dict[str, str]:
+        """Return the name of each activity type the babies have an activity of.
+
+        The library chooses the current name (a type synced on its own wins over the copies
+        activities embed), so a type renamed in the app is named anew. A type without a name is
+        named by its ID.
+        """
+        names = {choice.object_id: choice.name for choice in self.engine.activity_choices()}
+        return {
+            type_id: (names.get(type_id) or "").strip() or type_id
+            for baby in babies.values()
+            for type_id in baby.activities or {}
+        }
 
     # Core PR 26
     def _medicine_doses(self, baby_id: str) -> dict[str, Medication]:

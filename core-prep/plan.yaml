@@ -1,10 +1,10 @@
 # The core pull request sequence, as data for scripts/core_cut.py.
 #
-# Every value is the planned core PR that brings an item into core (1 to 27), or `hacs` for an
+# Every value is the planned core PR that brings an item into core (1 to 28), or `hacs` for an
 # item that stays in this repository. A cut for PR N writes everything planned for PRs 1 to N.
 # Python code inside a file is cut by markers in the source: see scripts/core_cut.py.
 
-prs: 27
+prs: 28
 
 # Files of custom_components/baby_tracker/. strings.json, icons.json, services.yaml,
 # manifest.json, and quality_scale.yaml are generated, so they aren't listed.
@@ -100,6 +100,7 @@ keys:
   entity.sensor.last_vaccine: 25
   entity.sensor.last_medicine: 26
   entity.sensor.next_medicine_dose: 26
+  entity.sensor.last_activity: 28
   services.log_diaper: 9
   services.log_bottle: 10
   services.log_nursing: 10
@@ -115,6 +116,7 @@ keys:
   services.start_pump: 21
   services.stop_pump: 21
   services.log_medicine: 26
+  services.log_activity: 28
   selector.diaper_type: 9
   selector.bottle_kind: 10
   selector.finish_side: 10
@@ -157,6 +159,7 @@ keys:
   exceptions.no_pump_timer: 21
   exceptions.pump_not_saved: 21
   exceptions.unknown_medicine: 26
+  exceptions.unknown_activity: 28
   exceptions.invalid_selection_name: 26
   exceptions.ambiguous_selection: 26
   exceptions.no_usual_dose: 26

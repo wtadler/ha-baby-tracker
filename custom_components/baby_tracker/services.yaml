@@ -424,3 +424,40 @@ log_medicine:
       example: 6F1C2A3E-0000-4000-8000-000000000002
       selector:
         text:
+
+log_activity:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: baby_tracker
+    activity:
+      required: true
+      example: Tummy Time
+      selector:
+        text:
+    minutes:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 1440
+          step: 1
+          mode: box
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: On the play mat
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000003
+      selector:
+        text:

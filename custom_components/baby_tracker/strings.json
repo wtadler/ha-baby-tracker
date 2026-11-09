@@ -255,6 +255,17 @@
             "name": "Next dose by medicine"
           }
         }
+      },
+      "last_activity": {
+        "name": "Last {activity}",
+        "state_attributes": {
+          "duration_minutes": {
+            "name": "Duration"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
       }
     },
     "switch": {
@@ -629,6 +640,36 @@
           "description": "How much was given, in the medicine's own unit. Defaults to its usual dose."
         }
       }
+    },
+    "log_activity": {
+      "name": "Log activity",
+      "description": "Adds an activity, such as tummy time, as Home Assistant's own device in the Baby Tracker account. It can be of any activity type the account has: one built into the app, or one added in the app.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "activity": {
+          "name": "Activity",
+          "description": "The activity type's name as the app shows it, such as Tummy Time, or its ID. It must be built into the app or added in the app."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "How long it lasted. Leave it empty or 0 when it wasn't timed."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the activity."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new activity each time."
+        }
+      }
     }
   },
   "selector": {
@@ -772,6 +813,9 @@
     },
     "account_changed": {
       "message": "The account's sync group changed, so Baby Tracker stopped syncing. Open the repair in Settings to start over from the new group."
+    },
+    "unknown_activity": {
+      "message": "Activity {activity} isn't a type the account has. Add the type in the Baby Tracker app first, then use its name as the app shows it."
     }
   },
   "issues": {

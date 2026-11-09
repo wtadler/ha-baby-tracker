@@ -95,6 +95,9 @@
       },
       "next_medicine_dose": {
         "default": "mdi:pill-multiple"
+      },
+      "last_activity": {
+        "default": "mdi:run"
       }
     },
     "switch": {
@@ -181,6 +184,9 @@
     },
     "log_medicine": {
       "service": "mdi:pill"
+    },
+    "log_activity": {
+      "service": "mdi:run"
     }
   }
 }

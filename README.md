@@ -34,6 +34,7 @@ Each baby in the account becomes a device with:
 | **Last milestone**, **Last vaccine** | The newest one, by name, with when it was, its description, ID, and note as attributes. |
 | **Last medicine** | The medicine of the newest dose, with the dose's amount and unit, time, medicine ID, and note as attributes. |
 | **Next medicine dose** | When the newest dose's medicine can be given again: the dose's time plus the medicine's interval (in minutes, as the app stores it). Unknown when the medicine has no interval. The `medicines` attribute holds every medicine's own next time by name, so two alternating medicines each show theirs. A time in the past means it can be given now. It comes from synced doses, so it can lag a dose given on a phone by one poll. |
+| **Last** *activity*, such as **Last Tummy Time** or **Last Bath** | One for each activity type the baby has been logged with: when the newest activity of that type was, with its minutes (`duration_minutes`) and note as attributes. Both the app's built-in types (Crawling, Cruising, Tummy Time, TV Time, Story Time) and types added in the app count; the app has no bath screen, for example, so a bath is usually an activity type someone added. A type's sensor appears once the baby has an activity of it, and keeps its entity ID and history if the type is renamed in the app (the new name shows after a restart). |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
 
 Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
@@ -112,6 +113,7 @@ A baby's actions take the baby's device as `device_id`. The account's actions ta
 | `baby_tracker.start_nursing`, `baby_tracker.switch_nursing_side`, `baby_tracker.stop_nursing`, `baby_tracker.discard_nursing` | Run Home Assistant's nursing timer. |
 | `baby_tracker.start_pump`, `baby_tracker.stop_pump` | Run the account's pump timer. `stop_pump` takes an optional `amount`. |
 | `baby_tracker.log_medicine` | Log a dose of a medicine the account has used. Fields: `device_id` (the baby), `medicine` (its name as the app shows it, or its ID), `amount` (in the medicine's own unit; defaults to its usual dose), `time`, `note`, and `object_id`. A name two medicines share is refused until you give the ID. |
+| `baby_tracker.log_activity` | Log an activity of any type the account has: one built into the app, such as Tummy Time, or one added in the app, such as Bath. Fields: `device_id` (the baby), `activity` (the type's name as the app shows it, or its ID), `minutes` (how long it lasted, up to a day; 0 or empty when not timed), `time`, `note`, and `object_id`. A type has to exist in the app first: this can't add a new one. A name two types share is refused until you give the ID. |
 | `baby_tracker.undo` | Delete the newest record Home Assistant wrote, or one by `object_id`. |
 
 Times default to now, except for `log_sleep`, which needs a start and an end. The `log_*` actions
