@@ -67,7 +67,7 @@ All three were observed in captures on 2026-10-26.
 Two more are used for babies and [selections](#selections) only. Neither was captured (unconfirmed):
 
 - `3`: relive. A device that refuses a delete because the baby or selection still has records posts this, carrying its own copy, so the other devices restore it.
-- `4`: conflict. The payload is a `ConflictRecord` with `winner` and `loser`, each a full baby or selection. Receivers move the loser's records to the winner. See [Selections](#selections).
+- `4`: conflict. The payload has a `winner` and a `loser`, each a full baby or selection. Receivers move the loser's records to the winner. See [Selections](#selections).
 
 ## Timers
 
@@ -95,7 +95,7 @@ Fields observed beyond the shared ones (`BCObjectType`, `objectID`, `time`, `tim
 | `Pumped` (a bottle of pumped milk) | `amount` |
 | `Pump` | `amount` (total), `leftAmount`, `rightAmount`, `leftDuration`, `rightDuration`, `finishSide`, `sides` (a timed pump with no volume carries `amount` 0; no `baby`: a pump belongs to the account, and `leftAmount` and `rightAmount` appear only when per-side amounts were entered) |
 | `Nursing` | `leftDuration`, `rightDuration`, `bothDuration`, `finishSide`, `isDetailed`, `pairSessionState`, `state` |
-| `NursingSession` (Android's timed nursing) | Everything `Nursing` has, plus `detailed`, `leftTimestamps`, and `rightTimestamps`. It counts as a nursing feed. |
+| `NursingSession` (Android's timed nursing) | The `Nursing` keys, with `isDetailed` spelled `detailed`, plus `leftTimestamps` and `rightTimestamps`. It counts as a nursing feed. |
 | `Sleep` | `duration` (minutes; 0 while running) |
 | `Diaper` | `status` (0 wet, 1 dirty, 2 mixed), `amount`, `peeColor`, `pooColor`, `texture`, `flag` |
 
@@ -114,7 +114,7 @@ None of these were captured, so the keys are unconfirmed. Each record type below
 | Type | Keys beyond the shared ones |
 |---|---|
 | `Medication` (a dose; stored in the `Medicine` table) | `amount` (a plain number), `medicationSelection` (the medicine) |
-| `NursingSession` (Android's nursing timer) | the `Nursing` keys, plus `detailed`, `state`, `pairSessionState`, `leftTimestamps`, `rightTimestamps` |
+| `NursingSession` (Android's nursing timer) | see [Payloads by type](#payloads-by-type) |
 | `Temperature` | `temperature` (a measure) |
 | `Growth` | `weight` (a measure), `length` and `head` (each a measure), `deleted`, `queryIndex` |
 | `OtherFeed` (solids and other foods) | `feedType` (the food, a selection), `desc` (a selection), `amount` (a measure), `unit` (free text) |
@@ -168,9 +168,9 @@ The codes in these payloads. Only the nursing and pump `finishSide` codes and th
 The iOS side is from the captures above. The Android side is unconfirmed, except where noted.
 
 - **Booleans.** Android sends JSON booleans for `newFlage`, `pictureLoaded`, `gender`, `englishMeasure`, and selection flags such as `prescription` and `bottle`. In the iOS captures, `newFlage`, `pictureLoaded`, `gender`, and `englishMeasure` are the strings `"true"` and `"false"`.
-- **Nested objects.** Android labels only the top-level record with `BCObjectType`, and a `ConflictRecord`'s `winner` and `loser`. The embedded baby, selections, measures, and pictures carry none. iOS labels the nested ones too, such as `"BCObjectType": "VolumeMeasure"`.
+- **Nested objects.** Android labels only the top-level record with `BCObjectType`, and a conflict payload's `winner` and `loser`. The embedded baby, selections, measures, and pictures carry none. iOS labels the nested ones too, such as `"BCObjectType": "VolumeMeasure"`.
 - **Object IDs.** Android's new IDs are lowercase UUIDs. iOS IDs are uppercase.
-- **Fewer keys on Android.** Android's `Diaper` has only `status` and `amount`, with no `peeColor`, `pooColor`, `texture`, or `flag`. Its `Nursing` has only the three durations and `finishSide`. `isDetailed`, `state`, and `pairSessionState` are on iOS's `Nursing` but only on Android's `NursingSession`, where the first is spelled `detailed`.
+- **Fewer keys on Android.** Android's `Diaper` has only `status` and `amount`, with no `peeColor`, `pooColor`, `texture`, or `flag`. Its `Nursing` has only the three durations and `finishSide`. Android's timed nursing is a `NursingSession`, which has more keys than its `Nursing` (see [Payloads by type](#payloads-by-type)).
 - **Dates** are the same on both: `yyyy-MM-dd HH:mm:ss +0000`, in UTC.
 - **How Android writes enum codes.** An Android phone on a real account sent digit strings such as `"1"` where iOS sends ints ([ha-baby-tracker#122](https://github.com/wtadler/ha-baby-tracker/issues/122)). That was seen. Whether any Android build sends constant names instead is unconfirmed, so read an int or a digit string.
 - **The iOS medicine flag.** iOS records on a real account spell `prescription` as `isPresciption` ([ha-baby-tracker#121](https://github.com/wtadler/ha-baby-tracker/issues/121)).
