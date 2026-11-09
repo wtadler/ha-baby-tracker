@@ -562,6 +562,23 @@ def test_every_planned_cut_has_no_trace_of_the_hacs_repository(
                 assert trace not in text, (name, trace)
 
 
+def _auth_handler_names(source: str) -> set[str]:
+    """Return the names used where the coordinator handles a rejected sign-in.
+
+    Only that path must avoid ConfigEntryError. A sync group change stops the entry with one
+    (PR 27), which has nothing to do with the password.
+    """
+    return {
+        node.id
+        for handler in ast.walk(ast.parse(source))
+        if isinstance(handler, ast.ExceptHandler)
+        and isinstance(handler.type, ast.Name)
+        and handler.type.id == "AuthenticationError"
+        for node in ast.walk(handler)
+        if isinstance(node, ast.Name)
+    }
+
+
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_cut_raises_config_entry_auth_failed_on_a_rejected_password(
     planned: Callable[[int], dict[Path, str]], number: int
@@ -571,7 +588,7 @@ def test_every_cut_raises_config_entry_auth_failed_on_a_rejected_password(
     # instead of sending the rejected password at every interval.
     source = planned(number)[COMPONENT / "coordinator.py"]
     assert "raise ConfigEntryAuthFailed(" in source
-    assert "ConfigEntryError" not in source
+    assert "ConfigEntryError" not in _auth_handler_names(source)
     assert 'translation_key="auth_failed"' in source
 
 
@@ -604,8 +621,9 @@ def test_the_repository_still_raises_config_entry_auth_failed() -> None:
         and isinstance(node.exc.func, ast.Name)
     }
     assert "ConfigEntryAuthFailed" in raised
-    assert "ConfigEntryError" not in raised
-    assert "ConfigEntryError" not in {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    assert "ConfigEntryError" not in _auth_handler_names(
+        (INTEGRATION / "coordinator.py").read_text()
+    )
 
 
 def test_the_pr1_cut_leaves_out_later_features(core_cut: ModuleType, core: Path) -> None:

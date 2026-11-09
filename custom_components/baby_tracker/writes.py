@@ -67,6 +67,7 @@ from pybabytracker.validation import (
 from .bottle import BOTTLE_KINDS, OUNCES, VOLUME_UNITS, configured_bottle
 from .const import DOMAIN
 from .coordinator import BabyTrackerCoordinator, SyncBeforeWriteError
+from .sync_group import stop_for_group_change  # Core PR 27
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -181,6 +182,8 @@ async def _write[T](
         _LOGGER.error("This device's own log can't be caught up: %s", err)
         raise _own_log_gap(coordinator) from err
     except BabyTrackerError as err:
+        if stop_for_group_change(coordinator, err):  # Core PR 27
+            raise _error("account_changed") from err
         raise _error("write_failed", error=str(err)) from err
     forget_gap(coordinator.hass, coordinator.config_entry.entry_id)
     return result

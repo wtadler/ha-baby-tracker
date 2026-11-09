@@ -33,6 +33,8 @@ class FakeServer:
     def __init__(self) -> None:
         """Set up an empty service."""
         self.password = PASSWORD
+        # The sync group's AccountID. A test changes it to reset the group, as the app can.
+        self.account_id = 100  # Core PR 27
         self.logs: dict[str, list[dict[str, Any]]] = {}
         self.names: dict[str, str] = {}
         self.sign_in_error: Exception | None = None
@@ -158,6 +160,7 @@ class FakeClient:
         self.device_name = device_name
         self.kwargs = kwargs
         self.closed = False
+        self.account_id: int | None = None  # Core PR 27
         self._signed_in = False
         server.clients.append(self)
 
@@ -179,6 +182,8 @@ class FakeClient:
         return 1
 
     async def _ensure_session(self) -> None:
+        # A reset on the service shows on the next request.
+        self.account_id = self.server.account_id  # Core PR 27
         if self.server.request_error is not None:
             raise self.server.request_error
         if not self._signed_in or self.password != self.server.password:

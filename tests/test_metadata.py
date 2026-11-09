@@ -641,3 +641,16 @@ def test_the_pump_timer_errors_repair_entities_and_icons_are_translated() -> Non
     icons = _icons()["entity"]
     assert icons["switch"]["pump"]["state"]["on"] != icons["switch"]["pump"]["state"]["off"]
     assert icons["sensor"]["pump_timer"]["default"].startswith("mdi:")
+
+
+def test_the_sync_group_repair_and_its_error_are_translated() -> None:
+    for name in ("strings.json", "translations/en.json"):
+        strings = load_integration_json(name)
+        assert strings["exceptions"]["account_changed"]["message"]
+        repair = strings["issues"]["sync_group_changed"]
+        assert "{account}" in repair["title"]
+        confirm = repair["fix_flow"]["step"]["confirm"]
+        assert confirm["title"]
+        assert "{account}" in confirm["description"]
+        assert "Nothing is lost" in confirm["description"]
+        assert repair["fix_flow"]["abort"]["reload_failed"]

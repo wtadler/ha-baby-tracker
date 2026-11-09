@@ -189,6 +189,11 @@ to save it, or press **Discard nursing** to drop a nursing one.
 skipped or overwritten. Delete the account's entry under **Settings > Devices & services** and add
 it again with the same email and password.
 
+**A repair says the sync group changed.** Sync was reset in the Baby Tracker app, so the account now
+uses a different sync group, and Baby Tracker stopped syncing. Fix the repair under **Settings >
+Repairs**: it deletes the sync data Home Assistant saved and loads the new group from the start.
+Nothing is lost from the account.
+
 **No Live Activity appears.** Open the automation's trace. If it shows the `notify` action sent,
 the phone is dropping it: under **Settings > Apps > Home Assistant > Live Activities** on the
 iPhone, turn Live Activities off and back on, then start a timer again.

@@ -769,6 +769,9 @@
     },
     "unknown_medicine": {
       "message": "Medicine {medicine} isn't one the account has used or added in the app. Check the name as the app shows it."
+    },
+    "account_changed": {
+      "message": "The account's sync group changed, so Baby Tracker stopped syncing. Open the repair in Settings to start over from the new group."
     }
   },
   "issues": {
@@ -787,6 +790,20 @@
     "pump_timer_long": {
       "title": "The pump timer has run for over an hour",
       "description": "Home Assistant's pump timer has been running for more than an hour. The Baby Tracker app doesn't show a running pump, so nothing else will end it.\n\nTo fix it, turn off the Pump timer switch, or call the Stop pump action, to save the session. A session is saved as at most 240 minutes. If the session wasn't real, use the Undo action to delete the record Home Assistant just saved.\n\nThis notice goes away when the timer stops."
+    },
+    "sync_group_changed": {
+      "title": "The sync group changed for {account}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Start over from the new sync group?",
+            "description": "Sync was reset in the Baby Tracker app for {account}, so the account now uses a different sync group. Baby Tracker stopped syncing so nothing from the old group is mixed in.\n\nFixing it deletes the sync data saved in Home Assistant and loads the new group from the start. Nothing is lost from the account: the records stay in the Baby Tracker app. Select Submit to continue."
+          }
+        },
+        "abort": {
+          "reload_failed": "The account couldn't load yet. The saved sync data is cleared, and this repair goes away once syncing works. If it doesn't, fix the repair again."
+        }
+      }
     }
   }
 }

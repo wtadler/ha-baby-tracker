@@ -25,6 +25,7 @@ from .coordinator import (
     storage_key,
 )
 from .services import async_setup_services  # Core PR 9
+from .sync_group import forget_group_change  # Core PR 27
 from .timer_state import (  # Core PR 18
     nursing_storage_key,
     pump_storage_key,  # Core PR 21
@@ -149,6 +150,7 @@ async def async_unload_entry(
 async def async_remove_entry(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
     """Delete what the entry saved."""
     forget_gap(hass, entry.entry_id)  # Core PR 11
+    forget_group_change(hass, entry.entry_id)  # Core PR 27
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
     # Core PR 18
     await Store(hass, STORAGE_VERSION, nursing_storage_key(entry.entry_id)).async_remove()
