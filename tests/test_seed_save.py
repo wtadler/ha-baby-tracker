@@ -5,16 +5,18 @@ import io
 import sqlite3
 import zipfile
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from homeassistant.core import HomeAssistant
+from pybabytracker import BabyTrackerConnectionError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.baby_tracker.const import DOMAIN
 
 from . import BABY_ONE_ID, tick
 from .factories import DEVICE_A, at
-from .fake_server import FakeClient
+from .fake_server import FakeClient, FakeServer
 
 OLD_DIAPER = "D0000000-0000-4000-8000-0000000000AA"
 
@@ -43,8 +45,12 @@ def _seed_zip(object_id: str, when: float) -> bytes:
 
 
 @pytest.fixture
-def seed_downloads(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Give every fake client a seed, and count its downloads."""
+def seed_downloads(init_integration: MockConfigEntry, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Give every fake client a seed, and count its downloads.
+
+    The entry is set up first, with no seed, so its first sync moves a log forward and saves.
+    The seed is then read by a later sync that moves no log: the case these tests cover.
+    """
     seed = _seed_zip(OLD_DIAPER, at(-600).timestamp())
     downloads: list[int] = []
 
@@ -74,7 +80,7 @@ async def test_a_sync_that_reads_the_seed_saves_it(
 
     saved = _saved(hass_storage, init_integration)
     assert seed_downloads == [1]
-    assert saved["seeded"] is True
+    assert saved["seeded"] == 1
     assert saved["last_seen"] == {DEVICE_A: 2}
     assert OLD_DIAPER in {entry["payload"]["objectID"] for entry in saved["records"]}
 
@@ -94,4 +100,30 @@ async def test_a_restart_after_the_seed_was_saved_does_not_read_it_again(
     await tick(hass)
 
     assert seed_downloads == [1]
-    assert _saved(hass_storage, init_integration)["seeded"] is True
+    assert _saved(hass_storage, init_integration)["seeded"] == 1
+
+
+async def test_a_sync_that_fails_after_reading_the_seed_still_saves_it(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    hass_storage: dict[str, Any],
+    seed_downloads: list[int],
+) -> None:
+    """Test the seed is saved when the device list fails after it was read."""
+    real_get_seed = FakeClient.get_seed  # type: ignore[attr-defined]
+
+    async def get_seed_then_fail(client: FakeClient) -> bytes:
+        seed: bytes = await real_get_seed(client)
+        server.request_error = BabyTrackerConnectionError("down")
+        return seed
+
+    with patch.object(FakeClient, "get_seed", get_seed_then_fail, create=True):
+        await tick(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    saved = _saved(hass_storage, init_integration)
+    assert seed_downloads == [1]
+    assert saved["seeded"] == 1
+    assert saved["last_seen"] == {DEVICE_A: 2}
+    assert OLD_DIAPER in {entry["payload"]["objectID"] for entry in saved["records"]}
