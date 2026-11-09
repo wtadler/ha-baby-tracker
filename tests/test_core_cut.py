@@ -990,13 +990,29 @@ def _removed_fields(files: dict[Path, str]) -> set[str]:
     return repository - fields(files.get(COMPONENT / "services.py", ""))
 
 
+# The methods of ``hass.services`` whose arguments are a domain and an action.
+_NAMES_AN_ACTION = {
+    "call",
+    "has_service",
+    "async_remove",
+    "remove",
+    "supports_response",
+    "async_register",
+    "register",
+}
+
+
 def _action_call(node: ast.AST) -> tuple[ast.expr | None, list[ast.expr]] | None:
-    """The action and data of a call to one of the integration's actions, else None."""
-    if not (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "async_call"
-    ):
+    """The action and data of a call that names one of the integration's actions, else None.
+
+    That's ``async_call`` (or ``call``) for the integration's domain, or another method of
+    ``hass.services`` that takes a domain and an action (``has_service``, ``async_remove``, and
+    so on).
+    """
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+        return None
+    registry = isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "services"
+    if node.func.attr != "async_call" and not (registry and node.func.attr in _NAMES_AN_ACTION):
         return None
     keywords = {k.arg: k.value for k in node.keywords if k.arg}
     domain = node.args[0] if node.args else keywords.get("domain")
@@ -1080,7 +1096,8 @@ def _actions_called(files: dict[Path, str]) -> list[str]:
     """Where a test of the cut calls an action the cut's services.yaml doesn't have.
 
     An action is called by name in ``async_call`` for the integration's domain, or as the
-    ``action`` argument of a test helper that makes such a call. A name the call reads is
+    ``action`` argument of a test helper that makes such a call. Only the repository's own
+    actions count, so a test that an action doesn't exist isn't one. A name the call reads is
     followed to what it's built from: the function's own assignments, the values of its
     ``parametrize`` argument, and the tests' top-level tables. There, any string that names
     one of the repository's actions counts, unless it's only compared against.
@@ -1174,7 +1191,7 @@ def _actions_called(files: dict[Path, str]) -> list[str]:
                     action = node.args[index] if len(node.args) > index else keywords.get("action")
                 if (
                     isinstance(action, ast.Constant)
-                    and isinstance(action.value, str)
+                    and action.value in known
                     and action.value not in services
                 ):
                     found.add((str(path), action.lineno, action.value))
@@ -1435,6 +1452,28 @@ def test_the_registration_check_reads_the_registered_names() -> None:
     }
     assert _registered_actions(files) == {"log_diaper", "log_bottle"}
     assert _registered_actions({}) == set()
+
+
+def test_the_action_check_reads_every_service_registry_call_that_names_an_action() -> None:
+    test = (
+        "async def test_a(hass):\n"
+        "    assert hass.services.has_service(DOMAIN, 'log_diaper')\n"
+        "    assert hass.services.has_service(DOMAIN, 'undo')\n"
+        "    hass.services.async_remove(DOMAIN, 'log_pump')\n"
+        "    assert hass.services.supports_response(domain=DOMAIN, service='log_sleep')\n"
+        "    assert not hass.services.has_service('switch', 'undo')\n"
+        "    assert other.has_service(DOMAIN, 'undo')\n"
+        "    assert not hass.services.has_service(DOMAIN, 'log_milestone')\n"
+    )
+    files = {
+        COMPONENT / "services.yaml": "log_diaper:\n  fields: {}\n",
+        TESTS / "test_x.py": test,
+    }
+    assert _actions_called(files) == [
+        f"{TESTS / 'test_x.py'}:3: undo",
+        f"{TESTS / 'test_x.py'}:4: log_pump",
+        f"{TESTS / 'test_x.py'}:5: log_sleep",
+    ]
 
 
 def test_a_cut_with_no_services_yaml_has_no_actions() -> None:

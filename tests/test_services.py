@@ -375,7 +375,7 @@ async def test_the_actions_exist_even_before_any_entry_is_set_up(hass: HomeAssis
 
     assert await async_setup_component(hass, DOMAIN, {})
     assert hass.services.has_service(DOMAIN, "log_diaper")
-    assert hass.services.has_service(DOMAIN, "undo")
+    assert hass.services.has_service(DOMAIN, "undo")  # Core PR 13
 
 
 async def test_a_successful_write_updates_the_sensor_without_waiting_for_the_next_sync(
@@ -443,7 +443,7 @@ async def test_both_accounts_work_with_two_config_entries(
     second_server: FakeServer,
 ) -> None:
     assert hass.services.has_service(DOMAIN, "log_diaper")
-    assert hass.services.has_service(DOMAIN, "undo")
+    assert hass.services.has_service(DOMAIN, "undo")  # Core PR 13
 
     await log_diaper(hass, BABY_ONE_ID, "wet", note="first account")
     await log_diaper(hass, BABY_THREE_ID, "mixed", note="second account")

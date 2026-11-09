@@ -120,7 +120,11 @@ def account_device(hass: HomeAssistant, entry: MockConfigEntry) -> dr.DeviceEntr
 
 # Core PR 12
 # The actions that name the account (a pump belongs to it), not a baby.
-ACCOUNT_ACTIONS = ("log_pump", "start_pump", "stop_pump")
+ACCOUNT_ACTIONS = (
+    "log_pump",
+    "start_pump",  # Core PR 21
+    "stop_pump",  # Core PR 21
+)
 
 
 # Core PR 9
