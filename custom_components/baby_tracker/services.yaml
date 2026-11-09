@@ -387,3 +387,40 @@ discard_nursing:
         device:
           filter:
             - integration: baby_tracker
+
+log_medicine:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: baby_tracker
+    medicine:
+      required: true
+      example: Pain reliever drops
+      selector:
+        text:
+    amount:
+      required: false
+      example: 2.5
+      selector:
+        number:
+          min: 0.01
+          max: 1000
+          step: 0.05
+          mode: box
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: After fever
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000002
+      selector:
+        text:

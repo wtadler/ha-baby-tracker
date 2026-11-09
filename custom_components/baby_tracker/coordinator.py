@@ -24,11 +24,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util  # Core PR 7
 from pybabytracker import (
     AuthenticationError,
+    Baby,  # Core PR 23
     BabyTrackerClient,
     BabyTrackerError,
     DayTotals,  # Core PR 7
     Formula,
     LastBreast,  # Core PR 7
+    Medication,  # Core PR 26
     Nursing,
     NursingTimer,  # Core PR 18
     Pumped,
@@ -48,6 +50,11 @@ from .const import (
     is_account_identifier,  # Core PR 6
 )
 from .guard import TimerGuard  # Core PR 18
+from .pictures import (  # Core PR 23
+    AttachedPicture,
+    PictureCache,
+    newest_attached_picture,
+)
 from .timer_state import TimerState  # Core PR 18
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,6 +76,19 @@ class BabyData:
     sleep: Record | None = None
     today: DayTotals = DayTotals()  # Core PR 7
     nursing: NursingTimer | None = None  # Core PR 18
+    # Core PR 23
+    # The baby's photo in the app (the cover photo), as a file on the service.
+    photo_file: str | None = None
+    # Core PR 23
+    # The newest picture attached to any of the baby's records.
+    latest_picture: AttachedPicture | None = None
+    milestone: Record | None = None  # Core PR 24
+    vaccine: Record | None = None  # Core PR 25
+    medicine: Record | None = None  # Core PR 26
+    # Core PR 26
+    # The newest dose of each medicine, by the medicine's ID (or its name when it has none), so
+    # the next dose of every medicine is known when two of them alternate.
+    medicine_doses: dict[str, Medication] | None = None
     # Core PR 4
     # The newest nursing, whatever feed came after it, so its minutes stay visible.
     last_nursing: Record | None = None
@@ -100,6 +120,28 @@ class BabyTrackerData:
 def storage_key(entry_id: str) -> str:
     """Return the storage key for an entry's sync state."""
     return f"{DOMAIN}.{entry_id}"
+
+
+# Core PR 23
+def _photo_file(baby: Baby | None) -> str | None:
+    return baby.picture_file if baby is not None else None
+
+
+# Core PR 26
+def medicine_key(dose: Medication) -> str | None:
+    """Return what tells a dose's medicine from the others: its ID, or else its name."""
+    selection = dose.medication_selection
+    object_id = selection.get("objectID") if isinstance(selection, dict) else None
+    if isinstance(object_id, str) and object_id.strip():
+        return object_id
+    name = dose.medicine_name
+    return name if name is not None and name.strip() else None
+
+
+# Core PR 26
+def _dose_order(dose: Medication) -> tuple[float, str]:
+    """Order doses by time, then by record ID, so equal times give the same answer every time."""
+    return (dose.time.timestamp() if dose.time is not None else 0.0, dose.object_id)
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -140,6 +182,12 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             always_update=False,
         )
         self.client = client
+        # Core PR 23
+        # A picture download is a background task of the entry, which stops it on unload.
+        self.pictures = PictureCache(
+            client,
+            lambda download, name: entry.async_create_background_task(hass, download, name),
+        )
         self.session = session
         self._device_uuid: str = entry.data[CONF_DEVICE_UUID]
         self.engine = SyncEngine(self._device_uuid)
@@ -233,6 +281,12 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 sleep=latest.get("Sleep"),
                 today=self._today(baby_id),  # Core PR 7
                 nursing=self.timers.nursing.get(baby_id),  # Core PR 18
+                photo_file=_photo_file(self.engine.babies().get(baby_id)),  # Core PR 23
+                latest_picture=self._latest_picture(baby_id),  # Core PR 23
+                milestone=latest.get("Milestone"),  # Core PR 24
+                vaccine=latest.get("Vaccine"),  # Core PR 25
+                medicine=latest.get("Medication"),  # Core PR 26
+                medicine_doses=self._medicine_doses(baby_id),  # Core PR 26
                 last_nursing=self._last_nursing(latest),  # Core PR 4
             )
         return BabyTrackerData(
@@ -241,6 +295,25 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             pump=self.timers.pump,  # Core PR 21
             last_breast=last_breast(self.engine.records.values(), dt_util.utcnow()),  # Core PR 7
         )
+
+    # Core PR 23
+    def _latest_picture(self, baby_id: str) -> AttachedPicture | None:
+        return newest_attached_picture(self.engine.records.values(), baby_id)
+
+    # Core PR 26
+    def _medicine_doses(self, baby_id: str) -> dict[str, Medication]:
+        """Return the newest dose of each medicine the baby was given."""
+        newest: dict[str, Medication] = {}
+        for record in self.engine.records.values():
+            if not isinstance(record, Medication) or record.baby_id != baby_id:
+                continue
+            key = medicine_key(record)
+            if key is None or record.time is None:
+                continue
+            kept = newest.get(key)
+            if kept is None or _dose_order(record) > _dose_order(kept):
+                newest[key] = record
+        return newest
 
     # Core PR 4
     def _last_nursing(self, latest: dict[str, Record]) -> Record | None:
@@ -261,6 +334,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         data = self._snapshot()
         self._remove_deleted_devices(data)  # Core PR 6
         self._baby_names = {baby_id: baby.name for baby_id, baby in data.babies.items()}
+        self.pictures.set_babies(len(data.babies))  # Core PR 23
         # Core PR 18
         # The saved copy of an orphaned nursing timer is dropped in a task the entry tracks.
         self.timers.drop_orphaned_nursing(data.babies)

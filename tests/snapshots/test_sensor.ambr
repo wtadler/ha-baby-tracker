@@ -283,6 +283,115 @@
     'state': '2026-10-25T13:00:00+00:00',
   })
 # ---
+# name: test_sensors[sensor.baby_one_last_medicine-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_medicine',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last medicine',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last medicine',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_medicine',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_medicine',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_medicine-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'amount': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last medicine',
+      'medicine_id': None,
+      'note': None,
+      'time': None,
+      'unit': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_medicine',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_milestone-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_milestone',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last milestone',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last milestone',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_milestone',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_milestone',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_milestone-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'description': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last milestone',
+      'milestone_id': None,
+      'note': None,
+      'time': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_milestone',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
 # name: test_sensors[sensor.baby_one_last_nursing-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -605,6 +714,114 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '45',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_vaccine-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_last_vaccine',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last vaccine',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last vaccine',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_vaccine',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_last_vaccine',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_last_vaccine-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'description': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Last vaccine',
+      'note': None,
+      'time': None,
+      'vaccine_id': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_last_vaccine',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_one_next_medicine_dose-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_one_next_medicine_dose',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Next medicine dose',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Next medicine dose',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'next_medicine_dose',
+    'unique_id': '11111111-AAAA-4AAA-8AAA-000000000001_next_medicine_dose',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_one_next_medicine_dose-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby One Next medicine dose',
+      'medicine': None,
+      'medicines': dict({
+      }),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_one_next_medicine_dose',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
   })
 # ---
 # name: test_sensors[sensor.baby_one_nursing_left_time-entry]
@@ -1337,6 +1554,115 @@
     'state': 'unknown',
   })
 # ---
+# name: test_sensors[sensor.baby_two_last_medicine-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_medicine',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last medicine',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last medicine',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_medicine',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_medicine',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_medicine-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'amount': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last medicine',
+      'medicine_id': None,
+      'note': None,
+      'time': None,
+      'unit': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_medicine',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_milestone-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_milestone',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last milestone',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last milestone',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_milestone',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_milestone',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_milestone-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'description': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last milestone',
+      'milestone_id': None,
+      'note': None,
+      'time': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_milestone',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
 # name: test_sensors[sensor.baby_two_last_nursing-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -1655,6 +1981,114 @@
     }),
     'context': <ANY>,
     'entity_id': 'sensor.baby_two_last_sleep_duration',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_vaccine-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_last_vaccine',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last vaccine',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last vaccine',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_vaccine',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_last_vaccine',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_last_vaccine-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'description': None,
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Last vaccine',
+      'note': None,
+      'time': None,
+      'vaccine_id': None,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_last_vaccine',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.baby_two_next_medicine_dose-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.baby_two_next_medicine_dose',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Next medicine dose',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Next medicine dose',
+    'platform': 'baby_tracker',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'next_medicine_dose',
+    'unique_id': '22222222-BBBB-4BBB-8BBB-000000000002_next_medicine_dose',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.baby_two_next_medicine_dose-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Baby Two Next medicine dose',
+      'medicine': None,
+      'medicines': dict({
+      }),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.baby_two_next_medicine_dose',
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,

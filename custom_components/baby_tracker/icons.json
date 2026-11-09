@@ -83,6 +83,18 @@
       },
       "last_breast": {
         "default": "mdi:mother-nurse"
+      },
+      "last_milestone": {
+        "default": "mdi:star"
+      },
+      "last_vaccine": {
+        "default": "mdi:needle"
+      },
+      "last_medicine": {
+        "default": "mdi:pill"
+      },
+      "next_medicine_dose": {
+        "default": "mdi:pill-multiple"
       }
     },
     "switch": {
@@ -113,6 +125,14 @@
           "on": "mdi:water-pump",
           "off": "mdi:water-pump-off"
         }
+      }
+    },
+    "image": {
+      "latest_picture": {
+        "default": "mdi:image"
+      },
+      "photo": {
+        "default": "mdi:account-box"
       }
     }
   },
@@ -158,6 +178,9 @@
     },
     "stop_pump": {
       "service": "mdi:timer-stop"
+    },
+    "log_medicine": {
+      "service": "mdi:pill"
     }
   }
 }

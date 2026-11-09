@@ -24,6 +24,7 @@ from .writes import (
     async_discard_nursing,
     async_log_bottle,
     async_log_diaper,
+    async_log_medicine,  # Core PR 26
     async_log_nursing,
     async_log_pump,
     async_log_sleep,
@@ -63,6 +64,7 @@ class BabyTrackerServiceArgument(StrEnum):
     START = "start"
     END = "end"
     SIDE = "side"
+    MEDICINE = "medicine"  # Core PR 26
 
 
 def _uuid_upper(value: object) -> str:
@@ -96,6 +98,30 @@ def _baby_schema(fields: dict[Any, Any]) -> probatio.All[Any]:
 LOG_DIAPER_SCHEMA = _baby_schema(
     {
         probatio.Required(BabyTrackerServiceArgument.TYPE): probatio.In(list(DIAPER_STATUS)),
+        probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
+    }
+)
+
+
+# Core PR 26
+def _not_a_bool(value: object) -> object:
+    """Refuse a bool, which would otherwise read as the amount 1 or 0."""
+    if isinstance(value, bool):
+        raise probatio.Invalid("an amount must be a number")
+    return value
+
+
+# Core PR 26
+# The medicine is looked up, and the amount checked, in writes.py after the write's own sync, so a
+# medicine first given on a phone minutes ago is found and every refusal is translated.
+LOG_MEDICINE_SCHEMA = _baby_schema(
+    {
+        probatio.Required(BabyTrackerServiceArgument.MEDICINE): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.AMOUNT): probatio.All(
+            _not_a_bool, probatio.Coerce(float)
+        ),
         probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
         probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
         probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
@@ -337,6 +363,20 @@ async def _log_diaper(call: ServiceCall) -> None:
     )
 
 
+# Core PR 26
+async def _log_medicine(call: ServiceCall) -> None:
+    coordinator, baby_id = _baby(call)
+    await async_log_medicine(
+        coordinator,
+        baby_id,
+        call.data[BabyTrackerServiceArgument.MEDICINE],
+        amount=call.data.get(BabyTrackerServiceArgument.AMOUNT),
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
+    )
+
+
 async def _log_bottle(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
     await async_log_bottle(
@@ -506,4 +546,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, BabyTrackerService.DISCARD_NURSING, _discard_nursing, schema=BABY_ONLY_SCHEMA
+    )
+    hass.services.async_register(  # Core PR 26
+        DOMAIN, BabyTrackerService.LOG_MEDICINE, _log_medicine, schema=LOG_MEDICINE_SCHEMA
     )

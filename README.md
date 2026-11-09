@@ -29,6 +29,11 @@ Each baby in the account becomes a device with:
 | **Wet diaper**, **Dirty diaper**, **Mixed diaper**, **Bottle** buttons | Log that record now. The bottle is the one set in the options. |
 | **Sleep**, **Nursing left**, **Nursing right** switches | Start and stop timers. See [Timers](#timers). |
 | **Nursing left time**, **Nursing right time**, **Discard nursing** | The running nursing session's minutes per side, and a way to drop it. |
+| **Photo** | The baby's photo in the app, as an image. It is downloaded the first time something asks to show it. |
+| **Latest picture** | The newest picture attached to any of the baby's entries, with the entry's type, ID, and time as attributes. It is off by default, because it can show any entry's photo, a diaper's included. Turn it on in the entity settings. |
+| **Last milestone**, **Last vaccine** | The newest one, by name, with when it was, its description, ID, and note as attributes. |
+| **Last medicine** | The medicine of the newest dose, with the dose's amount and unit, time, medicine ID, and note as attributes. |
+| **Next medicine dose** | When the newest dose's medicine can be given again: the dose's time plus the medicine's interval (in minutes, as the app stores it). Unknown when the medicine has no interval. The `medicines` attribute holds every medicine's own next time by name, so two alternating medicines each show theirs. A time in the past means it can be given now. It comes from synced doses, so it can lag a dose given on a phone by one poll. |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
 
 Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
@@ -106,6 +111,7 @@ A baby's actions take the baby's device as `device_id`. The account's actions ta
 | `baby_tracker.start_sleep`, `baby_tracker.stop_sleep` | Start or end the baby's sleep timer. |
 | `baby_tracker.start_nursing`, `baby_tracker.switch_nursing_side`, `baby_tracker.stop_nursing`, `baby_tracker.discard_nursing` | Run Home Assistant's nursing timer. |
 | `baby_tracker.start_pump`, `baby_tracker.stop_pump` | Run the account's pump timer. `stop_pump` takes an optional `amount`. |
+| `baby_tracker.log_medicine` | Log a dose of a medicine the account has used. Fields: `device_id` (the baby), `medicine` (its name as the app shows it, or its ID), `amount` (in the medicine's own unit; defaults to its usual dose), `time`, `note`, and `object_id`. A name two medicines share is refused until you give the ID. |
 | `baby_tracker.undo` | Delete the newest record Home Assistant wrote, or one by `object_id`. |
 
 Times default to now, except for `log_sleep`, which needs a start and an end. The `log_*` actions

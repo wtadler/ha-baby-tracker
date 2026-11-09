@@ -190,6 +190,71 @@
             "name": "Time"
           }
         }
+      },
+      "last_milestone": {
+        "name": "Last milestone",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "description": {
+            "name": "Description"
+          },
+          "milestone_id": {
+            "name": "Milestone ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "last_vaccine": {
+        "name": "Last vaccine",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "description": {
+            "name": "Description"
+          },
+          "vaccine_id": {
+            "name": "Vaccine ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "last_medicine": {
+        "name": "Last medicine",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          },
+          "amount": {
+            "name": "Amount"
+          },
+          "unit": {
+            "name": "Unit"
+          },
+          "medicine_id": {
+            "name": "Medicine ID"
+          },
+          "note": {
+            "name": "Note"
+          }
+        }
+      },
+      "next_medicine_dose": {
+        "name": "Next medicine dose",
+        "state_attributes": {
+          "medicine": {
+            "name": "Medicine"
+          },
+          "medicines": {
+            "name": "Next dose by medicine"
+          }
+        }
       }
     },
     "switch": {
@@ -204,6 +269,25 @@
       },
       "pump": {
         "name": "Pump timer"
+      }
+    },
+    "image": {
+      "latest_picture": {
+        "name": "Latest picture",
+        "state_attributes": {
+          "record_id": {
+            "name": "Entry ID"
+          },
+          "record_type": {
+            "name": "Entry type"
+          },
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "photo": {
+        "name": "Photo"
       }
     }
   },
@@ -515,6 +599,36 @@
           "description": "An optional note to save with the pump."
         }
       }
+    },
+    "log_medicine": {
+      "name": "Log medicine",
+      "description": "Adds a dose of a medicine a baby was given, as Home Assistant's own device in the Baby Tracker account.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it happened. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the dose."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new dose each time."
+        },
+        "medicine": {
+          "name": "Medicine",
+          "description": "The medicine's name as the app shows it. It must be one the account has used or added in the app."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "How much was given, in the medicine's own unit. Defaults to its usual dose."
+        }
+      }
     }
   },
   "selector": {
@@ -624,7 +738,7 @@
       "message": "Give the name or the ID of an entry."
     },
     "ambiguous_selection": {
-      "message": "More than one entry has that name. Use its ID instead."
+      "message": "More than one {medicine} is on the account. Use the ID of the one you mean: {ids}"
     },
     "no_usual_dose": {
       "message": "This medicine has no usual dose, so give an amount."
@@ -652,6 +766,9 @@
     },
     "minutes_with_sides": {
       "message": "Give the minutes or the minutes for each side, not both."
+    },
+    "unknown_medicine": {
+      "message": "Medicine {medicine} isn't one the account has used or added in the app. Check the name as the app shows it."
     }
   },
   "issues": {

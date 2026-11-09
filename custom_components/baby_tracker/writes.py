@@ -7,6 +7,7 @@ the checks that refuse bad input before anything is sent.
 """
 
 import logging
+import math  # Core PR 26
 import uuid
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
@@ -24,17 +25,17 @@ from pybabytracker import (
     DIAPER_WET,
     SIDE_LEFT,
     SIDE_RIGHT,
-    AmbiguousSelectionError,  # HACS-only
+    AmbiguousSelectionError,  # Core PR 26
     AmountTooSmallError,
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerError,
     EndBeforeStartError,
     InvalidAmountError,
-    InvalidSelectionNameError,  # HACS-only
+    InvalidSelectionNameError,  # Core PR 26
     MinutesTooLongError,
     NotOwnRecordError,
-    NoUsualDoseError,  # HACS-only
+    NoUsualDoseError,  # Core PR 26
     NursingTimer,
     ObjectIdInUseError,
     ProtocolError,
@@ -46,6 +47,7 @@ from pybabytracker import (
     SyncEngine,
     TimerNotRunningError,
     UnknownBabyError,
+    UnknownSelectionError,  # Core PR 26
     ValidationError,
     Volume,
     WriteOutcomeUnknownError,
@@ -92,10 +94,9 @@ VALIDATION_KEYS: dict[type[ValidationError], str] = {
     EndBeforeStartError: "end_before_start",
     SleepTooLongError: "sleep_too_long",
     SleepStartOutOfRangeError: "sleep_start_out_of_range",
-    # The pick-list and dose errors come with the medicine service, which isn't planned yet.
-    InvalidSelectionNameError: "invalid_selection_name",  # HACS-only
-    AmbiguousSelectionError: "ambiguous_selection",  # HACS-only
-    NoUsualDoseError: "no_usual_dose",  # HACS-only
+    InvalidSelectionNameError: "invalid_selection_name",  # Core PR 26
+    AmbiguousSelectionError: "ambiguous_selection",  # Core PR 26
+    NoUsualDoseError: "no_usual_dose",  # Core PR 26
 }
 
 
@@ -224,8 +225,8 @@ DEFAULT_NOTE = "Added from Home Assistant"
 
 
 def _note(note: str) -> str:
-    """Return the note to write: the caller's, or the default when it's empty."""
-    return note or DEFAULT_NOTE
+    """Return the note to write: the caller's, or the default when it's empty or only spaces."""
+    return note if note.strip() else DEFAULT_NOTE
 
 
 async def _add(
@@ -276,6 +277,66 @@ async def async_log_diaper(
             note=_note(note),
             object_id=object_id,
         )
+
+    await _add(coordinator, object_id, add)
+
+
+# Core PR 26
+async def async_log_medicine(
+    coordinator: BabyTrackerCoordinator,
+    baby_id: str,
+    medicine: str,
+    *,
+    amount: float | None = None,
+    time: datetime | None = None,
+    note: str = "",
+    object_id: str | None = None,
+) -> None:
+    """Add a dose of a medicine the account has used, of ``amount`` (default its usual dose).
+
+    The medicine is looked up by the library inside the write, after the sync that precedes it, so
+    one first given on a phone since the last poll is found. Each library refusal is translated.
+    """
+    if amount is not None and not (math.isfinite(amount) and round(amount, 2) > 0):
+        raise validation_error("invalid_amount")
+    moment, offset = _in_home_assistant_time(time)
+
+    async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
+        try:
+            return await engine.add_medication(
+                client,
+                baby_id,
+                medicine,
+                amount=amount,
+                time=moment,
+                timezone_offset=offset,
+                note=_note(note),
+                object_id=object_id,
+            )
+        except ObjectIdInUseError:
+            raise
+        except UnknownSelectionError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_medicine",
+                translation_placeholders={"medicine": medicine},
+            ) from err
+        except AmbiguousSelectionError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="ambiguous_selection",
+                translation_placeholders={
+                    "medicine": medicine,
+                    "ids": ", ".join(err.object_ids),
+                },
+            ) from err
+        except ValidationError as err:
+            raise validation_error(VALIDATION_KEYS[type(err)]) from err
+        except ValueError as err:
+            # The amount check above covers every bad amount, so what's left is not about the
+            # amount (the engine can't write, a time without a zone): a write error, as for any
+            # other refusal the library makes after the checks.
+            raise _error("write_failed", error=str(err)) from err
 
     await _add(coordinator, object_id, add)
 

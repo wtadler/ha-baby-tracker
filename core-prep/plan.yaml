@@ -1,10 +1,10 @@
 # The core pull request sequence, as data for scripts/core_cut.py.
 #
-# Every value is the planned core PR that brings an item into core (1 to 22), or `hacs` for an
+# Every value is the planned core PR that brings an item into core (1 to 26), or `hacs` for an
 # item that stays in this repository. A cut for PR N writes everything planned for PRs 1 to N.
 # Python code inside a file is cut by markers in the source: see scripts/core_cut.py.
 
-prs: 22
+prs: 26
 
 # Files of custom_components/baby_tracker/. strings.json, icons.json, services.yaml,
 # manifest.json, and quality_scale.yaml are generated, so they aren't listed.
@@ -26,6 +26,8 @@ integration_files:
   timers.py: 18
   timer_state.py: 18
   guard.py: 18
+  image.py: 23
+  pictures.py: 23
   brand: hacs
   translations: hacs
 
@@ -90,6 +92,12 @@ keys:
   entity.sensor.last_nursing_left_time: 4
   entity.sensor.last_nursing_right_time: 4
   entity.sensor.last_sleep_duration: 4
+  entity.image.photo: 23
+  entity.image.latest_picture: 23
+  entity.sensor.last_milestone: 24
+  entity.sensor.last_vaccine: 25
+  entity.sensor.last_medicine: 26
+  entity.sensor.next_medicine_dose: 26
   services.log_diaper: 9
   services.log_bottle: 10
   services.log_nursing: 10
@@ -104,6 +112,7 @@ keys:
   services.discard_nursing: 18
   services.start_pump: 21
   services.stop_pump: 21
+  services.log_medicine: 26
   selector.diaper_type: 9
   selector.bottle_kind: 10
   selector.finish_side: 10
@@ -144,6 +153,10 @@ keys:
   exceptions.pump_already_running: 21
   exceptions.no_pump_timer: 21
   exceptions.pump_not_saved: 21
+  exceptions.unknown_medicine: 26
+  exceptions.invalid_selection_name: 26
+  exceptions.ambiguous_selection: 26
+  exceptions.no_usual_dose: 26
   issues.own_log_gap: 11
   issues.nursing_timer_long: 18
   issues.pump_timer_long: 21
@@ -286,6 +299,7 @@ quality_scale:
     entity-disabled-by-default:
       1: {status: done, comment: "No entity starts disabled. Each is one of the integration's main readings or controls."}
       4: {status: done, comment: "The three nursing minutes sensors (total, left, and right of the last nursing) start disabled. The last nursing time and the last sleep duration cover what most people need, and the minutes are a detail, so a less popular entity."}
+      23: {status: done, comment: "Latest picture starts disabled, because it can show any entry's picture, a diaper's included. Every other entity is one of the integration's main readings or controls."}
     entity-translations:
       1: done
     exception-translations:

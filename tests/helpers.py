@@ -306,6 +306,9 @@ BABY_ACTIONS: dict[str, tuple[dict[str, Any], str | None]] = {
 ACTION_IDS = list(BABY_ACTIONS)
 
 ALL_ACTIONS = [*BABY_ACTIONS, "log_pump", "start_pump", "stop_pump", "undo"]
+# Core PR 26
+# A dose needs a medicine the account has used, so log_medicine has its own tests.
+ALL_ACTIONS.append("log_medicine")
 
 
 # A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.

@@ -83,6 +83,15 @@ TIMER_KEYS = ("sleep_timer", "nursing_timer", "nursing_left_time", "nursing_righ
 
 
 PER_BABY = len(KEYS) + len(DETAIL_KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
+# Core PR 24
+# Each baby also has a last milestone sensor.
+PER_BABY += 1
+# Core PR 25
+# And a last vaccine sensor.
+PER_BABY += 1
+# Core PR 26
+# And last medicine and next medicine dose sensors.
+PER_BABY += 2
 
 
 # The buttons share each baby's device, so entity counts here look at readings only.

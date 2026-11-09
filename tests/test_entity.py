@@ -106,7 +106,7 @@ async def test_every_platform_has_its_states_after_the_refactor(
             er.async_get(hass), init_integration.entry_id
         )
     }
-    assert domains == {"button", "sensor", "binary_sensor", "switch"}
+    assert domains == {"button", "sensor", "binary_sensor", "switch", "image"}
     assert hass.states.get(DIAPER).state == at(0).isoformat()
     assert hass.states.get("binary_sensor.baby_one_asleep").state == "off"
     assert hass.states.get(LAST_PUMP).state == "unknown"
