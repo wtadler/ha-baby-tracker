@@ -23,7 +23,7 @@ from typing import Any, override
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from pybabytracker.timers import LEFT, RIGHT
+from pybabytracker.timers import LEFT, RIGHT  # Core PR 18
 
 from .coordinator import (
     BabyData,
@@ -33,12 +33,12 @@ from .coordinator import (
 )
 from .entity import BabyTrackerAccountEntity, BabyTrackerBabyEntity
 from .writes import (
-    async_start_nursing,
-    async_start_pump,
+    async_start_nursing,  # Core PR 18
+    async_start_pump,  # Core PR 21
     async_start_sleep,
-    async_stop_pump,
+    async_stop_pump,  # Core PR 21
     async_stop_sleep,
-    async_turn_off_nursing_side,
+    async_turn_off_nursing_side,  # Core PR 18
 )
 
 # The coordinator's lock serializes writes, so Home Assistant needn't.
@@ -68,6 +68,7 @@ class BabyTrackerAccountSwitchDescription(SwitchEntityDescription):
     turn_off_fn: AccountAction
 
 
+# Core PR 18
 def _nursing_side(side: str) -> tuple[Callable[[BabyData], bool], BabyAction, BabyAction]:
     """Return what a nursing side's switch reads, and does when turned on and off."""
 
@@ -83,6 +84,7 @@ def _nursing_side(side: str) -> tuple[Callable[[BabyData], bool], BabyAction, Ba
     return is_on, turn_on, turn_off
 
 
+# Core PR 18
 def _nursing_description(side: str) -> BabyTrackerSwitchDescription:
     is_on, turn_on, turn_off = _nursing_side(side)
     return BabyTrackerSwitchDescription(
@@ -112,24 +114,27 @@ SWITCHES: tuple[BabyTrackerSwitchDescription, ...] = (
         turn_off_fn=_stop_sleep,
     ),
     # On while Home Assistant's nursing timer runs on that side: at most one of the two.
-    _nursing_description(LEFT),
-    _nursing_description(RIGHT),
+    _nursing_description(LEFT),  # Core PR 18
+    _nursing_description(RIGHT),  # Core PR 18
 )
 
 
+# Core PR 21
 async def _stop_pump(coordinator: BabyTrackerCoordinator) -> None:
     await async_stop_pump(coordinator)
 
 
+# On while Home Assistant's pump timer runs. Turning it off logs the minutes with no amount.
+_PUMP_SWITCH = BabyTrackerAccountSwitchDescription(  # Core PR 21
+    key="pump",
+    translation_key="pump",
+    is_on_fn=lambda data: data.pump is not None,
+    turn_on_fn=async_start_pump,
+    turn_off_fn=_stop_pump,
+)
+
 ACCOUNT_SWITCHES: tuple[BabyTrackerAccountSwitchDescription, ...] = (
-    # On while Home Assistant's pump timer runs. Turning it off logs the minutes with no amount.
-    BabyTrackerAccountSwitchDescription(
-        key="pump",
-        translation_key="pump",
-        is_on_fn=lambda data: data.pump is not None,
-        turn_on_fn=async_start_pump,
-        turn_off_fn=_stop_pump,
-    ),
+    _PUMP_SWITCH,  # Core PR 21
 )
 
 

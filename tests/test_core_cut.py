@@ -1783,6 +1783,77 @@ def test_the_platforms_are_the_repositorys_platform_modules() -> None:
     assert _platform_modules() == {"binary_sensor", "button", "image", "sensor", "switch"}
 
 
+def _entity_keys(files: dict[Path, str]) -> set[tuple[str, str]]:
+    """The (platform, key) of each ``translation_key`` an entity description of the cut gives.
+
+    The platforms are the cut's platform modules. A key written as an f-string over ``side``
+    counts once for each side.
+    """
+    found: set[tuple[str, str]] = set()
+    for path, text in files.items():
+        if path.parent != COMPONENT or path.suffix != ".py" or path.stem not in _platform_modules():
+            continue
+        for node in ast.walk(ast.parse(text)):
+            if not (isinstance(node, ast.keyword) and node.arg == "translation_key"):
+                continue
+            value = node.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                found.add((path.stem, value.value))
+            elif isinstance(value, ast.JoinedStr):
+                for side in ("left", "right"):
+                    parts = [
+                        side
+                        if isinstance(part, ast.FormattedValue)
+                        else str(getattr(part, "value", ""))
+                        for part in value.values
+                    ]
+                    found.add((path.stem, "".join(parts)))
+    return found
+
+
+def _unnamed_entities(files: dict[Path, str]) -> list[str]:
+    """The entity keys the cut's platforms use that its strings.json has no name for."""
+    strings = json.loads(files[COMPONENT / "strings.json"]).get("entity", {})
+    return sorted(
+        f"entity.{platform}.{key}"
+        for platform, key in _entity_keys(files)
+        if key not in strings.get(platform, {})
+    )
+
+
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_names_the_entities_it_creates(
+    planned: Callable[[int], dict[Path, str]], number: int
+) -> None:
+    # In core an entity whose translation key has no string gets no name, so its entity ID is
+    # not the one the tests use.
+    assert _unnamed_entities(planned(number)) == []
+
+
+def test_the_entity_name_check_flags_a_key_with_no_string() -> None:
+    switch = (
+        "A = SwitchEntityDescription(key='sleep', translation_key='sleep')\n"
+        "def d(side):\n"
+        "    return SwitchEntityDescription(key=side, translation_key=f'nursing_{side}')\n"
+        "B = SwitchEntityDescription(key='x')\n"
+    )
+    strings = {"entity": {"switch": {"sleep": {"name": "Sleep"}, "nursing_left": {}}}}
+    files = {
+        COMPONENT / "switch.py": switch,
+        COMPONENT / "entity.py": "X = dict(translation_key='baby')\n",
+        COMPONENT / "strings.json": json.dumps(strings),
+    }
+    assert _entity_keys(files) == {
+        ("switch", "sleep"),
+        ("switch", "nursing_left"),
+        ("switch", "nursing_right"),
+    }
+    assert _unnamed_entities(files) == ["entity.switch.nursing_right"]
+    strings["entity"]["switch"]["nursing_right"] = {}
+    files[COMPONENT / "strings.json"] = json.dumps(strings)
+    assert _unnamed_entities(files) == []
+
+
 def _registered_actions(files: dict[Path, str]) -> set[str]:
     """The actions the cut's services.py registers, by name."""
     if COMPONENT / "services.py" not in files:

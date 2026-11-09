@@ -10,7 +10,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import BabyTrackerConfigEntry, BabyTrackerCoordinator
 from .entity import BabyTrackerBabyEntity
-from .writes import async_discard_nursing, async_log_configured_bottle, async_log_diaper
+from .writes import (
+    async_discard_nursing,  # Core PR 20
+    async_log_configured_bottle,  # Core PR 15
+    async_log_diaper,
+)
 
 # The coordinator's lock serializes writes, so Home Assistant needn't.
 PARALLEL_UPDATES = 0
@@ -30,6 +34,18 @@ def _diaper(kind: str) -> Callable[[BabyTrackerCoordinator, str], Awaitable[None
     return press
 
 
+# Logs the bottle the options describe, read when the button is pressed.
+_BOTTLE = BabyTrackerButtonDescription(  # Core PR 15
+    key="bottle", translation_key="bottle", press_fn=async_log_configured_bottle
+)
+
+# For a nursing timer left running by mistake: drops it without writing anything.
+_DISCARD_NURSING = BabyTrackerButtonDescription(  # Core PR 20
+    key="discard_nursing",
+    translation_key="discard_nursing",
+    press_fn=async_discard_nursing,
+)
+
 BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     BabyTrackerButtonDescription(
         key="wet_diaper", translation_key="wet_diaper", press_fn=_diaper("wet")
@@ -40,16 +56,8 @@ BUTTONS: tuple[BabyTrackerButtonDescription, ...] = (
     BabyTrackerButtonDescription(
         key="mixed_diaper", translation_key="mixed_diaper", press_fn=_diaper("mixed")
     ),
-    # Logs the bottle the options describe, read when the button is pressed.
-    BabyTrackerButtonDescription(
-        key="bottle", translation_key="bottle", press_fn=async_log_configured_bottle
-    ),
-    # For a nursing timer left running by mistake: drops it without writing anything.
-    BabyTrackerButtonDescription(
-        key="discard_nursing",
-        translation_key="discard_nursing",
-        press_fn=async_discard_nursing,
-    ),
+    _BOTTLE,  # Core PR 15
+    _DISCARD_NURSING,  # Core PR 20
 )
 
 

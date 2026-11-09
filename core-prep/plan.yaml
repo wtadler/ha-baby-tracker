@@ -82,8 +82,8 @@ keys:
   entity.sensor.nursing_timer: 19
   entity.sensor.nursing_left_time: 19
   entity.sensor.nursing_right_time: 19
-  entity.switch.nursing_left: 20
-  entity.switch.nursing_right: 20
+  entity.switch.nursing_left: 18
+  entity.switch.nursing_right: 18
   entity.button.discard_nursing: 20
   entity.sensor.pump_timer: 21
   entity.switch.pump: 21
