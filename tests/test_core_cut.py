@@ -518,8 +518,11 @@ def test_strict_typing_adds_the_integration_once_in_order(core_cut: ModuleType, 
     )
 
 
-def test_the_pr1_cut_has_no_trace_of_the_hacs_repository(core_cut: ModuleType, core: Path) -> None:
-    core_cut.cut(1, core, ruff=None)
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_has_no_trace_of_the_hacs_repository(
+    core_cut: ModuleType, core: Path, number: int
+) -> None:
+    core_cut.cut(number, core, ruff=None)
     for root in (core / COMPONENT, core / TESTS):
         for name, text in _tree(root).items():
             for trace in ("custom_components", "HACS", "Core PR", "# Core:", "_custom_component"):
@@ -620,6 +623,90 @@ def test_every_planned_cut_leaves_no_unused_imports(
             "--no-cache",
             "--select",
             "F401",
+            "--output-format",
+            "concise",
+            str(core / COMPONENT),
+            str(core / TESTS),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout
+
+
+def _class_members(tree: ast.Module) -> dict[str, set[str]]:
+    """The names each top-level class assigns in its body, by class name."""
+    members: dict[str, set[str]] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            names = members.setdefault(node.name, set())
+            for item in node.body:
+                targets = (
+                    item.targets
+                    if isinstance(item, ast.Assign)
+                    else [item.target]
+                    if isinstance(item, ast.AnnAssign)
+                    else []
+                )
+                names.update(t.id for t in targets if isinstance(t, ast.Name))
+            names.update(
+                item.name
+                for item in node.body
+                if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+            )
+    return members
+
+
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_uses_only_class_members_it_keeps(
+    core_cut: ModuleType, core: Path, number: int
+) -> None:
+    # A HACS-only member (``BABY = "baby"  # HACS-only``) leaves the cut, so a line still kept in
+    # core that reads ``BabyTrackerServiceArgument.BABY`` fails at import. Ruff can't see that.
+    core_cut.cut(number, core, ruff=None)
+    trees = {
+        f"{root.name}/{name}": ast.parse(text)
+        for root in (core / COMPONENT, core / TESTS)
+        for name, text in _tree(root).items()
+        if name.endswith(".py")
+    }
+    members: dict[str, set[str]] = {}
+    for name, text in _tree(core / COMPONENT).items():
+        if name.endswith(".py"):
+            for cls, names in _class_members(ast.parse(text)).items():
+                members.setdefault(cls, set()).update(names)
+    missing = sorted(
+        f"{name}:{node.lineno}: {node.value.id}.{node.attr}"
+        for name, tree in trees.items()
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id in members
+        and node.attr not in members[node.value.id]
+        and not node.attr.startswith("__")
+    )
+    assert missing == []
+
+
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_uses_only_names_it_defines(
+    core_cut: ModuleType, core: Path, number: int
+) -> None:
+    # A line kept in core that uses a name only HACS defines (a HACS-only helper or enum member)
+    # parses fine but fails at runtime, so each such line needs the HACS-only marker too.
+    core_cut.cut(number, core, ruff=None)
+    ruff = shutil.which("ruff") or str(Path(sys.executable).parent / "ruff")
+    result = subprocess.run(
+        [
+            ruff,
+            "check",
+            "--isolated",
+            "--no-cache",
+            "--target-version",
+            "py314",
+            "--select",
+            "F821,F822,F823",
             "--output-format",
             "concise",
             str(core / COMPONENT),

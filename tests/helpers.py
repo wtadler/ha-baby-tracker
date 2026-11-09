@@ -1,8 +1,8 @@
 """Small helpers shared by the test modules."""
 
-import json
+import json  # HACS-only
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path  # HACS-only
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -37,8 +37,9 @@ from .factories import (
 )
 from .fake_server import FakeServer
 
+# HACS-only: the repository layout, for the metadata tests
 ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION = ROOT / "custom_components" / "baby_tracker"
+INTEGRATION = ROOT / "custom_components" / "baby_tracker"  # HACS-only
 
 OTHER_DEVICES_RECORD = "D0000000-0000-4000-8000-000000000001"  # baby one's diaper from device A
 
@@ -353,4 +354,5 @@ async def entry_with_options(hass: HomeAssistant, options: dict[str, Any]) -> Mo
 
 
 def load_integration_json(name: str) -> Any:
+    """HACS-only: read one of the integration's JSON files."""
     return json.loads((INTEGRATION / name).read_text())

@@ -75,23 +75,23 @@ def _uuid_upper(value: object) -> str:
         raise probatio.Invalid("must be a UUID") from err
 
 
-# Every baby action names its baby with ``device_id``. HACS-only: ``baby`` is the deprecated alias.
+# Every baby action names its baby with ``device_id``.
 _BABY_TARGET = {
     probatio.Optional(BabyTrackerServiceArgument.DEVICE_ID): cv.string,
-    probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
+    probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,  # HACS-only: deprecated alias
 }
+_BABY_KEYS = (
+    BabyTrackerServiceArgument.DEVICE_ID,
+    BabyTrackerServiceArgument.BABY,  # HACS-only
+)
 
 
 def _baby_schema(fields: dict[Any, Any]) -> probatio.All[Any]:
     """Return the schema of an action that targets one baby."""
     return probatio.All(
         probatio.Schema({**_BABY_TARGET, **fields}),
-        cv.has_at_least_one_key(
-            BabyTrackerServiceArgument.DEVICE_ID, BabyTrackerServiceArgument.BABY
-        ),
-        cv.has_at_most_one_key(
-            BabyTrackerServiceArgument.DEVICE_ID, BabyTrackerServiceArgument.BABY
-        ),
+        cv.has_at_least_one_key(*_BABY_KEYS),
+        cv.has_at_most_one_key(*_BABY_KEYS),  # HACS-only
     )
 
 
@@ -174,20 +174,25 @@ LOG_SLEEP_SCHEMA = _baby_schema(
     }
 )
 
-# A pump belongs to the account, not a baby, so it names an account. HACS-only: ``device`` and
-# ``baby`` (an account's or a baby's device) are the deprecated ways to name one.
+# A pump belongs to the account, not a baby, so it names an account.
 _PUMP_COMMON = {
     probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
     probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
 }
+
+_PUMP_KEYS = (
+    BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
+    BabyTrackerServiceArgument.DEVICE,  # HACS-only
+    BabyTrackerServiceArgument.BABY,  # HACS-only
+)
 
 LOG_PUMP_SCHEMA = probatio.All(
     probatio.Schema(
         {
             **_PUMP_COMMON,
             probatio.Optional(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string,
-            probatio.Optional(BabyTrackerServiceArgument.DEVICE): cv.string,
-            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.DEVICE): cv.string,  # HACS-only
+            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,  # HACS-only
             # The total, or the sides (checked in writes.py): so none has a default, and an
             # explicit 0 minutes alongside ``minutes`` is a conflict.
             probatio.Optional(BabyTrackerServiceArgument.AMOUNT): probatio.Coerce(float),
@@ -203,16 +208,8 @@ LOG_PUMP_SCHEMA = probatio.All(
             probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
         }
     ),
-    cv.has_at_least_one_key(
-        BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
-        BabyTrackerServiceArgument.DEVICE,
-        BabyTrackerServiceArgument.BABY,
-    ),
-    cv.has_at_most_one_key(
-        BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
-        BabyTrackerServiceArgument.DEVICE,
-        BabyTrackerServiceArgument.BABY,
-    ),
+    cv.has_at_least_one_key(*_PUMP_KEYS),
+    cv.has_at_most_one_key(*_PUMP_KEYS),  # HACS-only
 )
 
 # The pump timer belongs to the account, so these name it by config entry.
@@ -254,14 +251,14 @@ UNDO_SCHEMA = probatio.All(
         {
             probatio.Optional(BabyTrackerServiceArgument.CONFIG_ENTRY_ID): cv.string,
             probatio.Optional(BabyTrackerServiceArgument.DEVICE_ID): cv.string,
-            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,
+            probatio.Optional(BabyTrackerServiceArgument.BABY): cv.string,  # HACS-only
             probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): cv.string,
         }
     ),
     cv.has_at_least_one_key(
         BabyTrackerServiceArgument.CONFIG_ENTRY_ID,
         BabyTrackerServiceArgument.DEVICE_ID,
-        BabyTrackerServiceArgument.BABY,
+        BabyTrackerServiceArgument.BABY,  # HACS-only
     ),
 )
 
@@ -326,29 +323,29 @@ def _from_baby_device(hass: HomeAssistant, device_id: str) -> tuple[BabyTrackerC
 
 
 def _baby(call: ServiceCall) -> tuple[BabyTrackerCoordinator, str]:
-    """Return the coordinator and ID of the baby an action names, by ``device_id`` or ``baby``."""
-    if BabyTrackerServiceArgument.DEVICE_ID in call.data:
-        return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.DEVICE_ID])
+    """Return the coordinator and ID of the baby an action names by ``device_id``."""
     # HACS-only: the deprecated ``baby`` alias
-    _warn_deprecated(call, BabyTrackerServiceArgument.BABY, BabyTrackerServiceArgument.DEVICE_ID)
-    return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.BABY])
+    if BabyTrackerServiceArgument.DEVICE_ID not in call.data:
+        _warn_deprecated(
+            call, BabyTrackerServiceArgument.BABY, BabyTrackerServiceArgument.DEVICE_ID
+        )
+        return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.BABY])
+    return _from_baby_device(call.hass, call.data[BabyTrackerServiceArgument.DEVICE_ID])
 
 
 def _account_coordinator(call: ServiceCall) -> BabyTrackerCoordinator:
-    """Return the account a pump goes to.
-
-    That is the named config entry. HACS-only: the deprecated ``device`` and ``baby`` name the
-    entry that owns a device (a baby's or the account's).
-    """
-    if BabyTrackerServiceArgument.CONFIG_ENTRY_ID in call.data:
-        return _entry_coordinator(call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID])
-    field = (
-        BabyTrackerServiceArgument.DEVICE
-        if BabyTrackerServiceArgument.DEVICE in call.data
-        else BabyTrackerServiceArgument.BABY
-    )
-    _warn_deprecated(call, field, BabyTrackerServiceArgument.CONFIG_ENTRY_ID)
-    return _from_device(call.hass, call.data[field])[0]
+    """Return the account a pump goes to: the named config entry."""
+    # HACS-only: the deprecated ``device`` and ``baby`` name the entry that owns a device (a
+    # baby's or the account's).
+    if BabyTrackerServiceArgument.CONFIG_ENTRY_ID not in call.data:
+        field = (
+            BabyTrackerServiceArgument.DEVICE
+            if BabyTrackerServiceArgument.DEVICE in call.data
+            else BabyTrackerServiceArgument.BABY
+        )
+        _warn_deprecated(call, field, BabyTrackerServiceArgument.CONFIG_ENTRY_ID)
+        return _from_device(call.hass, call.data[field])[0]
+    return _entry_coordinator(call.hass, call.data[BabyTrackerServiceArgument.CONFIG_ENTRY_ID])
 
 
 async def _log_diaper(call: ServiceCall) -> None:
@@ -489,7 +486,7 @@ async def _undo(call: ServiceCall) -> None:
     baby_id: str | None = None
     if (
         BabyTrackerServiceArgument.DEVICE_ID in call.data
-        or BabyTrackerServiceArgument.BABY in call.data
+        or BabyTrackerServiceArgument.BABY in call.data  # HACS-only
     ):
         coordinator, baby_id = _baby(call)
     else:
