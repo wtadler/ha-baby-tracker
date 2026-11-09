@@ -1,9 +1,9 @@
 """Core PR 9: the write path shared by every action, the first action (log_diaper), and how the
-actions are registered. Several tests here run over every action, so the cut trims their
-parametrization to the actions the PR ships."""
+actions are registered. The tests that run over every logging action arrive with the second ones
+(PR 10), and each action's cases with the PR that brings the action."""
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any  # Core PR 10
 from unittest.mock import patch
 
 import probatio
@@ -14,11 +14,14 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from pybabytracker import (
     OP_ADD,
-    SIDE_LEFT,
+    SIDE_LEFT,  # Core PR 12
     BabyTrackerConnectionError,
     SyncEngine,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry, load_json_array_fixture
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    load_json_array_fixture,  # Core PR 10
+)
 
 from custom_components.baby_tracker.const import (
     DOMAIN,
@@ -28,7 +31,7 @@ from . import NOW, OWN_DEVICE, OWN_DEVICE_TWO
 from .factories import (
     BABY_ONE_ID,
     BABY_THREE_ID,
-    BABY_TWO_ID,
+    BABY_TWO_ID,  # Core PR 10
     DEVICE_A,
     at,
 )
@@ -56,21 +59,25 @@ def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
+# Core PR 10
 CAPTURE = load_json_array_fixture("captured_payloads.json", DOMAIN)
 
 
+# Core PR 10
 IGNORED = ("objectID", "timestamp", "note", "baby")
 
 
 RETRY_ID = "7E57ED00-0000-4000-8000-000000000001"
 
 
+# Core PR 10
 def captured(prefix: str) -> dict[str, Any]:
     """The captured add payload for a label, minus the keys a write fills in itself."""
     [entry] = [e for e in CAPTURE if e["label"].startswith(prefix) and e["opcode"] == 0]
     return {k: v for k, v in entry["payload"].items() if k not in IGNORED}
 
 
+# Core PR 10
 VALID: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] = {
     "log_bottle": (
         {"kind": "formula", "amount": 4, "unit": "fl. oz.", "time": "2026-10-26T16:54:35+00:00"},
@@ -81,21 +88,6 @@ VALID: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] = {
         {"kind": "pumped", "amount": 3, "unit": "fl. oz.", "time": "2026-10-26T16:54:55+00:00"},
         "C2 pumped bottle add",
         {},
-    ),
-    "log_pump": (
-        {
-            "left_amount": 2,
-            "right_amount": 5,
-            "unit": "fl. oz.",
-            "left_minutes": 1,
-            "right_minutes": 1,
-            "finish_side": "left",
-            "time": "2026-10-26T16:55:15+00:00",
-        },
-        "C3 pump add",
-        # Capture C3 stored 0 (not set) for a two-sided pump, which the service can't write yet
-        # (#123).
-        {"finishSide": SIDE_LEFT},
     ),
     "log_nursing": (
         {
@@ -116,13 +108,33 @@ VALID: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] = {
     ),
 }
 
+# Core PR 12
+VALID["log_pump"] = (
+    {
+        "left_amount": 2,
+        "right_amount": 5,
+        "unit": "fl. oz.",
+        "left_minutes": 1,
+        "right_minutes": 1,
+        "finish_side": "left",
+        "time": "2026-10-26T16:55:15+00:00",
+    },
+    "C3 pump add",
+    # Capture C3 stored 0 (not set) for a two-sided pump, which the service can't write yet
+    # (#123).
+    {"finishSide": SIDE_LEFT},
+)
 
+
+# Core PR 10
 ACTION_OF = {"log_bottle_pumped": "log_bottle"}
 
 
+# Core PR 10
 ACTIONS = list(VALID)
 
 
+# Core PR 10
 async def run_valid(hass: HomeAssistant, name: str, **extra: Any) -> None:
     data, _, _ = VALID[name]
     await call(hass, ACTION_OF.get(name, name), **{**data, **extra})
@@ -132,21 +144,12 @@ def key_of(raised: pytest.ExceptionInfo[ServiceValidationError]) -> str | None:
     return raised.value.translation_key
 
 
+# Core PR 10
 LIMITS = {
     "nursing left over 240": ("log_nursing", {"left_minutes": 241}, "minutes_too_long"),
     "nursing right over 240": (
         "log_nursing",
         {"left_minutes": 5, "right_minutes": 241},
-        "minutes_too_long",
-    ),
-    "pump left over 240": (
-        "log_pump",
-        {"left_amount": 2, "left_minutes": 241},
-        "minutes_too_long",
-    ),
-    "pump right over 240": (
-        "log_pump",
-        {"left_amount": 2, "right_minutes": 241},
         "minutes_too_long",
     ),
     "sleep over 24 hours": (
@@ -159,12 +162,28 @@ LIMITS = {
         {"kind": "formula", "amount": 0.004, "unit": "fl. oz."},
         "amount_too_small",
     ),
-    "pump rounds to zero": (
-        "log_pump",
-        {"left_amount": 0.004, "right_amount": 0.004},
-        "amount_too_small",
-    ),
 }
+
+# Core PR 12
+LIMITS["pump left over 240"] = (
+    "log_pump",
+    {"left_amount": 2, "left_minutes": 241},
+    "minutes_too_long",
+)
+
+# Core PR 12
+LIMITS["pump right over 240"] = (
+    "log_pump",
+    {"left_amount": 2, "right_minutes": 241},
+    "minutes_too_long",
+)
+
+# Core PR 12
+LIMITS["pump rounds to zero"] = (
+    "log_pump",
+    {"left_amount": 0.004, "right_amount": 0.004},
+    "amount_too_small",
+)
 
 
 def _schema_fields(schema: probatio.All | probatio.Schema) -> set[str]:
@@ -437,6 +456,7 @@ async def test_both_accounts_work_with_two_config_entries(
     assert OWN_DEVICE_TWO in second_server.logs and OWN_DEVICE not in second_server.logs
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_posts_a_record_matching_the_captured_format(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -458,6 +478,7 @@ async def test_each_action_posts_a_record_matching_the_captured_format(
     assert payload["newFlage"] == "true"
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_posts_an_add_under_the_next_number_with_a_new_uppercase_id(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -472,6 +493,7 @@ async def test_each_action_posts_an_add_under_the_next_number_with_a_new_upperca
     assert len(first.object_id) == 36
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_goes_to_the_baby_named(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -482,6 +504,7 @@ async def test_each_action_goes_to_the_baby_named(
     assert only_record(server).baby.object_id == BABY_TWO_ID
 
 
+# Core PR 10
 @pytest.mark.parametrize("with_id", [False, True], ids=["no-id", "with-id"])
 @pytest.mark.parametrize("case", list(LIMITS))
 async def test_a_value_past_a_limit_is_a_translated_validation_error_with_no_sync(
@@ -503,15 +526,21 @@ async def test_a_value_past_a_limit_is_a_translated_validation_error_with_no_syn
     assert len(server.calls) == sent
 
 
+# Core PR 10
 @pytest.mark.parametrize(
     ("action", "data"),
     [
         ("log_nursing", {"left_minutes": 240, "right_minutes": 240}),
-        ("log_pump", {"left_amount": 2, "left_minutes": 240}),
+        ("log_pump", {"left_amount": 2, "left_minutes": 240}),  # Core PR 12
         ("log_sleep", {"start": "2026-10-25T01:00:00+00:00", "end": "2026-10-26T01:00:00+00:00"}),
         ("log_bottle", {"kind": "formula", "amount": 0.01, "unit": "fl. oz."}),
     ],
-    ids=["nursing", "pump", "sleep", "bottle"],
+    ids=[
+        "nursing",
+        "pump",  # Core PR 12
+        "sleep",
+        "bottle",
+    ],
 )
 async def test_the_values_at_the_limits_are_accepted(
     hass: HomeAssistant,
@@ -525,7 +554,16 @@ async def test_the_values_at_the_limits_are_accepted(
     assert len(posted(server)) == 1
 
 
-@pytest.mark.parametrize("action", ["log_bottle", "log_nursing", "log_sleep", "log_pump"])
+# Core PR 10
+@pytest.mark.parametrize(
+    "action",
+    [
+        "log_bottle",
+        "log_nursing",
+        "log_sleep",
+        "log_pump",  # Core PR 12
+    ],
+)
 async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
     hass: HomeAssistant, init_integration: MockConfigEntry, action: str
 ) -> None:
@@ -533,9 +571,9 @@ async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
         "log_bottle": "add_formula",
         "log_nursing": "add_nursing",
         "log_sleep": "add_sleep",
-        "log_pump": "add_pump",
+        "log_pump": "add_pump",  # Core PR 12
     }[action]
-    data, _, _ = VALID[{"log_bottle": "log_bottle"}.get(action, action)]
+    data, _, _ = VALID[action]
     with (
         patch.object(SyncEngine, engine_method, side_effect=ValueError("some other refusal")),
         pytest.raises(ValueError, match="some other refusal"),
@@ -543,6 +581,7 @@ async def test_a_value_error_that_is_not_an_id_clash_is_not_reported_as_one(
         await call(hass, action, object_id=RETRY_ID, **data)
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", [n for n in ACTIONS if n != "log_pump"])
 async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -556,6 +595,7 @@ async def test_each_action_for_an_unknown_baby_device_is_a_validation_error(
     assert server.posted == []
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_a_retry_with_the_same_object_id_does_not_post_twice(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -567,6 +607,7 @@ async def test_a_retry_with_the_same_object_id_does_not_post_twice(
     assert (number, record.object_id) == (1, RETRY_ID)
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_each_action_rejects_an_object_id_that_is_not_a_uuid(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -576,6 +617,7 @@ async def test_each_action_rejects_an_object_id_that_is_not_a_uuid(
     assert server.posted == []
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_an_object_id_that_belongs_to_another_record_is_a_validation_error(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str
@@ -586,6 +628,7 @@ async def test_an_object_id_that_belongs_to_another_record_is_a_validation_error
     assert server.posted == []
 
 
+# Core PR 10
 @pytest.mark.parametrize("name", ACTIONS)
 async def test_a_failed_write_raises_a_translated_error_and_changes_no_sensor(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, name: str

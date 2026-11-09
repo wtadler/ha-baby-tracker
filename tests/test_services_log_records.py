@@ -59,10 +59,15 @@ async def test_log_bottle_writes_formula_or_pumped_by_kind(
     [
         ("log_bottle", {"kind": "formula", "amount": 120}, "amount"),
         ("log_bottle", {"kind": "pumped", "amount": 90}, "amount"),
-        ("log_pump", {"left_amount": 60, "right_amount": 75}, "leftAmount"),
-        ("log_pump", {"left_amount": 60}, "leftAmount"),
+        ("log_pump", {"left_amount": 60, "right_amount": 75}, "leftAmount"),  # Core PR 12
+        ("log_pump", {"left_amount": 60}, "leftAmount"),  # Core PR 12
     ],
-    ids=["formula", "pumped", "pump", "pump-one-side"],
+    ids=[
+        "formula",
+        "pumped",
+        "pump",  # Core PR 12
+        "pump-one-side",  # Core PR 12
+    ],
 )
 async def test_a_milliliter_write_is_accepted_and_sent_as_metric(
     hass: HomeAssistant,

@@ -1035,18 +1035,131 @@ def _action_helpers(
     }
 
 
+def _module_bindings(files: dict[Path, str]) -> dict[str, list[tuple[Path, ast.AST]]]:
+    """What each top-level name of the tests is built from: its assignments, and the
+    ``NAME[key] = ...`` and ``NAME.append(...)`` statements that fill it in."""
+    bindings: dict[str, list[tuple[Path, ast.AST]]] = {}
+    for path, tree in _python(files).items():
+        if not path.is_relative_to(TESTS):
+            continue
+        for node in tree.body:
+            targets: list[ast.expr] = []
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign | ast.AugAssign):
+                targets = [node.target]
+            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+                func = node.value.func
+                if isinstance(func, ast.Attribute):
+                    targets = [func.value]
+            for target in targets:
+                while isinstance(target, ast.Subscript | ast.Attribute):
+                    target = target.value
+                for name in _bound(target):
+                    bindings.setdefault(name, []).append((path, node))
+    return bindings
+
+
+def _parametrized_names(decorator: ast.expr) -> set[str]:
+    """The argument names of a ``pytest.mark.parametrize`` decorator, else none."""
+    if not (
+        isinstance(decorator, ast.Call)
+        and ast.unparse(decorator.func) == "pytest.mark.parametrize"
+        and decorator.args
+    ):
+        return set()
+    names = decorator.args[0]
+    if isinstance(names, ast.Constant) and isinstance(names.value, str):
+        return {name.strip() for name in names.value.split(",")}
+    if isinstance(names, ast.Tuple | ast.List):
+        return {n.value for n in names.elts if isinstance(n, ast.Constant)}
+    return set()
+
+
 def _actions_called(files: dict[Path, str]) -> list[str]:
     """Where a test of the cut calls an action the cut's services.yaml doesn't have.
 
     An action is called by name in ``async_call`` for the integration's domain, or as the
-    ``action`` argument of a test helper that makes such a call.
+    ``action`` argument of a test helper that makes such a call. A name the call reads is
+    followed to what it's built from: the function's own assignments, the values of its
+    ``parametrize`` argument, and the tests' top-level tables. There, any string that names
+    one of the repository's actions counts, unless it's only compared against.
     """
     services = yaml.safe_load(files.get(COMPONENT / "services.yaml", "")) or {}
+    known = set(yaml.safe_load((INTEGRATION / "services.yaml").read_text()))
     functions = _test_functions(files)
     helpers = _action_helpers(functions)
+    bindings = _module_bindings(files)
+    callers = set(helpers)
+    while True:
+        more = {
+            function.name
+            for found_in in functions.values()
+            for function in found_in
+            if any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in callers
+                for node in ast.walk(function)
+            )
+        } - callers
+        if not more:
+            break
+        callers |= more
     found: set[tuple[str, int, str]] = set()
+
+    def constants(node: ast.AST, path: Path, seen: set[str]) -> None:
+        compared = {
+            id(inner)
+            for compare in ast.walk(node)
+            if isinstance(compare, ast.Compare)
+            for inner in ast.walk(compare)
+        }
+        for inner in ast.walk(node):
+            if id(inner) in compared:
+                continue
+            if (
+                isinstance(inner, ast.Constant)
+                and inner.value in known
+                and inner.value not in services
+            ):
+                found.add((str(path), inner.lineno, inner.value))
+            elif isinstance(inner, ast.Name) and inner.id in bindings and inner.id not in seen:
+                seen.add(inner.id)
+                for where, binding in bindings[inner.id]:
+                    constants(binding, where, seen)
+
     for path, found_in in functions.items():
         for function in found_in:
+            sent: list[ast.expr] = []
+            for node in ast.walk(function):
+                if (called := _action_call(node)) is not None:
+                    sent.extend(e for e in (called[0], *called[1]) if e is not None)
+                elif (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in callers
+                ):
+                    sent.extend(node.args)
+                    sent.extend(k.value for k in node.keywords)
+            read = {n.id for e in sent for n in ast.walk(e) if isinstance(n, ast.Name)}
+            while True:
+                more = {
+                    n.id
+                    for node in ast.walk(function)
+                    if isinstance(node, ast.Assign) and any(_bound(t) & read for t in node.targets)
+                    for n in ast.walk(node.value)
+                    if isinstance(n, ast.Name)
+                } - read
+                if not more:
+                    break
+                read |= more
+            for decorator in function.decorator_list:
+                if _parametrized_names(decorator) & read:
+                    constants(decorator.args[1], path, set())
+            for name in read & set(bindings):
+                for where, binding in bindings[name]:
+                    constants(binding, where, {name})
             for node in ast.walk(function):
                 action: ast.expr | None = None
                 if (called := _action_call(node)) is not None:
@@ -1220,6 +1333,108 @@ def test_the_action_check_finds_each_way_a_test_calls_an_action() -> None:
         f"{TESTS / 'test_x.py'}:6: log_nursing",
         f"{TESTS / 'test_x.py'}:7: log_pump",
     ]
+
+
+def test_the_action_check_follows_parametrize_and_tables_to_the_action() -> None:
+    helpers = (
+        "from homeassistant.components.baby_tracker.const import DOMAIN\n"
+        "async def call(hass, action, baby='one', **data):\n"
+        "    await hass.services.async_call(DOMAIN, action, data, blocking=True)\n"
+    )
+    test = (
+        "import pytest\n"
+        "from .helpers import call\n"
+        "VALID = {}\n"
+        "VALID['log_diaper'] = {}\n"
+        "VALID['log_bottle'] = {}\n"
+        "ACTIONS = list(VALID)\n"
+        "LIMITS = {'too long': ('log_pump', {}, 'minutes_too_long')}\n"
+        "async def run_valid(hass, name):\n"
+        "    await call(hass, name, **VALID[name])\n"
+        "@pytest.mark.parametrize('name', ACTIONS)\n"
+        "async def test_a(hass, name):\n"
+        "    await run_valid(hass, name)\n"
+        "@pytest.mark.parametrize('case', list(LIMITS))\n"
+        "async def test_b(hass, case):\n"
+        "    action, data, key = LIMITS[case]\n"
+        "    await call(hass, action, **data)\n"
+        "@pytest.mark.parametrize(('action', 'n'), [('log_sleep', 1), ('log_diaper', 2)])\n"
+        "async def test_c(hass, action, n):\n"
+        "    await call(hass, action)\n"
+        "@pytest.mark.parametrize('name', [n for n in ('log_diaper',) if n != 'undo'])\n"
+        "async def test_d(hass, name):\n"
+        "    await call(hass, name)\n"
+        "@pytest.mark.parametrize('kind', ['wet', 'dirty'])\n"
+        "async def test_e(hass, kind):\n"
+        "    await call(hass, 'log_diaper', type=kind)\n"
+    )
+    files = {
+        COMPONENT / "services.yaml": "log_diaper:\n  fields: {}\n",
+        TESTS / "helpers.py": helpers,
+        TESTS / "test_x.py": test,
+    }
+    assert _actions_called(files) == [
+        f"{TESTS / 'test_x.py'}:5: log_bottle",
+        f"{TESTS / 'test_x.py'}:7: log_pump",
+        f"{TESTS / 'test_x.py'}:17: log_sleep",
+    ]
+
+
+def _registered_actions(files: dict[Path, str]) -> set[str]:
+    """The actions the cut's services.py registers, by name."""
+    if COMPONENT / "services.py" not in files:
+        return set()
+    names = {
+        item.targets[0].id: item.value.value
+        for node in ast.parse(files[COMPONENT / "const.py"]).body
+        if isinstance(node, ast.ClassDef) and node.name == "BabyTrackerService"
+        for item in node.body
+        if isinstance(item, ast.Assign)
+        and isinstance(item.targets[0], ast.Name)
+        and isinstance(item.value, ast.Constant)
+    }
+    return {
+        names[node.args[1].attr]
+        for node in ast.walk(ast.parse(files[COMPONENT / "services.py"]))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "async_register"
+        and isinstance(node.args[1], ast.Attribute)
+    }
+
+
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_registers_the_actions_it_describes(
+    planned: Callable[[int], dict[Path, str]], number: int
+) -> None:
+    # Core rejects an action with no services.yaml entry or strings, and a described action
+    # that isn't registered is a broken promise.
+    files = planned(number)
+    described = set(yaml.safe_load(files.get(COMPONENT / "services.yaml", "")) or {})
+    strings = json.loads(files[COMPONENT / "strings.json"]).get("services", {})
+    icons = json.loads(files.get(COMPONENT / "icons.json", "{}")).get("services", {})
+    assert _registered_actions(files) == described
+    assert set(strings) == described
+    assert set(icons) == described
+
+
+def test_the_registration_check_reads_the_registered_names() -> None:
+    files = {
+        COMPONENT / "const.py": (
+            "class BabyTrackerService(StrEnum):\n"
+            "    LOG_DIAPER = 'log_diaper'\n"
+            "    LOG_BOTTLE = 'log_bottle'\n"
+        ),
+        COMPONENT / "services.py": (
+            "def async_setup_services(hass):\n"
+            "    hass.services.async_register(DOMAIN, BabyTrackerService.LOG_DIAPER, f)\n"
+            "    hass.services.async_register(\n"
+            "        DOMAIN, BabyTrackerService.LOG_BOTTLE, g, schema=S\n"
+            "    )\n"
+        ),
+    }
+    assert _registered_actions(files) == {"log_diaper", "log_bottle"}
+    assert _registered_actions({}) == set()
 
 
 def test_a_cut_with_no_services_yaml_has_no_actions() -> None:
