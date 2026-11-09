@@ -1,48 +1,51 @@
-"""Core PRs 9 through 15: writes show in the sensors at once, and what a failed write or a
+"""Core PRs 10 through 14: writes show in the sensors at once, and what a failed write or a
 removed entry leaves behind."""
 
-import asyncio
-from datetime import timedelta
+import asyncio  # Core PR 14
+from datetime import timedelta  # Core PR 14
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState  # Core PR 14
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import issue_registry as ir
-from homeassistant.util import dt as dt_util
-from homeassistant.util.unit_system import METRIC_SYSTEM
-from pybabytracker import (
+from homeassistant.exceptions import HomeAssistantError  # Core PR 14
+from homeassistant.helpers import issue_registry as ir  # Core PR 14
+from homeassistant.util import dt as dt_util  # Core PR 14
+from homeassistant.util.unit_system import METRIC_SYSTEM  # Core PR 13
+from pybabytracker import (  # Core PR 14
     NoResponseError,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,  # Core PR 14
+)
 
-from custom_components.baby_tracker.const import (
+from custom_components.baby_tracker.const import (  # Core PR 14
     DOMAIN,
 )
 
 from . import (
     NOW,
-    OWN_DEVICE,
+    OWN_DEVICE,  # Core PR 14
 )
-from .factories import (
+from .factories import (  # Core PR 13
     BABY_ONE_ID,
 )
 from .fake_server import FakeServer
 from .helpers import (
-    BOTTLE_TODAY,
-    FEEDS_TODAY,
+    BOTTLE_TODAY,  # Core PR 13
+    FEEDS_TODAY,  # Core PR 13
     LAST_FEED,
-    LAST_PUMP,
-    button,
+    LAST_PUMP,  # Core PR 12
+    button,  # Core PR 14
     call,
-    device_id,
-    fail_to_write,
-    gap_issue,
-    log_pump,
-    press,
-    state_of,
-    undo,
+    device_id,  # Core PR 13
+    fail_to_write,  # Core PR 14
+    gap_issue,  # Core PR 14
+    log_pump,  # Core PR 12
+    press,  # Core PR 14
+    state_of,  # Core PR 12
+    undo,  # Core PR 13
 )
 
 
@@ -56,6 +59,7 @@ def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
+# Core PR 12
 async def test_log_pump_updates_the_last_pump_sensor_without_a_poll(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
@@ -73,6 +77,7 @@ async def test_log_pump_updates_the_last_pump_sensor_without_a_poll(
     assert state.attributes["amount"] == 5
 
 
+# Core PR 14
 async def test_the_pending_post_and_its_grace_window_survive_a_restart(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -93,6 +98,7 @@ async def test_the_pending_post_and_its_grace_window_survive_a_restart(
     assert raised.value.translation_key == "write_outcome_unknown"
 
 
+# Core PR 14
 async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -112,6 +118,7 @@ async def test_the_repair_issue_is_cleared_when_the_entry_is_removed(
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
+# Core PR 14
 async def test_a_removed_entry_forgets_its_gap_clock(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -133,6 +140,7 @@ async def test_a_removed_entry_forgets_its_gap_clock(
     assert gap_issue(hass, init_integration) is None
 
 
+# Core PR 14
 async def test_a_wet_press_bumps_todays_count_with_no_poll(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -201,6 +209,7 @@ async def test_nursing_updates_the_last_feed_sensor_without_a_poll(
     assert state.attributes["finish_side"] == "right"
 
 
+# Core PR 12
 async def test_a_pump_updates_the_last_pump_sensor_without_a_poll(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -223,6 +232,7 @@ async def test_a_pump_updates_the_last_pump_sensor_without_a_poll(
     assert state.attributes["left_duration_minutes"] == 10
 
 
+# Core PR 13
 async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -252,6 +262,7 @@ async def test_a_bottle_bumps_todays_feeds_and_bottle_volume_with_no_poll(
     assert float(hass.states.get(BOTTLE_TODAY).state) == pytest.approx(4 * 29.5735, abs=0.1)
 
 
+# Core PR 14
 async def test_a_scheduled_sync_waits_for_a_write_in_progress(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

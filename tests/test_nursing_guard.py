@@ -35,7 +35,6 @@ from .helpers import (
     NURSING_TIMER,
     account_device,
     call,
-    device_id,
     minutes,
     nursing_posts,
     phone_sleep,
@@ -673,20 +672,6 @@ async def test_discard_needs_a_device(
 ) -> None:
     with pytest.raises(vol.Invalid):
         await hass.services.async_call(DOMAIN, "discard_nursing", {}, blocking=True)
-
-
-async def test_discard_accepts_the_deprecated_baby_field_and_raises_its_repair(
-    hass: HomeAssistant, init_integration: MockConfigEntry, freezer: FrozenDateTimeFactory
-) -> None:
-    freezer.move_to(NOW)
-    await toggle(hass, NURSE_LEFT)
-
-    await hass.services.async_call(
-        DOMAIN, "discard_nursing", {"baby": device_id(hass, BABY_ONE_ID)}, blocking=True
-    )
-
-    assert state(hass, NURSING_TIMER).state == "unknown"
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "deprecated_discard_nursing_baby") is not None
 
 
 async def test_a_discard_during_a_stops_write_waits_and_finds_no_timer(

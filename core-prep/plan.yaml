@@ -21,7 +21,7 @@ integration_files:
   services.py: 9
   writes.py: 9
   button.py: 14
-  bottle.py: 15
+  bottle.py: 9
   switch.py: 17
   timers.py: 18
   timer_state.py: 18

@@ -673,6 +673,7 @@ async def test_a_write_sends_the_standard_offset_of_the_records_own_moment(
     assert only_record(server).timezone == expected
 
 
+# Core PR 10
 async def test_a_backdated_write_uses_the_standard_offset_not_the_offset_now(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

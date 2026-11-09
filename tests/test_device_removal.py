@@ -337,6 +337,7 @@ async def test_a_baby_added_again_gets_its_device_and_entities_back(
     assert all(hass.states.get(entity_id) is not None for entity_id in enabled_ids(hass, before))
 
 
+# Core PR 14
 async def test_a_deleted_baby_is_removed_on_a_write_sync_too(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:

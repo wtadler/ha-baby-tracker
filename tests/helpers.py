@@ -30,7 +30,7 @@ from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 
 from . import BABY_ONE, EMAIL, NOW, PASSWORD, get_baby_device, tick
 from .factories import (
-    BABY_ONE_ID,
+    BABY_ONE_ID,  # Core PR 9
     DEVICE_A,
     OP_UPDATE,
     record_payload,
@@ -73,11 +73,13 @@ def device_id(hass: HomeAssistant, baby_id: str) -> str:
     return device.id
 
 
+# Core PR 9
 async def log_diaper(hass: HomeAssistant, baby_id: str, kind: str = "wet", **extra: Any) -> None:
     data = {"device_id": device_id(hass, baby_id), "type": kind, **extra}
     await hass.services.async_call(DOMAIN, "log_diaper", data, blocking=True)
 
 
+# Core PR 13
 async def undo(hass: HomeAssistant, **data: Any) -> None:
     await hass.services.async_call(DOMAIN, "undo", data, blocking=True)
 
@@ -116,10 +118,12 @@ def account_device(hass: HomeAssistant, entry: MockConfigEntry) -> dr.DeviceEntr
     return device
 
 
+# Core PR 9
 # The actions that name the account (a pump belongs to it), not a baby.
 ACCOUNT_ACTIONS = ("log_pump", "start_pump", "stop_pump")
 
 
+# Core PR 9
 async def call(hass: HomeAssistant, action: str, baby_id: str = BABY_ONE_ID, **data: Any) -> None:
     """Call one of the integration's actions for a baby (a pump names its account instead)."""
     if action in ACCOUNT_ACTIONS:
@@ -174,6 +178,7 @@ async def pass_midnight(
     await hass.async_block_till_done()
 
 
+# Core PR 12
 async def log_pump(hass: HomeAssistant, **data: Any) -> None:
     await hass.services.async_call(DOMAIN, "log_pump", data, blocking=True)
 

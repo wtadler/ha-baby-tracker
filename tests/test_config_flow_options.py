@@ -24,7 +24,6 @@ from custom_components.baby_tracker.const import (
 from . import NOW, sync_interval
 from .fake_server import FakeServer
 from .helpers import (
-    INTEGRATION,
     LEGACY_INTERVAL,
     SLEEP_SWITCH,
     entry_with_options,
@@ -91,7 +90,8 @@ async def test_33_oz_shows_a_translated_error_and_the_form_recovers(
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_BOTTLE_SIZE: "bottle_too_large"}
     assert init_integration.options.get(CONF_BOTTLE_SIZE) != size
-    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    # strings.json sits next to config_flow.py, here and in core.
+    strings = json.loads((Path(config_flow.__file__).parent / "strings.json").read_text())
     assert strings["options"]["error"]["bottle_too_large"]
 
     good = {**bad, CONF_BOTTLE_SIZE: 4}

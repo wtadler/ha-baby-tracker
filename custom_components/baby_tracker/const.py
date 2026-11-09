@@ -62,9 +62,9 @@ def is_account_identifier(identifier: str) -> bool:
     return identifier.endswith(ACCOUNT_SUFFIX)
 
 
-CONF_BOTTLE_SIZE = "bottle_size"  # Core PR 15
-CONF_BOTTLE_UNIT = "bottle_unit"  # Core PR 15
-CONF_BOTTLE_TYPE = "bottle_type"  # Core PR 15
+CONF_BOTTLE_SIZE = "bottle_size"  # Core PR 9
+CONF_BOTTLE_UNIT = "bottle_unit"  # Core PR 9
+CONF_BOTTLE_TYPE = "bottle_type"  # Core PR 9
 
 
 # Core PR 9

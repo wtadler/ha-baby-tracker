@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from homeassistant.core import HomeAssistant
 from pybabytracker import (
-    OP_ADD,
+    OP_ADD,  # Core PR 12
     SIDE_LEFT,
     SIDE_NONE,
     SIDE_RIGHT,
@@ -15,7 +15,7 @@ from pybabytracker import (
     Formula,
     Nursing,
     NursingSession,
-    Pump,
+    Pump,  # Core PR 12
 )
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -28,7 +28,12 @@ from custom_components.baby_tracker.sensor import (
 from . import tick
 from .factories import DEVICE_A, at, volume
 from .fake_server import FakeServer
-from .helpers import call, nursing_posts, posted, state
+from .helpers import (
+    call,  # Core PR 10
+    nursing_posts,  # Core PR 10
+    posted,  # Core PR 12
+    state,
+)
 
 OBJECT_ID = "A0000000-0000-4000-8000-000000000001"
 LAST_FEED = "sensor.baby_one_last_feed"
@@ -201,6 +206,7 @@ def test_the_feed_classes_the_sensors_read_include_a_nursing_session() -> None:
     assert not issubclass(NursingSession, Formula)
 
 
+# Core PR 10
 @pytest.mark.parametrize(("side", "code"), [("left", 1), ("right", 2)])
 async def test_log_nursing_posts_the_numeric_code_for_the_chosen_side(
     hass: HomeAssistant,
@@ -216,6 +222,7 @@ async def test_log_nursing_posts_the_numeric_code_for_the_chosen_side(
     assert record.to_payload()["finishSide"] == code
 
 
+# Core PR 12
 @pytest.mark.parametrize(("side", "code"), [("left", 1), ("right", 2)])
 async def test_log_pump_posts_the_numeric_code_for_the_chosen_side(
     hass: HomeAssistant,

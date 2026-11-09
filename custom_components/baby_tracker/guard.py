@@ -12,12 +12,13 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     NURSING_TIMER_GUARD_AFTER,
-    PUMP_TIMER_GUARD_AFTER,
+    PUMP_TIMER_GUARD_AFTER,  # Core PR 21
     nursing_guard_issue_id,
-    pump_guard_issue_id,
+    pump_guard_issue_id,  # Core PR 21
 )
 from .timer_state import TimerState
 
+# Core PR 21
 # The guard's key for the account's pump timer; a baby's is the baby's ID (a UUID, so no clash).
 PUMP_GUARD_KEY = "pump"
 
@@ -72,6 +73,7 @@ class TimerGuard:
             )
             for baby_id, timer in self._timers.nursing.items()
         }
+        # Core PR 21
         if self._timers.pump is not None:
             timers[PUMP_GUARD_KEY] = (
                 self._timers.pump.started,
