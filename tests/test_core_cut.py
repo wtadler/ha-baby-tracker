@@ -1783,32 +1783,125 @@ def test_the_platforms_are_the_repositorys_platform_modules() -> None:
     assert _platform_modules() == {"binary_sensor", "button", "image", "sensor", "switch"}
 
 
-def _entity_keys(files: dict[Path, str]) -> set[tuple[str, str]]:
-    """The (platform, key) of each ``translation_key`` an entity description of the cut gives.
+def _side_key(value: ast.expr) -> str | None:
+    """The key an f-string over ``side`` and plain text gives, with ``{side}`` left in."""
+    if not isinstance(value, ast.JoinedStr):
+        return None
+    sides = [
+        part
+        for part in value.values
+        if isinstance(part, ast.FormattedValue)
+        and isinstance(part.value, ast.Name)
+        and part.value.id == "side"
+        and part.conversion == -1
+        and part.format_spec is None
+    ]
+    text = [part for part in value.values if isinstance(part, ast.Constant)]
+    if len(sides) != 1 or len(sides) + len(text) != len(value.values) or not text:
+        return None
+    return "".join(
+        "{side}" if isinstance(part, ast.FormattedValue) else part.value for part in value.values
+    )
 
-    The platforms are the cut's platform modules. A key written as an f-string over ``side``
-    counts once for each side.
+
+def _key_sites(files: dict[Path, str]) -> list[tuple[Path, ast.AST, set[str] | None]]:
+    """Each place a platform module of the cut sets an entity's translation key.
+
+    With the keys it sets, or None when the check can't tell them: anything but a string
+    literal, or an f-string over ``side``, and every ``_attr_translation_key`` and
+    ``{"translation_key": ...}``.
     """
-    found: set[tuple[str, str]] = set()
+    sites: list[tuple[Path, ast.AST, set[str] | None]] = []
     for path, text in files.items():
         if path.parent != COMPONENT or path.suffix != ".py" or path.stem not in _platform_modules():
             continue
         for node in ast.walk(ast.parse(text)):
-            if not (isinstance(node, ast.keyword) and node.arg == "translation_key"):
-                continue
-            value = node.value
-            if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                found.add((path.stem, value.value))
-            elif isinstance(value, ast.JoinedStr):
-                for side in ("left", "right"):
-                    parts = [
-                        side
-                        if isinstance(part, ast.FormattedValue)
-                        else str(getattr(part, "value", ""))
-                        for part in value.values
-                    ]
-                    found.add((path.stem, "".join(parts)))
-    return found
+            if isinstance(node, ast.keyword) and node.arg == "translation_key":
+                value = node.value
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    sites.append((path, node.value, {value.value}))
+                elif (side := _side_key(value)) is not None:
+                    sites.append((path, value, {side.format(side=s) for s in ("left", "right")}))
+                else:
+                    sites.append((path, value, None))
+            elif isinstance(node, ast.Dict):
+                sites.extend(
+                    (path, key, None)
+                    for key in node.keys
+                    if isinstance(key, ast.Constant) and key.value == "translation_key"
+                )
+            elif isinstance(node, ast.Assign | ast.AnnAssign | ast.AugAssign):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                sites.extend(
+                    (path, target, None)
+                    for target in targets
+                    if (isinstance(target, ast.Name) and target.id == "_attr_translation_key")
+                    or (
+                        isinstance(target, ast.Attribute) and target.attr == "_attr_translation_key"
+                    )
+                )
+    return sites
+
+
+def _entity_keys(files: dict[Path, str]) -> set[tuple[str, str]]:
+    """The (platform, key) of each ``translation_key`` an entity description of the cut gives."""
+    return {(path.stem, key) for path, _, keys in _key_sites(files) for key in keys or ()}
+
+
+def _unresolved_keys(files: dict[Path, str]) -> list[str]:
+    """Where a platform module sets a translation key the check can't read, as ``path:line``."""
+    return [
+        f"{path}:{node.lineno}"
+        for path, node, keys in sorted(
+            _key_sites(files), key=lambda site: (str(site[0]), site[1].lineno)
+        )
+        if keys is None
+    ]
+
+
+@pytest.mark.parametrize("number", range(1, LAST_PR + 1))
+def test_every_planned_cut_gives_its_entity_keys_in_a_way_the_check_reads(
+    planned: Callable[[int], dict[Path, str]], number: int
+) -> None:
+    assert _unresolved_keys(planned(number)) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "line"),
+    [
+        ("KEY = 'x'\nA = D(key='x', translation_key=KEY)\n", 2),
+        ("def d(key):\n    return D(key=key, translation_key=key)\n", 2),
+        ("def d(key):\n    return D(key=key, translation_key=f'{key}_time')\n", 2),
+        ("def d(side):\n    return D(translation_key=f'nursing_{side}_{side}')\n", 2),
+        ("def d(side):\n    return D(translation_key=f'{side}')\n", 2),
+        ("def d(side):\n    return D(translation_key='a' + side)\n", 2),
+        ("A = D(**{'translation_key': 'x'})\n", 1),
+        ("class E:\n    _attr_translation_key = 'x'\n", 2),
+        ("class E:\n    def __init__(self):\n        self._attr_translation_key = 'x'\n", 3),
+        ("class E:\n    _attr_translation_key: str = 'x'\n", 2),
+    ],
+)
+def test_the_entity_key_check_names_a_key_it_cannot_resolve(source: str, line: int) -> None:
+    files = {COMPONENT / "switch.py": source}
+    assert _unresolved_keys(files) == [f"{COMPONENT / 'switch.py'}:{line}"]
+
+
+def test_the_entity_key_check_accepts_the_keys_it_reads() -> None:
+    source = (
+        "A = D(key='x', translation_key='x')\n"
+        "def d(side):\n"
+        "    return D(translation_key=f'nursing_{side}')\n"
+        "def e(side):\n"
+        "    return D(translation_key=f'last_nursing_{side}_time')\n"
+        "B = D(key='y')\n"
+    )
+    assert _unresolved_keys({COMPONENT / "switch.py": source}) == []
+
+
+def test_the_entity_key_check_looks_only_at_platform_modules() -> None:
+    source = "def d(key):\n    return E(translation_key=key)\n"
+    files = {COMPONENT / "writes.py": source, COMPONENT / "entity.py": source}
+    assert _unresolved_keys(files) == []
 
 
 def _unnamed_entities(files: dict[Path, str]) -> list[str]:
