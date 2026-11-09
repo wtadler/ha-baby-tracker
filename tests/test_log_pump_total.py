@@ -5,12 +5,14 @@ The app writes most pumps with only a total ``amount`` and no per-side keys, and
 equal ``leftDuration`` and ``rightDuration``. Everything here is invented fixture data.
 """
 
+from typing import Any
+
 import probatio
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from pybabytracker import OP_ADD, SIDE_LEFT, Pump, Volume
+from pybabytracker import OP_ADD, SIDE_LEFT, SIDE_NONE, SIDE_RIGHT, Pump, Volume
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from . import NOW
@@ -257,6 +259,28 @@ async def test_amount_with_side_amounts_and_minutes_with_side_minutes_gives_the_
 
     assert raised.value.translation_key == "amount_with_sides"
     assert server.posted == []
+
+
+@pytest.mark.parametrize(
+    ("sides", "expected"),
+    [
+        ({"left_amount": 2}, SIDE_LEFT),
+        ({"right_amount": 3}, SIDE_RIGHT),
+        # The app saves most two-sided pumps with no side.
+        ({"left_amount": 2, "right_amount": 3}, SIDE_NONE),
+    ],
+)
+async def test_a_pumps_side_defaults_to_the_only_side_used_or_none(
+    sides: dict[str, Any],
+    expected: int,
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+) -> None:
+    await log_pump(hass, config_entry_id=init_integration.entry_id, **sides)
+
+    [(_, _, record)] = posted(server)
+    assert record.finish_side == expected
 
 
 # --- bad values -------------------------------------------------------------------------------

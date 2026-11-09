@@ -546,7 +546,7 @@
     },
     "stop_nursing": {
       "name": "Stop nursing",
-      "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it ended on, and the start time.",
+      "description": "Stops the nursing timer and saves one nursing record with each side's minutes, the side it started on, and the start time.",
       "fields": {
         "device_id": {
           "name": "Baby",
