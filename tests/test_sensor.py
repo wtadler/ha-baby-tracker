@@ -29,6 +29,7 @@ def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_sensors(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,

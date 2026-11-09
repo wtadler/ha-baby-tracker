@@ -86,25 +86,6 @@
         "name": "Discard nursing"
       }
     },
-    "image": {
-      "latest_picture": {
-        "name": "Latest picture",
-        "state_attributes": {
-          "record_id": {
-            "name": "Entry ID"
-          },
-          "record_type": {
-            "name": "Entry type"
-          },
-          "time": {
-            "name": "Time"
-          }
-        }
-      },
-      "photo": {
-        "name": "Photo"
-      }
-    },
     "sensor": {
       "diapers_today": {
         "name": "Diapers today",
@@ -164,8 +145,51 @@
       "nursing_right_time": {
         "name": "Nursing right time"
       },
+      "last_nursing": {
+        "name": "Last nursing"
+      },
+      "last_nursing_duration": {
+        "name": "Last nursing duration"
+      },
+      "last_nursing_left_time": {
+        "name": "Last nursing left time"
+      },
+      "last_nursing_right_time": {
+        "name": "Last nursing right time"
+      },
+      "last_sleep_duration": {
+        "name": "Last sleep duration"
+      },
       "pump_timer": {
         "name": "Pump timer"
+      },
+      "nursing_minutes_today": {
+        "name": "Nursing minutes today",
+        "state_attributes": {
+          "nursings": {
+            "name": "Nursings"
+          }
+        }
+      },
+      "last_breast": {
+        "name": "Last breast",
+        "state": {
+          "left": "Started left",
+          "right": "Started right",
+          "none": "No side"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Kind",
+            "state": {
+              "nursing": "Nursing",
+              "pump": "Pump"
+            }
+          },
+          "time": {
+            "name": "Time"
+          }
+        }
       },
       "last_milestone": {
         "name": "Last milestone",
@@ -245,6 +269,25 @@
       },
       "pump": {
         "name": "Pump timer"
+      }
+    },
+    "image": {
+      "latest_picture": {
+        "name": "Latest picture",
+        "state_attributes": {
+          "record_id": {
+            "name": "Entry ID"
+          },
+          "record_type": {
+            "name": "Entry type"
+          },
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "photo": {
+        "name": "Photo"
       }
     }
   },

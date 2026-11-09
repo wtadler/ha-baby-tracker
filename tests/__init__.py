@@ -39,7 +39,8 @@ DIAPER = "sensor.baby_one_last_diaper"
 
 async def setup_integration(hass: HomeAssistant, mock_config_entry: MockConfigEntry) -> None:
     """Add the entry to Home Assistant and set it up, as core's integration tests do."""
-    mock_config_entry.add_to_hass(hass)
+    if hass.config_entries.async_get_entry(mock_config_entry.entry_id) is None:
+        mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 

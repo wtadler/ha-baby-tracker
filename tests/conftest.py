@@ -72,6 +72,16 @@ def recorder_annotations(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(recorder_helpers, "Session", Session, raising=False)
 
 
+# HACS-only: core's own tests conftest provides this fixture
+@pytest.fixture
+def entity_registry_enabled_by_default() -> Iterator[None]:
+    """Enable every entity in the registry, including the ones that start disabled."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default", return_value=True
+    ):
+        yield
+
+
 # HACS-only: core's tests load core's integrations
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterator[None]:

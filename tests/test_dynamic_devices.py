@@ -58,14 +58,31 @@ def _device(hass: HomeAssistant, entry: MockConfigEntry, identifier: str) -> dr.
 KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the account, not a baby
 
 
-# The counts and the asleep sensor are in test_sensor_today.py; each baby also has these four.
-TODAY_KEYS = ("diapers_today", "feeds_today", "bottle_volume_today", "asleep")
+# The last nursing and last sleep details (test_sensor_last_nursing_and_sleep.py).
+DETAIL_KEYS = (
+    "last_nursing",
+    "last_nursing_duration",
+    "last_nursing_left_time",
+    "last_nursing_right_time",
+    "last_sleep_duration",
+)
+
+
+# The counts and the asleep sensor are in test_sensor_today.py; each baby also has these five.
+# The account has three readings of its own: last pump, pump timer, and last breast.
+TODAY_KEYS = (
+    "diapers_today",
+    "feeds_today",
+    "bottle_volume_today",
+    "nursing_minutes_today",
+    "asleep",
+)
 
 
 TIMER_KEYS = ("sleep_timer", "nursing_timer", "nursing_left_time", "nursing_right_time")
 
 
-PER_BABY = len(KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
+PER_BABY = len(KEYS) + len(DETAIL_KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
 # Core PR 24
 # Each baby also has a last milestone sensor.
 PER_BABY += 1
@@ -175,7 +192,9 @@ async def test_a_baby_that_appears_later_is_added_without_a_reload(
     assert _sensor_state(hass, "baby_three", "last_diaper").attributes["type"] == "dirty"
     device = get_baby_device(dr.async_get(hass), BABY_THREE_ID)
     assert device is not None
-    entries = er.async_entries_for_device(er.async_get(hass), device.id)
+    entries = er.async_entries_for_device(
+        er.async_get(hass), device.id, include_disabled_entities=True
+    )
     assert len([e for e in entries if e.domain in READINGS]) == PER_BABY
 
 
@@ -186,4 +205,4 @@ async def test_syncing_again_does_not_duplicate_a_baby(
     await tick(hass)
     await tick(hass)
     entries = er.async_entries_for_config_entry(er.async_get(hass), init_integration.entry_id)
-    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 2
+    assert len([e for e in entries if e.domain in READINGS]) == 3 * PER_BABY + 3
