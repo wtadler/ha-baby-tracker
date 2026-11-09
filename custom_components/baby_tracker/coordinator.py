@@ -174,7 +174,12 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             always_update=False,
         )
         self.client = client
-        self.pictures = PictureCache(client)  # Core PR 23
+        # Core PR 23
+        # A picture download is a background task of the entry, which stops it on unload.
+        self.pictures = PictureCache(
+            client,
+            lambda download, name: entry.async_create_background_task(hass, download, name),
+        )
         self.session = session
         self._device_uuid: str = entry.data[CONF_DEVICE_UUID]
         self.engine = SyncEngine(self._device_uuid)
@@ -186,13 +191,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self.lock = asyncio.Lock()
         self.timers = TimerState(hass, entry, self._publish)  # Core PR 18
         self.guard = TimerGuard(hass, entry, self.timers, self._async_republish)  # Core PR 18
-
-    # Core PR 23
-    @override
-    async def async_shutdown(self) -> None:
-        """Stop the picture downloads still running, then shut down."""
-        self.pictures.cancel()
-        await super().async_shutdown()
 
     @override
     async def _async_setup(self) -> None:

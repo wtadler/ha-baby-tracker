@@ -16,7 +16,7 @@ from pybabytracker import BabyTrackerConnectionError, ProtocolError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.baby_tracker.const import DOMAIN
-from custom_components.baby_tracker.pictures import FAILED_RETRY, MISSING_RETRY
+from custom_components.baby_tracker.pictures import FAILED_RETRY, MISSING_RETRY, PictureCache
 
 from . import BABY_ONE, BABY_THREE, BABY_TWO, NOW, setup_integration, tick
 from .factories import BABY_ONE_ID, DEVICE_A, at, baby_payload
@@ -649,9 +649,11 @@ async def test_the_downloads_still_running_stop_when_the_entry_unloads(
     await hass.async_block_till_done()
 
     # Home Assistant reports a cancelled request as an image error.
-    with pytest.raises(HomeAssistantError):
-        await request
+    async with asyncio.timeout(5):
+        with pytest.raises(HomeAssistantError):
+            await request
     assert cache.files == {}
+    assert cache.downloads == {}
 
 
 async def test_the_cache_holds_two_files_for_each_baby(
@@ -670,3 +672,43 @@ async def test_the_cache_holds_two_files_for_each_baby(
 
     # Two babies from the fixtures and five more: seven babies, fourteen files.
     assert len(cache.files) == 14
+
+
+async def test_a_finished_download_does_not_forget_a_newer_one_for_the_same_file() -> None:
+    started: list[asyncio.Future[bytes | None]] = []
+
+    def start(coro: Any, name: str) -> Any:
+        coro.close()
+        future: asyncio.Future[bytes | None] = asyncio.get_running_loop().create_future()
+        started.append(future)
+        return future
+
+    cache = PictureCache(None, start)  # type: ignore[arg-type]
+    first = asyncio.get_running_loop().create_task(cache.async_get("A.jpg"))
+    await asyncio.sleep(0)
+    older = cache.downloads["A.jpg"]
+    # A newer download for the file takes the older one's place.
+    newer = asyncio.get_running_loop().create_future()
+    cache.downloads["A.jpg"] = newer
+
+    older.set_result(None)
+    await asyncio.sleep(0)
+    await first
+
+    assert cache.downloads["A.jpg"] is newer
+
+
+async def test_the_cache_drops_the_oldest_files_when_a_baby_leaves(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    await _setup(hass, mock_config_entry)
+    cache = mock_config_entry.runtime_data.pictures
+    cache.set_babies(7)
+    for number in range(14):
+        server.pictures[f"P-{number}.jpg"] = JPEG
+        await cache.async_get(f"P-{number}.jpg")
+    assert len(cache.files) == 14
+
+    cache.set_babies(2)
+
+    assert list(cache.files) == [f"P-{number}.jpg" for number in range(6, 14)]

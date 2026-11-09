@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.util import dt as dt_util
 from pybabytracker import (
@@ -17,6 +18,8 @@ from pybabytracker import (
     BabyTrackerError,
     Record,
 )
+
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,14 +81,24 @@ class PictureCache:
     ``FAILED_RETRY``. A failure is logged at warning level once per file, not at every attempt.
     """
 
-    def __init__(self, client: BabyTrackerClient) -> None:
-        """Start with no files."""
+    def __init__(
+        self,
+        client: BabyTrackerClient,
+        start: Callable[[Coroutine[Any, Any, bytes | None], str], asyncio.Task[bytes | None]],
+    ) -> None:
+        """Start with no files. ``start`` runs a download as a task the config entry owns."""
         self._client = client
+        self._start = start
         self._files: OrderedDict[str, bytes] = OrderedDict()
         self._retry_after: dict[str, datetime] = {}
         self._warned: set[str] = set()
         self._downloads: dict[str, asyncio.Task[bytes | None]] = {}
         self._max_files = MIN_FILES
+
+    @property
+    def downloads(self) -> dict[str, asyncio.Task[bytes | None]]:
+        """The downloads running, by file name."""
+        return self._downloads
 
     @property
     def files(self) -> Mapping[str, bytes]:
@@ -107,11 +120,10 @@ class PictureCache:
         while len(self._files) > self._max_files:
             self._files.popitem(last=False)
 
-    def cancel(self) -> None:
-        """Stop the downloads still running, when the entry unloads."""
-        for task in self._downloads.values():
-            task.cancel()
-        self._downloads.clear()
+    def _forget(self, file: str, task: asyncio.Task[bytes | None]) -> None:
+        """Drop a finished download, unless a newer one for the file has taken its place."""
+        if self._downloads.get(file) is task:
+            del self._downloads[file]
 
     async def async_get(self, file: str | None) -> bytes | None:
         """Return a file's bytes, downloading it if it isn't held, or None when there are none."""
@@ -120,10 +132,11 @@ class PictureCache:
         if (content := self._cached(file)) is not None:
             return content
         task = self._downloads.get(file)
-        if task is None:
-            task = asyncio.get_running_loop().create_task(self._download(file))
+        # A task that is done but not yet forgotten (its callback runs a loop turn later) is stale.
+        if task is None or task.done():
+            task = self._start(self._download(file), f"{DOMAIN} download picture {file}")
             self._downloads[file] = task
-            task.add_done_callback(lambda _: self._downloads.pop(file, None))
+            task.add_done_callback(lambda done: self._forget(file, done))
         # Shielded, so cancelling this request leaves the download running.
         return await asyncio.shield(task)
 
