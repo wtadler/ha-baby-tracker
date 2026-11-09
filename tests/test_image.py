@@ -19,7 +19,7 @@ from custom_components.baby_tracker.const import DOMAIN
 from custom_components.baby_tracker.pictures import FAILED_RETRY, MISSING_RETRY
 
 from . import BABY_ONE, BABY_THREE, BABY_TWO, NOW, setup_integration, tick
-from .factories import BABY_ONE_ID, DEVICE_A, at
+from .factories import BABY_ONE_ID, DEVICE_A, at, baby_payload
 from .fake_server import FakeServer
 from .helpers import call, posted
 
@@ -604,3 +604,69 @@ async def test_downloaded_pictures_do_not_pile_up_in_memory(
         assert await cache.async_get(f"P-{number}.jpg") == JPEG
 
     assert len(cache.files) <= 8
+
+
+async def test_a_request_cancelled_mid_download_still_fills_the_cache(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    """Test a slow download isn't lost when the frontend gives up on the request."""
+    _with_photo(server, "PHOTO-1")
+    server.pictures["PHOTO-1.jpg"] = JPEG
+    server.picture_gate = asyncio.Event()
+    await _setup(hass, mock_config_entry)
+
+    request = asyncio.get_running_loop().create_task(async_get_image(hass, PHOTO, timeout=3600))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert server.picture_requests == ["PHOTO-1.jpg"]
+    request.cancel()
+    # Home Assistant reports a cancelled request as an image error.
+    with pytest.raises(HomeAssistantError):
+        await request
+
+    server.picture_gate.set()
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    assert list(mock_config_entry.runtime_data.pictures.files) == ["PHOTO-1.jpg"]
+    assert await _image(hass, PHOTO) == JPEG
+    assert server.picture_requests == ["PHOTO-1.jpg"]
+
+
+async def test_the_downloads_still_running_stop_when_the_entry_unloads(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    _with_photo(server, "PHOTO-1")
+    server.pictures["PHOTO-1.jpg"] = JPEG
+    server.picture_gate = asyncio.Event()
+    await _setup(hass, mock_config_entry)
+    request = asyncio.get_running_loop().create_task(async_get_image(hass, PHOTO, timeout=3600))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    cache = mock_config_entry.runtime_data.pictures
+    await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Home Assistant reports a cancelled request as an image error.
+    with pytest.raises(HomeAssistantError):
+        await request
+    assert cache.files == {}
+
+
+async def test_the_cache_holds_two_files_for_each_baby(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
+) -> None:
+    for number in range(4, 9):
+        server.add_payload(
+            DEVICE_A,
+            baby_payload(f"Baby {number}", f"{number}0000000-AAAA-4AAA-8AAA-00000000000{number}"),
+        )
+    await _setup(hass, mock_config_entry)
+    cache = mock_config_entry.runtime_data.pictures
+    for number in range(30):
+        server.pictures[f"P-{number}.jpg"] = JPEG
+        await cache.async_get(f"P-{number}.jpg")
+
+    # Two babies from the fixtures and five more: seven babies, fourteen files.
+    assert len(cache.files) == 14

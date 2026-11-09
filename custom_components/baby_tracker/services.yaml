@@ -406,7 +406,7 @@ log_medicine:
       example: 2.5
       selector:
         number:
-          min: 0
+          min: 0.01
           max: 1000
           step: 0.05
           mode: box

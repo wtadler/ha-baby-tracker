@@ -24,8 +24,10 @@ _LOGGER = logging.getLogger(__name__)
 # upload it later. A failed download waits less, as the cause is likelier to pass.
 MISSING_RETRY = timedelta(hours=6)
 FAILED_RETRY = timedelta(minutes=30)
-# How many downloaded files are held at once.
-MAX_FILES = 8
+# How many downloaded files are held at once: two for each baby (the photo and the latest picture),
+# and at least this many.
+MIN_FILES = 8
+FILES_PER_BABY = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +44,8 @@ def newest_attached_picture(records: Iterable[Record], baby_id: str) -> Attached
     """Return the newest picture on any of the baby's records.
 
     A record's time decides which is newest. A photo is shown as itself, and a video by its
-    thumbnail, since an image entity can't play one.
+    thumbnail, since an image entity can't play one. The video's thumbnail file (and a media type
+    sent as a digit string) is the expected shape, not yet seen in synced data.
     """
     newest: tuple[tuple[float, str], AttachedPicture] | None = None
     for record in records:
@@ -67,10 +70,12 @@ class PictureCache:
     """The bytes of picture files, downloaded when an image entity is asked for one.
 
     A file is downloaded once, on its first request, and not while the coordinator's lock is held,
-    so a slow picture host can't delay a sync or a write. Only the last few files are kept. Two
-    requests for one file share a download. A file the service doesn't have is not asked for again
-    for ``MISSING_RETRY``, and a failed download for ``FAILED_RETRY``. A failure is logged at
-    warning level once per file, not at every attempt.
+    so a slow picture host can't delay a sync or a write. Only the last few files are kept (see
+    ``set_babies``). A download runs as a task of its own, shared by every request for the file,
+    so a request that is cancelled (the frontend gives up after ten seconds, the library allows
+    thirty) still lets it finish and fill the cache for the next one. A file the service doesn't
+    have is not asked for again for ``MISSING_RETRY``, and a failed download for
+    ``FAILED_RETRY``. A failure is logged at warning level once per file, not at every attempt.
     """
 
     def __init__(self, client: BabyTrackerClient) -> None:
@@ -79,7 +84,8 @@ class PictureCache:
         self._files: OrderedDict[str, bytes] = OrderedDict()
         self._retry_after: dict[str, datetime] = {}
         self._warned: set[str] = set()
-        self._locks: dict[str, asyncio.Lock] = {}
+        self._downloads: dict[str, asyncio.Task[bytes | None]] = {}
+        self._max_files = MIN_FILES
 
     @property
     def files(self) -> Mapping[str, bytes]:
@@ -92,20 +98,34 @@ class PictureCache:
             self._files.move_to_end(file)
         return content
 
+    def set_babies(self, count: int) -> None:
+        """Size the cache for ``count`` babies."""
+        self._max_files = max(MIN_FILES, FILES_PER_BABY * count)
+        self._trim()
+
+    def _trim(self) -> None:
+        while len(self._files) > self._max_files:
+            self._files.popitem(last=False)
+
+    def cancel(self) -> None:
+        """Stop the downloads still running, when the entry unloads."""
+        for task in self._downloads.values():
+            task.cancel()
+        self._downloads.clear()
+
     async def async_get(self, file: str | None) -> bytes | None:
         """Return a file's bytes, downloading it if it isn't held, or None when there are none."""
         if file is None:
             return None
         if (content := self._cached(file)) is not None:
             return content
-        lock = self._locks.setdefault(file, asyncio.Lock())
-        async with lock:
-            if (content := self._cached(file)) is not None:
-                return content
-            content = await self._download(file)
-        if not lock.locked():
-            self._locks.pop(file, None)
-        return content
+        task = self._downloads.get(file)
+        if task is None:
+            task = asyncio.get_running_loop().create_task(self._download(file))
+            self._downloads[file] = task
+            task.add_done_callback(lambda _: self._downloads.pop(file, None))
+        # Shielded, so cancelling this request leaves the download running.
+        return await asyncio.shield(task)
 
     async def _download(self, file: str) -> bytes | None:
         now = dt_util.utcnow()
@@ -130,6 +150,5 @@ class PictureCache:
             return None
         self._warned.discard(file)
         self._files[file] = content
-        while len(self._files) > MAX_FILES:
-            self._files.popitem(last=False)
+        self._trim()
         return content

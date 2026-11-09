@@ -4,6 +4,7 @@ import asyncio
 import math
 from datetime import timedelta
 from typing import Any
+from unittest.mock import patch
 
 import probatio
 import pytest
@@ -563,3 +564,58 @@ async def test_an_account_device_is_refused(
             blocking=True,
         )
     assert server.posted == []
+
+
+async def test_a_record_id_taken_by_another_record_is_refused_not_called_a_bad_amount(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    _dose(server, 1, 30, DROPS)
+    await tick(hass)
+    taken = "6F1C2A3E-0000-4000-8000-0000000000AA"
+    await hass.services.async_call(
+        DOMAIN,
+        "log_diaper",
+        {"device_id": device_id(hass, BABY_ONE_ID), "type": "wet", "object_id": taken},
+        blocking=True,
+    )
+    server.posted.clear()
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await _log(hass, "Test Drops", object_id=taken)
+
+    assert raised.value.translation_key == "object_id_in_use"
+    assert server.posted == []
+
+
+async def test_a_value_error_the_library_raises_is_a_write_error_not_a_bad_amount(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    """Test a refusal unrelated to the amount isn't mislabelled as one."""
+    _dose(server, 1, 30, DROPS)
+    await tick(hass)
+
+    with (
+        patch.object(
+            init_integration.runtime_data.engine.__class__,
+            "add_medication",
+            side_effect=ValueError("no device ID"),
+        ),
+        pytest.raises(HomeAssistantError) as raised,
+    ):
+        await _log(hass, "Test Drops")
+
+    assert not isinstance(raised.value, ServiceValidationError)
+    assert raised.value.translation_key == "write_failed"
+    assert server.posted == []
+
+
+async def test_medicines_that_differ_only_in_case_are_both_listed_with_their_ids(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    _dose(server, 1, 0, {**DROPS, "name": "Drops"})
+    _dose(server, 2, 10, {**SYRUP, "name": " drops "})
+    await tick(hass)
+
+    medicines = _next(hass).attributes["medicines"]
+    assert len(medicines) == 2
+    assert {label.rsplit("(", 1)[1] for label in medicines} == {f"{DROPS_ID})", f"{SYRUP_ID})"}

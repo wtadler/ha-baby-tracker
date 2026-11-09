@@ -333,8 +333,10 @@ async def async_log_medicine(
         except ValidationError as err:
             raise validation_error(VALIDATION_KEYS[type(err)]) from err
         except ValueError as err:
-            # The library's own refusal of a bad amount, which the check above also makes.
-            raise validation_error("invalid_amount") from err
+            # The amount check above covers every bad amount, so what's left is not about the
+            # amount (the engine can't write, a time without a zone): a write error, as for any
+            # other refusal the library makes after the checks.
+            raise _error("write_failed", error=str(err)) from err
 
     await _add(coordinator, object_id, add)
 

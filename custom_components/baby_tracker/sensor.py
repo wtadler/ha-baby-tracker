@@ -657,10 +657,15 @@ class BabyTrackerNextMedicineDoseSensor(BabyTrackerBabyEntity, SensorEntity):
         record = _medicine_record(baby)
         doses = (baby.medicine_doses if baby is not None else None) or {}
         names = {key: _text(dose.medicine_name) or key for key, dose in doses.items()}
-        counts = Counter(names.values())
+        # The library tells medicines apart by name without case or edge spaces.
+        counts = Counter(name.strip().casefold() for name in names.values())
         medicines: dict[str, str | None] = {}
         for key, dose in doses.items():
-            label = names[key] if counts[names[key]] == 1 else f"{names[key]} ({key})"
+            label = (
+                names[key]
+                if counts[names[key].strip().casefold()] == 1
+                else f"{names[key]} ({key})"
+            )
             due = next_dose(dose)
             medicines[label] = due.isoformat() if due else None
         return {

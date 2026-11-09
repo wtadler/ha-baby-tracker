@@ -187,6 +187,13 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         self.timers = TimerState(hass, entry, self._publish)  # Core PR 18
         self.guard = TimerGuard(hass, entry, self.timers, self._async_republish)  # Core PR 18
 
+    # Core PR 23
+    @override
+    async def async_shutdown(self) -> None:
+        """Stop the picture downloads still running, then shut down."""
+        self.pictures.cancel()
+        await super().async_shutdown()
+
     @override
     async def _async_setup(self) -> None:
         """Load what was saved, so a restart fetches only what's newer."""
@@ -309,6 +316,7 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
         data = self._snapshot()
         self._remove_deleted_devices(data)  # Core PR 6
         self._baby_names = {baby_id: baby.name for baby_id, baby in data.babies.items()}
+        self.pictures.set_babies(len(data.babies))  # Core PR 23
         # Core PR 18
         # The saved copy of an orphaned nursing timer is dropped in a task the entry tracks.
         self.timers.drop_orphaned_nursing(data.babies)
