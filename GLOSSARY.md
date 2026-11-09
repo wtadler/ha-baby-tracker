@@ -13,3 +13,7 @@
 **Timer**: An activity that has started and not yet ended, such as a sleep or nursing session in progress. Ending a timer turns it into a finished record.
 
 **Backfill**: Building Home Assistant's copy of the records for the first time by replaying every device's transaction log from the start.
+
+**Selection**: An entry in one of the app's pick lists, such as a medicine, a food, a vaccine, a milestone, or a kind of activity. A record that uses one carries a copy of it.
+
+**Seed**: A zip of a sync group's database that the app downloads when it joins the group.
