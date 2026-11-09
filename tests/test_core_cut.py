@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -66,6 +67,38 @@ def _load() -> ModuleType:
 @pytest.fixture(scope="module")
 def core_cut() -> ModuleType:
     return _load()
+
+
+@pytest.fixture(scope="module")
+def planned(core_cut: ModuleType) -> Callable[[int], dict[Path, str]]:
+    """Each planned PR's files, cut once per module: the per-PR checks share them."""
+    cache: dict[int, dict[Path, str]] = {}
+
+    def files(number: int) -> dict[Path, str]:
+        if number not in cache:
+            cache[number] = core_cut.planned_files(number)
+        return cache[number]
+
+    return files
+
+
+@pytest.fixture(scope="module")
+def cut_tree(
+    planned: Callable[[int], dict[Path, str]], tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[int], Path]:
+    """A folder holding each planned PR's files as a cut writes them, made once per module."""
+    cache: dict[int, Path] = {}
+
+    def tree(number: int) -> Path:
+        if number not in cache:
+            root = tmp_path_factory.mktemp(f"cut{number:02d}")
+            for relative, text in planned(number).items():
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(text)
+            cache[number] = root
+        return cache[number]
+
+    return tree
 
 
 def _tree(root: Path) -> dict[str, str]:
@@ -520,28 +553,23 @@ def test_strict_typing_adds_the_integration_once_in_order(core_cut: ModuleType, 
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_has_no_trace_of_the_hacs_repository(
-    core_cut: ModuleType, core: Path, number: int
+    cut_tree: Callable[[int], Path], number: int
 ) -> None:
-    core_cut.cut(number, core, ruff=None)
+    core = cut_tree(number)
     for root in (core / COMPONENT, core / TESTS):
         for name, text in _tree(root).items():
             for trace in ("custom_components", "HACS", "Core PR", "# Core:", "_custom_component"):
                 assert trace not in text, (name, trace)
 
 
-def _cut_coordinator(core_cut: ModuleType, core: Path, number: int) -> str:
-    core_cut.cut(number, core, ruff=None)
-    return (core / COMPONENT / "coordinator.py").read_text()
-
-
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_cut_raises_config_entry_auth_failed_on_a_rejected_password(
-    core_cut: ModuleType, core: Path, number: int
+    planned: Callable[[int], dict[Path, str]], number: int
 ) -> None:
     # Core starts a reauth flow only when the integration has one, so PR 1, which has none,
     # still gets the authentication path: setup fails, and a loaded entry stops polling
     # instead of sending the rejected password at every interval.
-    source = _cut_coordinator(core_cut, core, number)
+    source = planned(number)[COMPONENT / "coordinator.py"]
     assert "raise ConfigEntryAuthFailed(" in source
     assert "ConfigEntryError" not in source
     assert 'translation_key="auth_failed"' in source
@@ -601,19 +629,19 @@ def test_the_pr1_cut_leaves_out_later_features(core_cut: ModuleType, core: Path)
 
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
-def test_every_planned_cut_is_valid_python(core_cut: ModuleType, core: Path, number: int) -> None:
-    core_cut.cut(number, core, ruff=None)
+def test_every_planned_cut_is_valid_python(cut_tree: Callable[[int], Path], number: int) -> None:
+    core = cut_tree(number)
     for path in [*(core / COMPONENT).rglob("*.py"), *(core / TESTS).rglob("*.py")]:
         ast.parse(path.read_text(), filename=str(path))
 
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_leaves_no_unused_imports(
-    core_cut: ModuleType, core: Path, number: int
+    cut_tree: Callable[[int], Path], number: int
 ) -> None:
     # Core's ruff fails on an import whose only users wait for a later PR, so each import
     # needs the marker of its earliest user.
-    core_cut.cut(number, core, ruff=None)
+    core = cut_tree(number)
     ruff = shutil.which("ruff") or str(Path(sys.executable).parent / "ruff")
     result = subprocess.run(
         [
@@ -687,11 +715,11 @@ def _cut_members(files: dict[Path, str]) -> dict[str, set[str]]:
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_uses_only_class_members_it_keeps(
-    core_cut: ModuleType, number: int
+    planned: Callable[[int], dict[Path, str]], number: int
 ) -> None:
     # A HACS-only member (``BABY = "baby"  # HACS-only``) leaves the cut, so a line still kept in
     # core that reads ``BabyTrackerServiceArgument.BABY`` fails at import. Ruff can't see that.
-    files = core_cut.planned_files(number)
+    files = planned(number)
     if number >= 9:
         # The check is only as good as the members it finds: from PR 9 on, the actions' fields.
         assert "DEVICE_ID" in _cut_members(files).get("BabyTrackerServiceArgument", set())
@@ -725,11 +753,11 @@ def test_the_member_check_knows_methods_annotations_and_tuple_targets() -> None:
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_uses_only_names_it_defines(
-    core_cut: ModuleType, core: Path, number: int
+    cut_tree: Callable[[int], Path], number: int
 ) -> None:
     # A line kept in core that uses a name only HACS defines (a HACS-only helper or enum member)
     # parses fine but fails at runtime, so each such line needs the HACS-only marker too.
-    core_cut.cut(number, core, ruff=None)
+    core = cut_tree(number)
     ruff = shutil.which("ruff") or str(Path(sys.executable).parent / "ruff")
     result = subprocess.run(
         [
@@ -851,10 +879,12 @@ def _unresolved_imports(files: dict[Path, str]) -> list[str]:
 
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
-def test_every_planned_cut_imports_only_what_it_has(core_cut: ModuleType, number: int) -> None:
+def test_every_planned_cut_imports_only_what_it_has(
+    planned: Callable[[int], dict[Path, str]], number: int
+) -> None:
     # Ruff can't see that ``from .bottle import OUNCES`` names a module or a name the cut leaves
     # for a later PR (or for HACS), and core fails at import.
-    assert _unresolved_imports(core_cut.planned_files(number)) == []
+    assert _unresolved_imports(planned(number)) == []
 
 
 def test_the_import_check_reports_a_missing_module_and_a_missing_name() -> None:
@@ -1095,11 +1125,11 @@ def _fields_sent(files: dict[Path, str], removed: set[str]) -> list[str]:
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
 def test_every_planned_cut_sends_only_fields_its_actions_take(
-    core_cut: ModuleType, number: int
+    planned: Callable[[int], dict[Path, str]], number: int
 ) -> None:
     # A test kept in core that still sends a HACS-only field (the deprecated ``baby`` or
     # ``device``) fails in core with "extra keys not allowed".
-    files = core_cut.planned_files(number)
+    files = planned(number)
     removed = _removed_fields(files)
     assert {"baby", "device"} <= removed
     assert _fields_sent(files, removed) == []
@@ -1151,9 +1181,11 @@ def test_the_field_check_finds_each_way_a_test_sends_a_field() -> None:
 
 
 @pytest.mark.parametrize("number", range(1, LAST_PR + 1))
-def test_every_planned_cut_calls_only_actions_it_has(core_cut: ModuleType, number: int) -> None:
+def test_every_planned_cut_calls_only_actions_it_has(
+    planned: Callable[[int], dict[Path, str]], number: int
+) -> None:
     # A test that calls an action planned for a later PR fails in core with "action not found".
-    assert _actions_called(core_cut.planned_files(number)) == []
+    assert _actions_called(planned(number)) == []
 
 
 def test_the_action_check_finds_each_way_a_test_calls_an_action() -> None:
