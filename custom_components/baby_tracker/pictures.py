@@ -1,23 +1,16 @@
-"""Picture files the image entities show: each baby's photo and newest attached picture."""
+"""Picture files the image entities show: each baby's photo."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 from collections import OrderedDict
-from collections.abc import Callable, Coroutine, Iterable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.util import dt as dt_util
-from pybabytracker import (
-    MEDIA_PHOTO,
-    MEDIA_VIDEO,
-    BabyTrackerClient,
-    BabyTrackerError,
-    Record,
-)
+from pybabytracker import BabyTrackerClient, BabyTrackerError
 
 from .const import DOMAIN
 
@@ -27,46 +20,9 @@ _LOGGER = logging.getLogger(__name__)
 # upload it later. A failed download waits less, as the cause is likelier to pass.
 MISSING_RETRY = timedelta(hours=6)
 FAILED_RETRY = timedelta(minutes=30)
-# How many downloaded files are held at once: two for each baby (the photo and the latest picture),
-# and at least this many.
+# How many downloaded files are held at once: one for each baby (the photo), and at least this many.
 MIN_FILES = 8
-FILES_PER_BABY = 2
-
-
-@dataclass(frozen=True, slots=True)
-class AttachedPicture:
-    """The newest picture attached to one of a baby's records, and what it's attached to."""
-
-    file: str
-    record_type: str
-    record_id: str
-    time: datetime | None
-
-
-def newest_attached_picture(records: Iterable[Record], baby_id: str) -> AttachedPicture | None:
-    """Return the newest picture on any of the baby's records.
-
-    A record's time decides which is newest. A photo is shown as itself, and a video by its
-    thumbnail, since an image entity can't play one. The video's thumbnail file (and a media type
-    sent as a digit string) is the expected shape, not yet seen in synced data.
-    """
-    newest: tuple[tuple[float, str], AttachedPicture] | None = None
-    for record in records:
-        if record.baby_id != baby_id or record.time is None:
-            continue
-        for picture in record.pictures:
-            if picture.media_type == MEDIA_PHOTO and picture.file is not None:
-                file = picture.file
-            elif picture.media_type == MEDIA_VIDEO:
-                file = picture.thumbnail_file
-            else:
-                continue
-            # Records at one time go to the larger ID, so a reload shows the same picture.
-            key = (record.time.timestamp(), record.object_id)
-            if newest is None or key > newest[0]:
-                attached = AttachedPicture(file, record.record_type, record.object_id, record.time)
-                newest = (key, attached)
-    return newest[1] if newest is not None else None
+FILES_PER_BABY = 1
 
 
 class PictureCache:

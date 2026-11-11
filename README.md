@@ -23,19 +23,23 @@ Each baby in the account becomes a device with:
 |---|---|
 | **Last diaper**, **Last feed**, **Last sleep** | When it happened, with the details (type, amount, sides, note) as attributes. The newest of nursing, formula, and pumped milk is the last feed. |
 | **Last nursing**, **Last sleep duration** | When the baby's newest nursing happened, even if a bottle came after it, and how many minutes the newest finished sleep lasted. |
-| **Last nursing duration**, **Last nursing left time**, **Last nursing right time** | The newest nursing's minutes, in total and per side. They start disabled: enable the ones you want. |
 | **Asleep** | On while the baby's newest sleep is running, started from any device. |
 | **Diapers today**, **Feeds today**, **Bottle volume today**, **Nursing minutes today** | Counts and minutes since local midnight. They chart and keep long-term statistics. |
 | **Wet diaper**, **Dirty diaper**, **Mixed diaper**, **Bottle** buttons | Log that record now. The bottle is the one set in the options. |
 | **Sleep**, **Nursing left**, **Nursing right** switches | Start and stop timers. See [Timers](#timers). |
 | **Nursing left time**, **Nursing right time**, **Discard nursing** | The running nursing session's minutes per side, and a way to drop it. |
 | **Photo** | The baby's photo in the app, as an image. It is downloaded the first time something asks to show it. |
-| **Latest picture** | The newest picture attached to any of the baby's entries, with the entry's type, ID, and time as attributes. It is off by default, because it can show any entry's photo, a diaper's included. Turn it on in the entity settings. |
-| **Last milestone**, **Last vaccine** | The newest one, by name, with when it was, its description, ID, and note as attributes. |
 | **Last medicine** | The medicine of the newest dose, with the dose's amount and unit, time, medicine ID, and note as attributes. |
 | **Next medicine dose** | When the newest dose's medicine can be given again: the dose's time plus the medicine's interval (in minutes, as the app stores it). Unknown when the medicine has no interval. The `medicines` attribute holds every medicine's own next time by name, so two alternating medicines each show theirs. A time in the past means it can be given now. It comes from synced doses, so it can lag a dose given on a phone by one poll. |
 | **Last** *activity*, such as **Last Tummy Time** or **Last Bath** | One for each activity type the baby has been logged with: when the newest activity of that type was, with its minutes (`duration_minutes`) and note as attributes. Both the app's built-in types (Crawling, Cruising, Tummy Time, TV Time, Story Time) and types added in the app count; the app has no bath screen, for example, so a bath is usually an activity type someone added. A type's sensor appears once the baby has an activity of it, and keeps its entity ID and history if the type is renamed in the app (the new name shows after a restart). |
 | **Sleep timer**, **Nursing timer** | When the running timer started, for a [live activity](#live-activity-on-your-iphone). |
+
+Every entity is on from the start. Six entities from earlier versions are gone: **Last milestone**,
+**Last vaccine**, **Last nursing duration**, **Last nursing left time**, **Last nursing right
+time**, and **Latest picture**. They only repeated what the app already shows, and an entity that
+is only worth adding switched off isn't added. The next start removes them from the entity
+registry, so none is left behind as unavailable. **Last nursing** still shows when the newest
+nursing happened, and **Photo** is still the baby's photo.
 
 Each account becomes a device with **Last pump**, a **Pump timer** switch, and a **Pump timer**
 sensor showing when it started, because the app stores pumps on the account, not on a baby. The

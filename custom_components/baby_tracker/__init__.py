@@ -46,6 +46,21 @@ PLATFORMS: list[Platform] = [
 # on setup).
 REMOVED_BUTTONS = ("_sleep", "_nurse_left", "_nurse_right")
 
+# HACS-only: the dropped entity cleanup. The keys of the per-baby entities (unique ID
+# ``<baby_id>_<key>``) that were removed, by platform: they only repeated what the app shows.
+# The key is compared whole, so an activity sensor (``<baby_id>_last_activity_<type_id>``) is never
+# taken for one of these.
+REMOVED_ENTITIES: dict[str, tuple[str, ...]] = {
+    Platform.SENSOR.value: (
+        "last_milestone",
+        "last_vaccine",
+        "last_nursing_duration",
+        "last_nursing_left_time",
+        "last_nursing_right_time",
+    ),
+    Platform.IMAGE.value: ("latest_picture",),
+}
+
 # Core PR 9
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -78,6 +93,7 @@ async def async_setup_entry(
 
     entry.runtime_data = coordinator
     _remove_old_timer_buttons(hass, entry)  # HACS-only: the legacy button cleanup
+    _remove_dropped_entities(hass, entry)  # HACS-only: the dropped entity cleanup
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True  # HACS-only: core's entry methods return None (2026.11 and later)
 
@@ -97,6 +113,23 @@ def _remove_old_timer_buttons(hass: HomeAssistant, entry: BabyTrackerConfigEntry
             and entity.platform == DOMAIN
             and entity.unique_id.endswith(REMOVED_BUTTONS)
         ):
+            registry.async_remove(entity.entity_id)
+
+
+# HACS-only: the dropped entity cleanup
+def _remove_dropped_entities(hass: HomeAssistant, entry: BabyTrackerConfigEntry) -> None:
+    """Drop the entities this integration no longer creates from the entity registry.
+
+    HACS-only: the dropped entity cleanup. Core never had these (Last milestone, Last vaccine, the
+    three Last nursing minutes sensors, and Latest picture), so a registry entry with no entity
+    behind it would show as unavailable, or as restored, forever. A disabled one is removed too.
+    Every other entity is left alone, and with none left this does nothing, so it is safe on every
+    setup.
+    """
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        _baby_id, _, key = entity.unique_id.partition("_")
+        if entity.platform == DOMAIN and key in REMOVED_ENTITIES.get(entity.domain, ()):
             registry.async_remove(entity.entity_id)
 
 

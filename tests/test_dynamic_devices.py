@@ -59,13 +59,7 @@ KEYS = ("last_diaper", "last_feed", "last_sleep")  # a pump belongs to the accou
 
 
 # The last nursing and last sleep details (test_sensor_last_nursing_and_sleep.py).
-DETAIL_KEYS = (
-    "last_nursing",
-    "last_nursing_duration",
-    "last_nursing_left_time",
-    "last_nursing_right_time",
-    "last_sleep_duration",
-)
+DETAIL_KEYS = ("last_nursing", "last_sleep_duration")
 
 
 # The counts and the asleep sensor are in test_sensor_today.py; each baby also has these five.
@@ -83,14 +77,8 @@ TIMER_KEYS = ("sleep_timer", "nursing_timer", "nursing_left_time", "nursing_righ
 
 
 PER_BABY = len(KEYS) + len(DETAIL_KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
-# Core PR 24
-# Each baby also has a last milestone sensor.
-PER_BABY += 1
-# Core PR 25
-# And a last vaccine sensor.
-PER_BABY += 1
 # Core PR 26
-# And last medicine and next medicine dose sensors.
+# Each baby also has last medicine and next medicine dose sensors.
 PER_BABY += 2
 
 

@@ -149,15 +149,6 @@
       "last_nursing": {
         "name": "Last nursing"
       },
-      "last_nursing_duration": {
-        "name": "Last nursing duration"
-      },
-      "last_nursing_left_time": {
-        "name": "Last nursing left time"
-      },
-      "last_nursing_right_time": {
-        "name": "Last nursing right time"
-      },
       "last_sleep_duration": {
         "name": "Last sleep duration"
       },
@@ -189,40 +180,6 @@
           },
           "time": {
             "name": "Time"
-          }
-        }
-      },
-      "last_milestone": {
-        "name": "Last milestone",
-        "state_attributes": {
-          "time": {
-            "name": "Time"
-          },
-          "description": {
-            "name": "Description"
-          },
-          "milestone_id": {
-            "name": "Milestone ID"
-          },
-          "note": {
-            "name": "Note"
-          }
-        }
-      },
-      "last_vaccine": {
-        "name": "Last vaccine",
-        "state_attributes": {
-          "time": {
-            "name": "Time"
-          },
-          "description": {
-            "name": "Description"
-          },
-          "vaccine_id": {
-            "name": "Vaccine ID"
-          },
-          "note": {
-            "name": "Note"
           }
         }
       },
@@ -284,20 +241,6 @@
       }
     },
     "image": {
-      "latest_picture": {
-        "name": "Latest picture",
-        "state_attributes": {
-          "record_id": {
-            "name": "Entry ID"
-          },
-          "record_type": {
-            "name": "Entry type"
-          },
-          "time": {
-            "name": "Time"
-          }
-        }
-      },
       "photo": {
         "name": "Photo"
       }

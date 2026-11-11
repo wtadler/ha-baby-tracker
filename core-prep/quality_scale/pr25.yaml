@@ -68,7 +68,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default:
     status: done
-    comment: Latest picture starts disabled, because it can show any entry's picture, a diaper's included. Every other entity is one of the integration's main readings or controls.
+    comment: No entity starts disabled. Each is one of the integration's main readings or controls.
   entity-translations: done
   exception-translations: done
   icon-translations: done

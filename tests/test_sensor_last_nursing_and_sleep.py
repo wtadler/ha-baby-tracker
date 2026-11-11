@@ -1,22 +1,16 @@
-"""Core PR 4: the last nursing sensors (time, total and side minutes) and last sleep duration."""
+"""Core PR 4: the last nursing sensor and the last sleep duration sensor."""
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from pybabytracker import BabyTrackerConnectionError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.baby_tracker.const import DOMAIN
 
 from . import NOW, setup_integration, tick
 from .factories import BABY_ONE_ID, DEVICE_A, OP_DELETE, OP_UPDATE, at, volume
 from .fake_server import FakeServer
 
 LAST_NURSING = "sensor.baby_one_last_nursing"
-DURATION = "sensor.baby_one_last_nursing_duration"
-LEFT = "sensor.baby_one_last_nursing_left_time"
-RIGHT = "sensor.baby_one_last_nursing_right_time"
 SLEEP = "sensor.baby_one_last_sleep_duration"
 
 
@@ -24,26 +18,6 @@ SLEEP = "sensor.baby_one_last_sleep_duration"
 def _start_at_now(freezer: FrozenDateTimeFactory) -> None:
     """Freeze the clock at NOW before anything is set up."""
     freezer.move_to(NOW)
-
-
-@pytest.fixture(autouse=True)
-def _enable_the_detail_sensors(hass: HomeAssistant, mock_config_entry: MockConfigEntry) -> None:
-    """Enable the sensors that start disabled, by registering them before the entry sets up."""
-    mock_config_entry.add_to_hass(hass)
-    registry = er.async_get(hass)
-    for key, entity_id in (
-        ("last_nursing_duration", DURATION),
-        ("last_nursing_left_time", LEFT),
-        ("last_nursing_right_time", RIGHT),
-    ):
-        registry.async_get_or_create(
-            "sensor",
-            DOMAIN,
-            f"{BABY_ONE_ID}_{key}",
-            config_entry=mock_config_entry,
-            suggested_object_id=entity_id.removeprefix("sensor."),
-            disabled_by=None,
-        )
 
 
 def _value(hass: HomeAssistant, entity_id: str) -> str:
@@ -58,22 +32,18 @@ def _nursing(server: FakeServer, number: int, minute: int, **sides: object) -> N
     )
 
 
-async def test_the_sensors_show_the_newest_nursing(
+async def test_the_sensor_shows_when_the_newest_nursing_happened(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     populated_server: FakeServer,
 ) -> None:
-    """Test the time and minutes come from the newest nursing."""
+    """Test the time comes from the newest nursing."""
     await setup_integration(hass, mock_config_entry)
 
     assert _value(hass, LAST_NURSING) == at(40).isoformat()
-    assert _value(hass, DURATION) == "19"
-    assert _value(hass, LEFT) == "7"
-    assert _value(hass, RIGHT) == "12"
-    state = hass.states.get(DURATION)
+    state = hass.states.get(LAST_NURSING)
     assert state is not None
-    assert state.attributes["device_class"] == "duration"
-    assert state.attributes["unit_of_measurement"] == "min"
+    assert state.attributes["device_class"] == "timestamp"
 
 
 async def test_a_bottle_after_the_nursing_does_not_hide_it(
@@ -81,21 +51,20 @@ async def test_a_bottle_after_the_nursing_does_not_hide_it(
     mock_config_entry: MockConfigEntry,
     populated_server: FakeServer,
 ) -> None:
-    """Test the sensors keep the nursing when a later feed is a bottle."""
+    """Test the sensor keeps the nursing when a later feed is a bottle."""
     await setup_integration(hass, mock_config_entry)
     # populated_server's pumped bottle at minute 60 is already newer than the nursing at 40.
     assert _value(hass, "sensor.baby_one_last_feed") == at(60).isoformat()
     assert _value(hass, LAST_NURSING) == at(40).isoformat()
-    assert _value(hass, LEFT) == "7"
 
 
-async def test_a_newer_nursing_replaces_the_readings(
+async def test_a_newer_nursing_replaces_the_reading(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    """Test a nursing that syncs later moves every sensor to it."""
+    """Test a nursing that syncs later moves the sensor to it, a bottle after it or not."""
     _nursing(server, 1, 30, leftDuration=4, rightDuration=0, bothDuration=0)
     await tick(hass)
-    assert _value(hass, DURATION) == "4"
+    assert _value(hass, LAST_NURSING) == at(30).isoformat()
 
     _nursing(server, 2, 90, leftDuration=10, rightDuration=15, bothDuration=2)
     server.add_record(
@@ -103,38 +72,22 @@ async def test_a_newer_nursing_replaces_the_readings(
     )
     await tick(hass)
     assert _value(hass, LAST_NURSING) == at(90).isoformat()
-    assert _value(hass, DURATION) == "27"
-    assert _value(hass, LEFT) == "10"
-    assert _value(hass, RIGHT) == "15"
 
 
-async def test_the_sensors_are_unknown_before_the_first_nursing(
+async def test_the_sensor_is_unknown_before_the_first_nursing(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
-    """Test a baby that has never nursed has unknown readings."""
-    for entity_id in (LAST_NURSING, DURATION, LEFT, RIGHT):
-        assert _value(hass, entity_id) == "unknown"
+    """Test a baby that has never nursed has an unknown reading."""
+    assert _value(hass, LAST_NURSING) == "unknown"
 
 
-async def test_a_side_with_no_whole_minutes_is_unknown(
+async def test_a_nursing_with_no_minutes_still_shows_when_it_happened(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    """Test a side the payload doesn't give as an int is unknown and left out of the total."""
-    _nursing(server, 4, 30, leftDuration=6, rightDuration=[], bothDuration=True)
-    await tick(hass)
-    assert _value(hass, LEFT) == "6"
-    assert _value(hass, RIGHT) == "unknown"
-    assert _value(hass, DURATION) == "6"
-
-
-async def test_a_nursing_with_no_minutes_at_all_has_no_total(
-    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test the total is unknown, not 0, when no side has minutes."""
+    """Test the time doesn't depend on the minutes the payload carries."""
     _nursing(server, 5, 30, leftDuration=None, rightDuration=None, bothDuration=None)
     await tick(hass)
     assert _value(hass, LAST_NURSING) == at(30).isoformat()
-    assert _value(hass, DURATION) == "unknown"
 
 
 async def test_the_sleep_duration_shows_the_newest_finished_sleep(
@@ -189,55 +142,50 @@ async def test_an_android_timer_session_is_the_last_nursing(
     )
     await tick(hass)
     assert _value(hass, LAST_NURSING) == at(60).isoformat()
-    assert _value(hass, DURATION) == "15"
 
     _nursing(server, 2, 90, leftDuration=3, rightDuration=0, bothDuration=0)
     await tick(hass)
     assert _value(hass, LAST_NURSING) == at(90).isoformat()
-    assert _value(hass, DURATION) == "3"
 
 
 @pytest.mark.parametrize(
-    ("left", "right", "both", "total", "left_state", "right_state"),
+    ("duration", "state"),
     [
-        (-5, 4, 0, "4", "unknown", "4"),  # a negative side is no minutes, not a subtraction
-        (5.0, 4, 0, "4", "unknown", "4"),  # a float isn't a whole number of minutes
-        ("4", "6", 0, "10", "4", "6"),  # Android sends digit strings
-        ("", " ", 0, "0", "unknown", "unknown"),  # empty and whitespace-only strings
-        ("+5", "٣", 0, "0", "unknown", "unknown"),  # not plain digits
-        (True, None, None, "unknown", "unknown", "unknown"),  # a bool isn't a number
-        (10**30, 0, 0, str(10**30), str(10**30), "0"),  # huge, but still a whole number
+        (-5, "unknown"),  # a negative length is no minutes
+        (5.0, "unknown"),  # a float isn't a whole number of minutes
+        ("40", "40"),  # Android sends digit strings
+        ("", "unknown"),  # an empty string
+        ("  ", "unknown"),  # whitespace only
+        ("+5", "unknown"),  # not plain digits
+        ("٣", "unknown"),  # not ASCII digits
+        (True, "unknown"),  # a bool isn't a number
+        (None, "unknown"),
+        ([], "unknown"),
+        (10**30, str(10**30)),  # huge, but still a whole number
     ],
 )
-async def test_the_minutes_read_as_the_library_reads_a_code(
+async def test_the_sleep_minutes_read_as_the_library_reads_a_code(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     server: FakeServer,
-    left: object,
-    right: object,
-    both: object,
-    total: str,
-    left_state: str,
-    right_state: str,
+    duration: object,
+    state: str,
 ) -> None:
-    """Test a malformed side gives unknown and adds nothing, whatever the payload holds."""
-    _nursing(server, 6, 30, leftDuration=left, rightDuration=right, bothDuration=both)
+    """Test a malformed length gives unknown, whatever the payload holds."""
+    server.add_record(
+        DEVICE_A, "Sleep", "S0000000-0000-4000-8000-000000000006", when=at(30), duration=duration
+    )
     await tick(hass)
-    assert _value(hass, LAST_NURSING) == at(30).isoformat()
-    assert _value(hass, LEFT) == left_state
-    assert _value(hass, RIGHT) == right_state
-    assert _value(hass, DURATION) == total
+    assert _value(hass, SLEEP) == state
 
 
-async def test_a_nursing_with_no_duration_keys_at_all_is_unknown(
+async def test_a_nursing_with_no_duration_keys_at_all_still_shows_when_it_happened(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
     """Test a record that lacks every duration key still shows when it happened."""
     _nursing(server, 7, 30)
     await tick(hass)
     assert _value(hass, LAST_NURSING) == at(30).isoformat()
-    for entity_id in (DURATION, LEFT, RIGHT):
-        assert _value(hass, entity_id) == "unknown"
 
 
 async def test_a_nursing_that_ties_on_time_is_settled_by_its_change_time(
@@ -265,17 +213,21 @@ async def test_a_nursing_that_ties_on_time_is_settled_by_its_change_time(
         bothDuration=0,
     )
     await tick(hass)
-    assert _value(hass, LEFT) == "9"
+    assert _value(hass, LAST_NURSING) == at(30).isoformat()
+    # The sensor shows the time alone, which the two share: the coordinator holds the record.
+    last = init_integration.runtime_data.data.babies[BABY_ONE_ID].last_nursing
+    assert last is not None
+    assert last.object_id == "N0000000-0000-4000-8000-000000000009"
 
 
-async def test_a_deleted_nursing_hands_the_sensors_back_to_the_one_before(
+async def test_a_deleted_nursing_hands_the_sensor_back_to_the_one_before(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
 ) -> None:
-    """Test deleting the newest nursing moves the readings back to the previous one."""
+    """Test deleting the newest nursing moves the reading back to the previous one."""
     _nursing(server, 10, 30, leftDuration=4, rightDuration=0, bothDuration=0)
     _nursing(server, 11, 60, leftDuration=9, rightDuration=0, bothDuration=0)
     await tick(hass)
-    assert _value(hass, LEFT) == "9"
+    assert _value(hass, LAST_NURSING) == at(60).isoformat()
 
     server.add_record(
         DEVICE_A,
@@ -285,15 +237,14 @@ async def test_a_deleted_nursing_hands_the_sensors_back_to_the_one_before(
         op=OP_DELETE,
     )
     await tick(hass)
-    assert _value(hass, LEFT) == "4"
     assert _value(hass, LAST_NURSING) == at(30).isoformat()
 
 
-@pytest.mark.parametrize("entity_id", [LAST_NURSING, DURATION, LEFT, RIGHT, SLEEP])
+@pytest.mark.parametrize("entity_id", [LAST_NURSING, SLEEP])
 async def test_the_sensors_are_unavailable_when_the_sync_fails(
     hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer, entity_id: str
 ) -> None:
-    """Test a sync failure makes every detail sensor unavailable, like the other sensors."""
+    """Test a sync failure makes each detail sensor unavailable, like the other sensors."""
     _nursing(server, 12, 30, leftDuration=4, rightDuration=0, bothDuration=0)
     await tick(hass)
     assert _value(hass, entity_id) != "unavailable"

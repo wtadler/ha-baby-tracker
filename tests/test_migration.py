@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryDisabler, ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -68,6 +68,42 @@ def add_old_timer_button(
         device_id=device.id,
         translation_key=key,
         has_entity_name=True,
+    )
+
+
+REMOVED_ENTITIES = (
+    ("sensor", "last_milestone"),
+    ("sensor", "last_vaccine"),
+    ("sensor", "last_nursing_duration"),
+    ("sensor", "last_nursing_left_time"),
+    ("sensor", "last_nursing_right_time"),
+    ("image", "latest_picture"),
+)
+
+
+def add_removed_entity(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    baby_id: str,
+    domain: str,
+    key: str,
+    name: str = "Baby One",
+    disabled_by: er.RegistryEntryDisabler | None = None,
+) -> er.RegistryEntry:
+    """Register an entity an earlier version created for a baby, on the baby's device."""
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, baby_id)}, name=name
+    )
+    return er.async_get(hass).async_get_or_create(
+        domain,
+        DOMAIN,
+        f"{baby_id}_{key}",
+        config_entry=entry,
+        device_id=device.id,
+        suggested_object_id=f"{name.lower().replace(' ', '_')}_{key}",
+        translation_key=key,
+        has_entity_name=True,
+        disabled_by=disabled_by,
     )
 
 
@@ -483,3 +519,147 @@ async def test_the_button_cleanup_runs_again_harmlessly_on_a_reload(
         for e in er.async_entries_for_config_entry(er.async_get(hass), mock_config_entry.entry_id)
         if e.domain == "switch"
     }
+
+
+# The removed entities: HACS-only cleanup, since core never had them.
+
+
+async def test_setup_removes_the_six_dropped_entities(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    old = [
+        add_removed_entity(hass, mock_config_entry, baby_id, domain, key)
+        for baby_id in (BABY_ONE_ID, BABY_TWO_ID)
+        for domain, key in REMOVED_ENTITIES
+    ]
+    registry = er.async_get(hass)
+    assert all(registry.async_get(entity.entity_id) is not None for entity in old)
+
+    await _setup_entry(hass, mock_config_entry)
+
+    for entity in old:
+        assert registry.async_get(entity.entity_id) is None
+        assert hass.states.get(entity.entity_id) is None
+
+
+async def test_a_disabled_dropped_entity_is_removed_too(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Test an entity switched off by the integration or by the user is cleaned out all the same."""
+    mock_config_entry.add_to_hass(hass)
+    by_integration = add_removed_entity(
+        hass,
+        mock_config_entry,
+        BABY_ONE_ID,
+        "sensor",
+        "last_nursing_duration",
+        disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+    )
+    by_user = add_removed_entity(
+        hass,
+        mock_config_entry,
+        BABY_ONE_ID,
+        "image",
+        "latest_picture",
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+
+    await _setup_entry(hass, mock_config_entry)
+
+    registry = er.async_get(hass)
+    assert registry.async_get(by_integration.entity_id) is None
+    assert registry.async_get(by_user.entity_id) is None
+
+
+async def test_the_cleanup_of_the_dropped_entities_leaves_every_other_entity_alone(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    for domain, key in REMOVED_ENTITIES:
+        add_removed_entity(hass, mock_config_entry, BABY_ONE_ID, domain, key)
+    # An entity the integration still makes, registered before setup, keeps its registry entry.
+    kept = {
+        key: add_removed_entity(hass, mock_config_entry, BABY_ONE_ID, domain, key)
+        for domain, key in (
+            ("sensor", "last_nursing"),
+            ("sensor", "last_sleep_duration"),
+            ("sensor", "last_medicine"),
+            ("image", "photo"),
+        )
+    }
+    # An activity sensor is keyed on a type's ID, which can't make it look like a dropped one.
+    activity = er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{BABY_ONE_ID}_last_activity_last_milestone",
+        config_entry=mock_config_entry,
+        suggested_object_id="baby_one_last_activity_last_milestone",
+        translation_key="last_activity",
+        has_entity_name=True,
+    )
+    registry = er.async_get(hass)
+    before = {key: entry.id for key, entry in kept.items()}
+
+    await _setup_entry(hass, mock_config_entry)
+
+    for key, entry in kept.items():
+        current = registry.async_get(entry.entity_id)
+        assert current is not None, key
+        assert current.id == before[key], key
+    assert registry.async_get(activity.entity_id) is not None
+    for domain, key in REMOVED_ENTITIES:
+        assert registry.async_get_entity_id(domain, DOMAIN, f"{BABY_ONE_ID}_{key}") is None, key
+    for key in ("last_diaper", "last_feed", "last_sleep", "diapers_today"):
+        assert registry.async_get_entity_id("sensor", DOMAIN, f"{BABY_ONE_ID}_{key}") is not None
+    assert hass.states.get("sensor.baby_one_last_nursing") is not None
+    assert hass.states.get("image.baby_one_photo") is not None
+
+
+async def test_the_dropped_entities_of_another_entry_are_not_touched(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """Test the cleanup reads only the entry being set up."""
+    mock_config_entry.add_to_hass(hass)
+    # A disabled entry isn't set up with the domain, so only its registry entries are at stake.
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        title=EMAIL_TWO,
+        unique_id=EMAIL_TWO,
+        data=dict(mock_config_entry.data),
+        disabled_by=ConfigEntryDisabler.USER,
+    )
+    other.add_to_hass(hass)
+    mine = add_removed_entity(hass, mock_config_entry, BABY_ONE_ID, "sensor", "last_vaccine")
+    theirs = add_removed_entity(
+        hass, other, BABY_THREE_ID, "sensor", "last_vaccine", name="Baby Three"
+    )
+
+    await _setup_entry(hass, mock_config_entry)
+
+    registry = er.async_get(hass)
+    assert registry.async_get(mine.entity_id) is None
+    assert registry.async_get(theirs.entity_id) is not None
+
+
+async def test_the_dropped_entity_cleanup_runs_again_harmlessly_on_a_reload(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    add_removed_entity(hass, mock_config_entry, BABY_ONE_ID, "sensor", "last_milestone")
+    await _setup_entry(hass, mock_config_entry)
+    registry = er.async_get(hass)
+    before = sorted(
+        (entry.entity_id, entry.id)
+        for entry in er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
+    )
+
+    assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    after = sorted(
+        (entry.entity_id, entry.id)
+        for entry in er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
+    )
+    assert after == before
+    assert registry.async_get_entity_id("sensor", DOMAIN, f"{BABY_ONE_ID}_last_milestone") is None

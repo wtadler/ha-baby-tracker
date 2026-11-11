@@ -37,14 +37,12 @@ from pybabytracker import (
     Diaper,  # Core PR 4
     Formula,  # Core PR 4
     Medication,  # Core PR 26
-    Milestone,  # Core PR 24
     Nursing,  # Core PR 4
     OtherActivity,  # Core PR 28
     Pump,  # Core PR 5
     Pumped,  # Core PR 4
     Record,
     Sleep,  # Core PR 4
-    Vaccine,  # Core PR 25
     numeric_code,  # Core PR 4
 )
 from pybabytracker.timers import LEFT, RIGHT  # Core PR 19
@@ -515,105 +513,16 @@ class BabyTrackerNursingTimeSensor(BabyTrackerBabyEntity, SensorEntity):
         return round(seconds / 60, 1)
 
 
-# Core PR 24
+# Core PR 26
 def _text(value: object) -> str | None:
     """Return ``value`` when it's text with something in it."""
     return value if isinstance(value, str) and value.strip() else None
 
 
-# Core PR 24
+# Core PR 26
 def _selection_field(selection: object, key: str) -> object:
     """Return one field of an embedded pick-list entry, or None when it isn't a mapping."""
     return selection.get(key) if isinstance(selection, dict) else None
-
-
-# Core PR 24
-def _milestone_sentence(baby: BabyData | None, description: object) -> str | None:
-    """Return the milestone as the app words it: the baby's name, then its description.
-
-    The app's descriptions start where the name ends (" came home", "'s first smile"), so
-    "Homer" and "'s first smile" read "Homer's first smile". Runs of spaces are tidied.
-    """
-    if _text(description) is None:
-        return None
-    name = baby.name if baby is not None and baby.name else ""
-    return " ".join(f"{name}{description}".split())
-
-
-# Core PR 24
-class BabyTrackerLastSelectionSensor(BabyTrackerBabyEntity, SensorEntity):
-    """The name of the newest record of a pick-list kind (a milestone, a vaccine), and when.
-
-    The state is the embedded entry's name. The attributes are the time, the entry's description
-    and ID, and the note, each None when the record doesn't carry a usable one.
-    """
-
-    _id_attribute: str
-
-    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
-        """Return the baby's newest record of the kind, and the entry embedded in it."""
-        raise NotImplementedError
-
-    def _description(self, description: object) -> str | None:
-        return _text(description)
-
-    @property
-    @override
-    def native_value(self) -> str | None:
-        """Return the newest entry's name, or None before the first."""
-        baby = self._baby
-        record, selection = self._selection(baby) if baby is not None else (None, None)
-        return _text(_selection_field(selection, "name")) if record is not None else None
-
-    @property
-    @override
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return when the newest one was, its description, its ID, and its note."""
-        baby = self._baby
-        record, selection = self._selection(baby) if baby is not None else (None, None)
-        time = record.time if record is not None else None
-        return {
-            "time": time.isoformat() if time else None,
-            "description": self._description(_selection_field(selection, "desc")),
-            self._id_attribute: _text(_selection_field(selection, "objectID")),
-            "note": _note(record),
-        }
-
-
-# Core PR 24
-LAST_MILESTONE = SensorEntityDescription(key="last_milestone", translation_key="last_milestone")
-
-
-# Core PR 24
-class BabyTrackerLastMilestoneSensor(BabyTrackerLastSelectionSensor):
-    """The newest milestone the baby reached."""
-
-    _id_attribute = "milestone_id"
-
-    @override
-    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
-        record = baby.milestone if isinstance(baby.milestone, Milestone) else None
-        return record, record.milestone_type if record is not None else None
-
-    @override
-    def _description(self, description: object) -> str | None:
-        return _milestone_sentence(self._baby, description)
-
-
-# Core PR 25
-LAST_VACCINE = SensorEntityDescription(key="last_vaccine", translation_key="last_vaccine")
-
-
-# Core PR 25
-class BabyTrackerLastVaccineSensor(BabyTrackerLastSelectionSensor):
-    """The newest vaccine the baby was given."""
-
-    _id_attribute = "vaccine_id"
-
-    @override
-    def _selection(self, baby: BabyData) -> tuple[Record | None, object]:
-        record = baby.vaccine if isinstance(baby.vaccine, Vaccine) else None
-        return record, record.vaccine_type if record is not None else None
 
 
 # Core PR 26
@@ -750,31 +659,6 @@ def _nursing_time(baby: BabyData) -> datetime | None:
 
 
 # Core PR 4
-def _nursing_minutes(baby: BabyData) -> int | None:
-    nursing = _last_nursing(baby)
-    if nursing is None:
-        return None
-    sides = [
-        _minutes(minutes)
-        for minutes in (nursing.left_duration, nursing.right_duration, nursing.both_duration)
-    ]
-    known = [minutes for minutes in sides if minutes is not None]
-    return sum(known) if known else None
-
-
-# Core PR 4
-def _nursing_left_minutes(baby: BabyData) -> int | None:
-    nursing = _last_nursing(baby)
-    return _minutes(nursing.left_duration) if nursing is not None else None
-
-
-# Core PR 4
-def _nursing_right_minutes(baby: BabyData) -> int | None:
-    nursing = _last_nursing(baby)
-    return _minutes(nursing.right_duration) if nursing is not None else None
-
-
-# Core PR 4
 def _sleep_minutes(baby: BabyData) -> int | None:
     sleep = baby.sleep
     # A running sleep's duration of 0 isn't a length yet; the sleep timer sensor covers it.
@@ -793,39 +677,13 @@ class BabyTrackerLastDetailSensorDescription(SensorEntityDescription):
 
 # Core PR 4
 # The last feed sensor follows the newest feed of any kind, so a bottle after a nursing hides the
-# nursing's minutes: the nursing sensors follow the newest nursing alone. The minutes are their own
-# sensors, not only attributes, so they show on the device page, keep history, and trigger
-# automations without a template.
+# nursing: the last nursing sensor follows the newest nursing alone.
 LAST_DETAIL_SENSORS: tuple[BabyTrackerLastDetailSensorDescription, ...] = (
     BabyTrackerLastDetailSensorDescription(
         key="last_nursing",
         translation_key="last_nursing",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_nursing_time,
-    ),
-    BabyTrackerLastDetailSensorDescription(
-        key="last_nursing_duration",
-        translation_key="last_nursing_duration",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        entity_registry_enabled_default=False,
-        value_fn=_nursing_minutes,
-    ),
-    BabyTrackerLastDetailSensorDescription(
-        key="last_nursing_left_time",
-        translation_key="last_nursing_left_time",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        entity_registry_enabled_default=False,
-        value_fn=_nursing_left_minutes,
-    ),
-    BabyTrackerLastDetailSensorDescription(
-        key="last_nursing_right_time",
-        translation_key="last_nursing_right_time",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        entity_registry_enabled_default=False,
-        value_fn=_nursing_right_minutes,
     ),
     BabyTrackerLastDetailSensorDescription(
         key="last_sleep_duration",
@@ -839,9 +697,9 @@ LAST_DETAIL_SENSORS: tuple[BabyTrackerLastDetailSensorDescription, ...] = (
 
 # Core PR 4
 class BabyTrackerLastDetailSensor(BabyTrackerBabyEntity, SensorEntity):
-    """When a baby's newest nursing happened, or the minutes of its newest nursing or sleep.
+    """When a baby's newest nursing happened, or the minutes of its newest sleep.
 
-    A nursing timed on a phone syncs only once it stops, so the nursing sensors show the last
+    A nursing timed on a phone syncs only once it stops, so the last nursing sensor shows the last
     finished one. The sleep duration is unknown while the newest sleep still runs.
     """
 
@@ -918,8 +776,6 @@ BABY_SENSORS: tuple[
     ((SLEEP_TIMER,), BabyTrackerTimerSensor),  # Core PR 8
     ((NURSING_TIMER,), BabyTrackerTimerSensor),  # Core PR 19
     (NURSING_TIME_SENSORS, BabyTrackerNursingTimeSensor),  # Core PR 19
-    ((LAST_MILESTONE,), BabyTrackerLastMilestoneSensor),  # Core PR 24
-    ((LAST_VACCINE,), BabyTrackerLastVaccineSensor),  # Core PR 25
     ((LAST_MEDICINE,), BabyTrackerLastMedicineSensor),  # Core PR 26
     ((NEXT_MEDICINE_DOSE,), BabyTrackerNextMedicineDoseSensor),  # Core PR 26
     (LAST_DETAIL_SENSORS, BabyTrackerLastDetailSensor),  # Core PR 4
