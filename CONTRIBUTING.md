@@ -1,5 +1,38 @@
 # Contributing
 
+## What belongs here
+
+This integration is headed for Home Assistant core, so every entity and action in it will be part
+of a core pull request and has to justify itself to core reviewers. The library,
+[`pybabytracker`](https://github.com/wtadler/pybabytracker), is where the app's full data model
+lives: it reads and writes every record type the app syncs, whether or not the integration uses it.
+A record type the library supports isn't a reason to add it here.
+
+A feature belongs in the integration if it gives Home Assistant something to do that the app
+can't:
+
+- **Automations on current state:** "fed 3 hours ago," the next medicine dose, a running sleep
+  timer.
+- **Quick logging away from a phone:** buttons, NFC tags, and voice, for frequent, time-sensitive
+  records such as diapers, bottles, sleep, and nursing.
+- **Numbers worth a graph:** daily totals, temperature, and growth.
+
+It doesn't belong if it only repeats what the app already shows, such as a date for a rare event,
+or setup done once in the app.
+
+Three more rules:
+
+- **Generic, not named.** No feature depends on a name the user typed, like an activity called
+  "Bath." Types are handled the same way and keyed by ID.
+- **Enabled by default, or not at all.** If an entity is only worth adding switched off, it
+  probably shouldn't be added.
+- **No HACS-only features.** Once the core pull requests land, this repository and core should
+  match. Code marked `# HACS-only` is only for migrations and deprecations, which core never needs.
+
+The decision, and the discussion behind it, is in
+[#161](https://github.com/wtadler/ha-baby-tracker/issues/161). Bug reports and fixes are always
+welcome. For a new feature, open an issue first, so we can agree it fits before you write it.
+
 ## Development
 
 ```sh
