@@ -15,7 +15,7 @@ from types import MappingProxyType
 from typing import Any
 
 from pybabytracker import (
-    AccountChangedError,  # Core PR 27
+    AccountResetError,  # Core PR 27
     AuthenticationError,
     Device,
     RawTransaction,
@@ -181,9 +181,9 @@ class FakeClient:
         if self.server.sign_in_error is not None:
             raise self.server.sign_in_error
         # Core PR 27
-        # The library's AccountResetError is an AccountChangedError with no new AccountID.
+        # The service refuses a device from before the reset whatever the password.
         if self.device_uuid in self.server.reset_devices:
-            raise AccountChangedError(self.account_id or 0, None)
+            raise AccountResetError(self.account_id or 0)
         if self.password != self.server.password:
             raise AuthenticationError("the service rejected the email or password")
         self._signed_in = True
