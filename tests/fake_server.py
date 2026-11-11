@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import Any
 
 from pybabytracker import (
+    AccountResetError,  # Core PR 27
     AuthenticationError,
     Device,
     RawTransaction,
@@ -35,6 +36,9 @@ class FakeServer:
         self.password = PASSWORD
         # The sync group's AccountID. A test changes it to reset the group, as the app can.
         self.account_id = 100  # Core PR 27
+        # Core PR 27
+        # Devices the service refuses because they joined before a sync reset.
+        self.reset_devices: set[str] = set()
         self.logs: dict[str, list[dict[str, Any]]] = {}
         self.names: dict[str, str] = {}
         self.sign_in_error: Exception | None = None
@@ -176,6 +180,10 @@ class FakeClient:
         )
         if self.server.sign_in_error is not None:
             raise self.server.sign_in_error
+        # Core PR 27
+        # The service refuses a device from before the reset whatever the password.
+        if self.device_uuid in self.server.reset_devices:
+            raise AccountResetError(self.account_id or 0)
         if self.password != self.server.password:
             raise AuthenticationError("the service rejected the email or password")
         self._signed_in = True
@@ -184,6 +192,10 @@ class FakeClient:
     async def _ensure_session(self) -> None:
         # A reset on the service shows on the next request.
         self.account_id = self.server.account_id  # Core PR 27
+        # Core PR 27
+        # A reset ends the session of every device from before it, and signing in again fails.
+        if self.device_uuid in self.server.reset_devices:
+            self._signed_in = False
         if self.server.request_error is not None:
             raise self.server.request_error
         if not self._signed_in or self.password != self.server.password:

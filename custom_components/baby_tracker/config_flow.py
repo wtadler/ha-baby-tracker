@@ -30,6 +30,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 from pybabytracker import (
+    AccountResetError,  # Core PR 27
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerConnectionError,
@@ -89,7 +90,12 @@ async def _check_login(
         return "invalid_auth"
     except BabyTrackerConnectionError:
         return "cannot_connect"
-    except Exception:
+    except Exception as err:  # Core before PR 27: except Exception:
+        # Core PR 27
+        # Sync was reset in the app, and the service refuses this device whatever the password.
+        # Reauth takes the password: the reload raises the repair, which joins as a new device.
+        if isinstance(err, AccountResetError):
+            return "sync_reset"
         _LOGGER.exception("Unexpected error while checking the login")
         return "unknown"
     finally:
@@ -168,6 +174,13 @@ class BabyTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
             if error is None:
                 return self.async_update_reload_and_abort(
                     entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}
+                )
+            # Core PR 27
+            if error == "sync_reset":
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    reason="reauth_sync_reset",
                 )
             errors["base"] = error
         return self.async_show_form(

@@ -32,6 +32,7 @@
     "abort": {
       "already_configured": "This Baby Tracker account is already set up.",
       "reauth_successful": "Signed in again. Syncing resumes.",
+      "reauth_sync_reset": "Saved. Sync was reset in the Baby Tracker app: fix the repair in Settings > Repairs to join the new sync group.",
       "unique_id_mismatch": "That is a different account than the one this entry was set up with. Add it as a new entry instead."
     }
   },
@@ -841,7 +842,7 @@
         "step": {
           "confirm": {
             "title": "Start over from the new sync group?",
-            "description": "Sync was reset in the Baby Tracker app for {account}, so the account now uses a different sync group. Baby Tracker stopped syncing so nothing from the old group is mixed in.\n\nFixing it deletes the sync data saved in Home Assistant and loads the new group from the start. Nothing is lost from the account: the records stay in the Baby Tracker app. Select Submit to continue."
+            "description": "Sync was reset in the Baby Tracker app for {account}, so the account now uses a different sync group. Baby Tracker stopped syncing so nothing from the old group is mixed in.\n\nFixing it deletes the sync data saved in Home Assistant and joins the new group as a new device, as the app does, loading it from the start. Nothing is lost from the account: the records stay in the Baby Tracker app. Select Submit to continue."
           }
         },
         "abort": {
