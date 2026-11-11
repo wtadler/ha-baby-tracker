@@ -29,8 +29,21 @@ def _subclasses(base: type[ValidationError]) -> set[type[ValidationError]]:
     return found
 
 
+# Errors from library writes the integration never calls, so none can reach a user. By name, so
+# the list holds for library versions that don't have them yet.
+UNREACHABLE = {
+    # Raised only by add_food, which no action calls.
+    "SelectionExistsError",
+}
+
+
 def test_every_validation_error_the_library_raises_has_a_key() -> None:
-    assert _subclasses(ValidationError) == set(VALIDATION_KEYS)
+    raised = {error for error in _subclasses(ValidationError) if error.__name__ not in UNREACHABLE}
+    assert raised == set(VALIDATION_KEYS)
+
+
+def test_no_unreachable_error_has_a_key() -> None:
+    assert not {error.__name__ for error in VALIDATION_KEYS} & UNREACHABLE
 
 
 @pytest.mark.parametrize("error", sorted(VALIDATION_KEYS, key=lambda kind: kind.__name__))
