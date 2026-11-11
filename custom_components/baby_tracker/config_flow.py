@@ -30,6 +30,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 from pybabytracker import (
+    AccountChangedError,  # Core PR 27
     AuthenticationError,
     BabyTrackerClient,
     BabyTrackerConnectionError,
@@ -89,7 +90,12 @@ async def _check_login(
         return "invalid_auth"
     except BabyTrackerConnectionError:
         return "cannot_connect"
-    except Exception:
+    except Exception as err:  # Core before PR 27: except Exception:
+        # Core PR 27
+        # Sync was reset in the app, and the service refuses this device whatever the password.
+        # Take the password: the reload raises the repair, which joins again as a new device.
+        if isinstance(err, AccountChangedError):
+            return None
         _LOGGER.exception("Unexpected error while checking the login")
         return "unknown"
     finally:

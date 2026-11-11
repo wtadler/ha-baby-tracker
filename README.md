@@ -192,9 +192,12 @@ skipped or overwritten. Delete the account's entry under **Settings > Devices & 
 it again with the same email and password.
 
 **A repair says the sync group changed.** Sync was reset in the Baby Tracker app, so the account now
-uses a different sync group, and Baby Tracker stopped syncing. Fix the repair under **Settings >
-Repairs**: it deletes the sync data Home Assistant saved and loads the new group from the start.
-Nothing is lost from the account.
+uses a different sync group, and Baby Tracker stopped syncing. The same repair appears when the
+service refuses Home Assistant's device after a reset. Fix the repair under **Settings >
+Repairs**: it deletes the sync data Home Assistant saved, joins the account again as a new device,
+and loads the new group from the start. Nothing is lost from the account, and the babies' devices
+and entities stay as they were. Records Home Assistant logged before the reset can no longer be
+undone or deleted from Home Assistant.
 
 **No Live Activity appears.** Open the automation's trace. If it shows the `notify` action sent,
 the phone is dropping it: under **Settings > Apps > Home Assistant > Live Activities** on the

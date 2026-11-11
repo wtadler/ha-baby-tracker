@@ -23,6 +23,8 @@ Notes about the Android app come from records seen on a real account and from ho
 
 Without a session, `GET /account/device` returns `401 Unauthorized`.
 
+After sync is reset in the app, `POST /session` from any device that joined before the reset returns `401`, labeled `text/html`, with the plain-text body `Account has been reset. Please login again` (confirmed). It answers that whatever the password, so it isn't a wrong password: asking for the password again can't fix it. See [Account ID changes](#account-id-changes).
+
 How the Android app handles the `POST /session` response (unconfirmed):
 
 - `200` is success, with the `AccountID` in the body. When joining, an `AccountID` of 0 counts as a failure.
@@ -222,6 +224,10 @@ Unconfirmed. A selection is an entry in one of the app's pick lists: a medicine,
 ## Account ID changes
 
 Unconfirmed. The `AccountID` from `POST /session` names the sync group. The Android app stores it when it creates, joins, or resets a group. Each time it signs in again after a `401`, it compares the new `AccountID` with the stored one. If they differ, it turns sync off and warns that sign-in failed. A different `AccountID` means the email and password now open a different group from the one the device's data came from. A client should stop syncing then and not merge into the new group.
+
+A reset also refuses every device from before it, at sign-in, with the `401` reply above. The fix is to join again as a new device: sign in with a new `DeviceUUID`, which the service accepts into the new group (confirmed), then read it from the start with a fresh state. The app does the same, since it takes a new device ID whenever it joins. Whether the service checks the password or the device first is unconfirmed: with a wrong password, a refused device may get either reply.
+
+A reset copies the account from the device that makes it: the new group starts from that device's data. A device whose sync had stopped carries over only the records it had, so anything that only other devices had synced since is missing from the new group.
 
 ## Other endpoints seen
 

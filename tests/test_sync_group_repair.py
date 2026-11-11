@@ -3,14 +3,18 @@ new sync group from scratch."""
 
 import asyncio
 import json
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 from pybabytracker import NoResponseError
@@ -25,7 +29,7 @@ from custom_components.baby_tracker.const import CONF_DEVICE_UUID, DOMAIN
 from . import BABY_THREE, DIAPER, ENTRY_ID, NEW_PASSWORD, NOW, tick
 from .factories import BABY_ONE_ID, DEVICE_B, at
 from .fake_server import FakeServer
-from .helpers import call, log_diaper, reauth_flows
+from .helpers import call, fail_to_write, gap_issue, log_diaper, reauth_flows
 
 ISSUE_ID = f"sync_group_changed_{ENTRY_ID}"
 NEW_GROUP = 200
@@ -407,3 +411,85 @@ async def test_fixing_the_repair_joins_again_as_a_new_device(
     assert init_integration.state is ConfigEntryState.LOADED
     assert hass.states.get(NEW_GROUP_DIAPER).state != "unavailable"
     assert issue(hass) is None
+
+
+async def test_reauth_for_a_device_refused_after_a_reset_takes_the_password_and_raises_the_repair(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    # The password changed, so reauth starts; then sync is reset in the app, and the service
+    # refuses the entry's device whatever the password.
+    server.password = NEW_PASSWORD
+    await tick(hass)
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert [flow["context"]["source"] for flow in flows] == ["reauth"]
+    old_device = refuse_old_devices(server, init_integration)
+
+    result = await hass.config_entries.flow.async_configure(
+        flows[0]["flow_id"], {CONF_PASSWORD: NEW_PASSWORD}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert init_integration.data[CONF_PASSWORD] == NEW_PASSWORD
+    assert issue(hass) is not None
+    assert reauth_flows(hass) == []
+
+    result = await fix(hass)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert init_integration.data[CONF_DEVICE_UUID] != old_device
+    assert init_integration.state is ConfigEntryState.LOADED
+    assert issue(hass) is None
+
+
+async def test_fixing_the_repair_forgets_the_old_devices_log_gap(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    server: FakeServer,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    server.last_sync_override[init_integration.data[CONF_DEVICE_UUID]] = 5
+    await fail_to_write(hass)
+    freezer.tick(timedelta(hours=1, minutes=1))
+    await fail_to_write(hass)
+    assert gap_issue(hass, init_integration) is not None
+    refuse_old_devices(server, init_integration)
+    await tick(hass)
+
+    await fix(hass)
+
+    assert gap_issue(hass, init_integration) is None
+
+
+async def test_fixing_the_repair_keeps_the_babys_device_and_entities(
+    hass: HomeAssistant, init_integration: MockConfigEntry, server: FakeServer
+) -> None:
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    before_entity = entities.async_get(DIAPER)
+    assert before_entity is not None
+    before_device = devices.async_get(before_entity.device_id or "")
+    assert before_device is not None
+    before_ids = {
+        entry.entity_id: entry.unique_id
+        for entry in er.async_entries_for_config_entry(entities, ENTRY_ID)
+    }
+    refuse_old_devices(server, init_integration)
+    await tick(hass)
+
+    await fix(hass)
+
+    after_entity = entities.async_get(DIAPER)
+    assert after_entity is not None
+    assert after_entity.id == before_entity.id
+    assert after_entity.unique_id == before_entity.unique_id
+    assert after_entity.device_id == before_device.id
+    after_device = devices.async_get(before_device.id)
+    assert after_device is not None
+    assert after_device.identifiers == before_device.identifiers
+    assert {
+        entry.entity_id: entry.unique_id
+        for entry in er.async_entries_for_config_entry(entities, ENTRY_ID)
+    } == before_ids
+    assert hass.states.get(DIAPER).state != "unavailable"

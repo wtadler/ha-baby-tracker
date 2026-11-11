@@ -11,6 +11,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import CONF_DEVICE_UUID, STORAGE_VERSION
 from .coordinator import storage_key
+from .writes import forget_gap
 
 
 class SyncGroupRepairFlow(RepairsFlow):
@@ -44,8 +45,11 @@ class SyncGroupRepairFlow(RepairsFlow):
         )
         async with lock:
             await Store(self.hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
+        # A gap in the old device's own log is moot once the entry joins as a new device.
+        forget_gap(self.hass, entry.entry_id)
         # Join as a new device, as the app does whenever it joins: after a reset the service
-        # refuses every device from before it, whatever the password.
+        # refuses every device from before it, whatever the password. The new ID has the same
+        # format as the one the config flow makes.
         self.hass.config_entries.async_update_entry(
             entry, data={**entry.data, CONF_DEVICE_UUID: str(uuid4()).upper()}
         )
