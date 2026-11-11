@@ -461,3 +461,43 @@ log_activity:
       example: 6F1C2A3E-0000-4000-8000-000000000003
       selector:
         text:
+
+log_temperature:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: baby_tracker
+    temperature:
+      required: true
+      example: 100.4
+      selector:
+        number:
+          min: 30
+          max: 113
+          step: 0.1
+          mode: box
+    unit:
+      required: false
+      example: °F
+      selector:
+        select:
+          options:
+            - °F
+            - °C
+    time:
+      required: false
+      selector:
+        datetime:
+    note:
+      required: false
+      example: Under the arm
+      selector:
+        text:
+    object_id:
+      required: false
+      example: 6F1C2A3E-0000-4000-8000-000000000004
+      selector:
+        text:

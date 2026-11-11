@@ -224,6 +224,38 @@
             "name": "Note"
           }
         }
+      },
+      "last_temperature": {
+        "name": "Last temperature",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "weight": {
+        "name": "Weight",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "length": {
+        "name": "Length",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          }
+        }
+      },
+      "head_circumference": {
+        "name": "Head circumference",
+        "state_attributes": {
+          "time": {
+            "name": "Time"
+          }
+        }
       }
     },
     "switch": {
@@ -614,6 +646,36 @@
           "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new activity each time."
         }
       }
+    },
+    "log_temperature": {
+      "name": "Log temperature",
+      "description": "Adds a temperature reading as Home Assistant's own device in the Baby Tracker account. It's saved in the unit it was taken in, not converted.",
+      "fields": {
+        "device_id": {
+          "name": "Baby",
+          "description": "The baby's device."
+        },
+        "temperature": {
+          "name": "Temperature",
+          "description": "The reading, such as 100.4 in °F or 38 in °C. A reading no body could have (outside 86 to 113 °F, or 30 to 45 °C) is refused, which catches a reading in one unit given as the other."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "°F or °C. Defaults to the one Home Assistant's unit system uses."
+        },
+        "time": {
+          "name": "Time",
+          "description": "When it was taken. Defaults to now. A time without an offset is read in Home Assistant's time zone."
+        },
+        "note": {
+          "name": "Note",
+          "description": "An optional note to save with the temperature."
+        },
+        "object_id": {
+          "name": "Record ID",
+          "description": "A UUID you choose. Reuse the same one to retry safely: if a write with this ID already landed, nothing is added again. Leave it empty for a new temperature each time."
+        }
+      }
     }
   },
   "selector": {
@@ -760,6 +822,12 @@
     },
     "unknown_activity": {
       "message": "Activity {activity} isn't a type the account has. Add the type in the Baby Tracker app first, then use its name as the app shows it."
+    },
+    "temperature_out_of_range": {
+      "message": "A temperature in {unit} must be from {low} to {high}. Check the number and the unit: a reading in °C given as °F is refused, and the other way around."
+    },
+    "invalid_temperature_unit": {
+      "message": "The unit must be °F or °C."
     }
   },
   "issues": {

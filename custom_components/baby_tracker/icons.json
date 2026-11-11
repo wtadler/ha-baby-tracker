@@ -83,6 +83,18 @@
       },
       "last_activity": {
         "default": "mdi:run"
+      },
+      "last_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "weight": {
+        "default": "mdi:scale-bathroom"
+      },
+      "length": {
+        "default": "mdi:human-male-height"
+      },
+      "head_circumference": {
+        "default": "mdi:tape-measure"
       }
     },
     "switch": {
@@ -169,6 +181,9 @@
     },
     "log_activity": {
       "service": "mdi:run"
+    },
+    "log_temperature": {
+      "service": "mdi:thermometer-plus"
     }
   }
 }

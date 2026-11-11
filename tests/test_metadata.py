@@ -114,6 +114,7 @@ def test_services_yaml_describes_the_diaper_and_undo_actions_and_their_fields() 
         "discard_nursing",
         "log_medicine",
         "log_activity",  # Core PR 28
+        "log_temperature",  # Core PR 29
     }
     assert set(services["log_diaper"]["fields"]) == {
         "device_id",
@@ -203,8 +204,18 @@ def test_services_yaml_describes_the_new_actions_and_their_fields() -> None:
         "discard_nursing",
         "log_medicine",
         "log_activity",  # Core PR 28
+        "log_temperature",  # Core PR 29
     }
     fields = {name: set(spec["fields"]) for name, spec in services.items()}
+    # Core PR 29
+    assert fields["log_temperature"] == {
+        "device_id",
+        "temperature",
+        "unit",
+        "time",
+        "note",
+        "object_id",
+    }
     # Core PR 28
     assert fields["log_activity"] == {
         "device_id",
@@ -537,6 +548,10 @@ def test_every_sensor_has_a_translated_name() -> None:
         "last_medicine": "Last medicine",
         "next_medicine_dose": "Next medicine dose",
         "last_activity": "Last {activity}",  # Core PR 28
+        "last_temperature": "Last temperature",  # Core PR 29
+        "weight": "Weight",  # Core PR 29
+        "length": "Length",  # Core PR 29
+        "head_circumference": "Head circumference",  # Core PR 29
     }
 
 
@@ -673,3 +688,31 @@ def test_the_activity_sensor_and_action_are_translated() -> None:
     icons = json.loads((INTEGRATION / "icons.json").read_text())
     assert icons["entity"]["sensor"]["last_activity"]["default"].startswith("mdi:")
     assert icons["services"]["log_activity"]["service"].startswith("mdi:")
+
+
+# Core PR 29
+def test_the_temperature_and_growth_sensors_and_action_are_translated() -> None:
+    strings = json.loads((INTEGRATION / "strings.json").read_text())
+    sensors = strings["entity"]["sensor"]
+    for key in ("last_temperature", "weight", "length", "head_circumference"):
+        assert set(sensors[key]["state_attributes"]) == {"time"}, key
+    message = strings["exceptions"]["temperature_out_of_range"]["message"]
+    for placeholder in ("{low}", "{high}", "{unit}"):
+        assert placeholder in message
+    assert "°F" in strings["exceptions"]["invalid_temperature_unit"]["message"]
+    assert "°C" in strings["exceptions"]["invalid_temperature_unit"]["message"]
+    assert "°F" in strings["services"]["log_temperature"]["fields"]["unit"]["description"]
+    icons = json.loads((INTEGRATION / "icons.json").read_text())
+    for key in ("last_temperature", "weight", "length", "head_circumference"):
+        assert icons["entity"]["sensor"][key]["default"].startswith("mdi:"), key
+    assert icons["services"]["log_temperature"]["service"].startswith("mdi:")
+
+
+# Core PR 29
+def test_log_temperature_offers_fahrenheit_and_celsius_and_requires_a_temperature() -> None:
+    services = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
+    fields = services["log_temperature"]["fields"]
+    assert fields["temperature"]["required"] is True
+    assert fields["unit"]["required"] is False
+    assert fields["unit"]["selector"]["select"]["options"] == ["°F", "°C"]
+    assert fields["device_id"]["selector"]["device"]["filter"] == [{"integration": DOMAIN}]

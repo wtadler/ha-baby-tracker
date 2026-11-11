@@ -80,6 +80,9 @@ PER_BABY = len(KEYS) + len(DETAIL_KEYS) + len(TODAY_KEYS) + len(TIMER_KEYS)
 # Core PR 26
 # Each baby also has last medicine and next medicine dose sensors.
 PER_BABY += 2
+# Core PR 29
+# And last temperature, weight, length, and head circumference sensors.
+PER_BABY += 4
 
 
 # The buttons share each baby's device, so entity counts here look at readings only.
