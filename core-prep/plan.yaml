@@ -61,6 +61,7 @@ keys:
   config.error: 1
   config.abort.already_configured: 1
   config.abort.reauth_successful: 2
+  config.abort.reauth_sync_reset: 27
   config.abort.unique_id_mismatch: 2
   options: 15
   device.baby: 1

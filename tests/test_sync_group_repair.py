@@ -430,7 +430,7 @@ async def test_reauth_for_a_device_refused_after_a_reset_takes_the_password_and_
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "reauth_successful"
+    assert result["reason"] == "reauth_sync_reset"
     assert init_integration.data[CONF_PASSWORD] == NEW_PASSWORD
     assert issue(hass) is not None
     assert reauth_flows(hass) == []
