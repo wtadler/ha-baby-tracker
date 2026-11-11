@@ -455,7 +455,11 @@ async def test_fixing_the_repair_forgets_the_old_devices_log_gap(
     await fail_to_write(hass)
     assert gap_issue(hass, init_integration) is not None
     refuse_old_devices(server, init_integration)
-    await tick(hass)
+    # Sync now, not by moving the clock: the frozen clock was moved an hour above, and a
+    # timer-driven sync after that ran only some of the time.
+    await init_integration.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_ID) is not None
 
     await fix(hass)
 
