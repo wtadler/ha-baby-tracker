@@ -52,11 +52,7 @@ from .const import (
     is_account_identifier,  # Core PR 6
 )
 from .guard import TimerGuard  # Core PR 18
-from .pictures import (  # Core PR 23
-    AttachedPicture,
-    PictureCache,
-    newest_attached_picture,
-)
+from .pictures import PictureCache  # Core PR 23
 from .sync_group import (  # Core PR 27
     forget_group_change,
     refuse_if_group_changed,
@@ -86,11 +82,6 @@ class BabyData:
     # Core PR 23
     # The baby's photo in the app (the cover photo), as a file on the service.
     photo_file: str | None = None
-    # Core PR 23
-    # The newest picture attached to any of the baby's records.
-    latest_picture: AttachedPicture | None = None
-    milestone: Record | None = None  # Core PR 24
-    vaccine: Record | None = None  # Core PR 25
     medicine: Record | None = None  # Core PR 26
     # Core PR 26
     # The newest dose of each medicine, by the medicine's ID (or its name when it has none), so
@@ -330,9 +321,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 today=self._today(baby_id),  # Core PR 7
                 nursing=self.timers.nursing.get(baby_id),  # Core PR 18
                 photo_file=_photo_file(self.engine.babies().get(baby_id)),  # Core PR 23
-                latest_picture=self._latest_picture(baby_id),  # Core PR 23
-                milestone=latest.get("Milestone"),  # Core PR 24
-                vaccine=latest.get("Vaccine"),  # Core PR 25
                 medicine=latest.get("Medication"),  # Core PR 26
                 medicine_doses=self._medicine_doses(baby_id),  # Core PR 26
                 activities=self._activities(baby_id),  # Core PR 28
@@ -345,10 +333,6 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             last_breast=last_breast(self.engine.records.values(), dt_util.utcnow()),  # Core PR 7
             activity_names=self._activity_names(babies),  # Core PR 28
         )
-
-    # Core PR 23
-    def _latest_picture(self, baby_id: str) -> AttachedPicture | None:
-        return newest_attached_picture(self.engine.records.values(), baby_id)
 
     # Core PR 28
     def _activities(self, baby_id: str) -> dict[str, OtherActivity]:

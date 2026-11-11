@@ -1,4 +1,4 @@
-"""Core PR 23: each baby's photo and newest attached picture, as image entities."""
+"""Core PR 23: each baby's photo, as an image entity."""
 
 import asyncio
 import logging
@@ -10,21 +10,18 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.image import async_get_image
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pybabytracker import BabyTrackerConnectionError, ProtocolError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.baby_tracker.const import DOMAIN
 from custom_components.baby_tracker.pictures import FAILED_RETRY, MISSING_RETRY, PictureCache
 
 from . import BABY_ONE, BABY_THREE, BABY_TWO, NOW, setup_integration, tick
-from .factories import BABY_ONE_ID, DEVICE_A, at, baby_payload
+from .factories import DEVICE_A, at, baby_payload
 from .fake_server import FakeServer
 from .helpers import call, posted
 
 PHOTO = "image.baby_one_photo"
-LATEST = "image.baby_one_latest_picture"
 JPEG = b"\xff\xd8\xffinvented photo"
 OTHER_JPEG = b"\xff\xd8\xffinvented other photo"
 
@@ -40,50 +37,7 @@ def _with_photo(server: FakeServer, picture_name: Any, baby: dict[str, Any] = BA
     server.add_payload(DEVICE_A, {**baby, "pictureName": picture_name})
 
 
-def _picture(file_name: Any, media_type: Any = "0", **overrides: Any) -> dict[str, Any]:
-    """A pictureNote entry as a phone is expected to sync one, with invented IDs."""
-    return {
-        "activityID": "ACTIVITY-1",
-        "attached": True,
-        "deleted": False,
-        "fileName": file_name,
-        "mediaType": media_type,
-        "newFlage": True,
-        "objectID": f"ID-{file_name}",
-        "timestamp": "2026-10-26 14:00:00 +0000",
-        **overrides,
-    }
-
-
-def _record(
-    server: FakeServer,
-    number: int,
-    minute: float,
-    *pictures: Any,
-    type_name: str = "Milestone",
-    **fields: Any,
-) -> str:
-    object_id = f"M0000000-0000-4000-8000-{number:012d}"
-    server.add_record(
-        DEVICE_A, type_name, object_id, when=at(minute), pictureNote=list(pictures), **fields
-    )
-    return object_id
-
-
-async def _setup(
-    hass: HomeAssistant, entry: MockConfigEntry, *, latest: bool = False
-) -> MockConfigEntry:
-    """Set the entry up, with Latest picture enabled when a test needs it."""
-    if latest:
-        entry.add_to_hass(hass)
-        er.async_get(hass).async_get_or_create(
-            "image",
-            DOMAIN,
-            f"{BABY_ONE_ID}_latest_picture",
-            config_entry=entry,
-            suggested_object_id="baby_one_latest_picture",
-            disabled_by=None,
-        )
+async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> MockConfigEntry:
     await setup_integration(hass, entry)
     return entry
 
@@ -403,197 +357,6 @@ async def test_each_baby_shows_its_own_photo(
     assert await _image(hass, "image.baby_two_photo") == OTHER_JPEG
 
 
-async def test_the_latest_picture_is_disabled_by_default(
-    hass: HomeAssistant, init_integration: MockConfigEntry
-) -> None:
-    """Test it can show any entry's picture (a diaper's, say), so it is opt-in."""
-    assert hass.states.get(LATEST) is None
-    registry = er.async_get(hass)
-    entry = registry.async_get(LATEST)
-    assert entry is not None
-    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
-    photo = registry.async_get(PHOTO)
-    assert photo is not None
-    assert photo.disabled_by is None
-
-
-async def test_the_latest_picture_is_the_newest_one_on_any_record(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    older = _record(server, 1, 10, _picture("PICTURE-1"))
-    newer = _record(server, 2, 30, _picture("PICTURE-2"))
-    server.pictures |= {"PICTURE-1.jpg": JPEG, "PICTURE-2.jpg": OTHER_JPEG}
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, LATEST) == OTHER_JPEG
-    state = hass.states.get(LATEST)
-    assert state is not None
-    assert state.attributes["record_type"] == "Milestone"
-    assert state.attributes["record_id"] == newer
-    assert state.attributes["record_id"] != older
-    assert state.attributes["time"] == at(30).isoformat()
-    assert server.picture_requests == ["PICTURE-2.jpg"]
-
-
-async def test_a_picture_on_a_diaper_is_the_latest_picture(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test why it is off by default: a diaper's photo shows here."""
-    _record(server, 1, 30, _picture("DIAPER-1"), type_name="Diaper", status="0")
-    server.pictures["DIAPER-1.jpg"] = JPEG
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, LATEST) == JPEG
-    state = hass.states.get(LATEST)
-    assert state is not None
-    assert state.attributes["record_type"] == "Diaper"
-
-
-async def test_a_video_shows_its_thumbnail(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    _record(server, 1, 10, _picture("VIDEO-1", media_type=1))
-    server.pictures["VIDEO-1__thumbnail.jpg"] = JPEG
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, LATEST) == JPEG
-    assert server.picture_requests == ["VIDEO-1__thumbnail.jpg"]
-
-
-async def test_a_deleted_picture_is_not_shown(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    _record(server, 1, 10, _picture("PICTURE-1"))
-    _record(server, 2, 30, _picture("PICTURE-2", deleted=True))
-    server.pictures |= {"PICTURE-1.jpg": JPEG, "PICTURE-2.jpg": OTHER_JPEG}
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, LATEST) == JPEG
-
-
-async def test_ties_in_the_latest_picture_go_to_the_larger_record_id(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test two records at one time give the same answer on every reload."""
-    _record(server, 2, 10, _picture("PICTURE-2"))
-    _record(server, 1, 10, _picture("PICTURE-1"))
-    _record(server, 3, 10, _picture("PICTURE-3"))
-    server.pictures |= {f"PICTURE-{n}.jpg": JPEG for n in (1, 2, 3)}
-    await _setup(hass, mock_config_entry, latest=True)
-
-    state = hass.states.get(LATEST)
-    assert state is not None
-    assert state.attributes["record_id"] == "M0000000-0000-4000-8000-000000000003"
-
-
-@pytest.mark.parametrize("media_type", [True, None, "x", 2, "2", [1], {"a": 1}, "", -1], ids=repr)
-async def test_a_picture_that_is_neither_a_photo_nor_a_video_is_not_shown(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer, media_type: Any
-) -> None:
-    _record(server, 1, 30, _picture("PICTURE-1", media_type=media_type))
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert _state(hass, LATEST) == "unknown"
-    assert server.picture_requests == []
-
-
-async def test_a_picture_with_no_media_type_key_is_not_shown(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    entry = _picture("PICTURE-1")
-    del entry["mediaType"]
-    _record(server, 1, 30, entry)
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert _state(hass, LATEST) == "unknown"
-
-
-@pytest.mark.parametrize("file_name", ["", "   ", "a/b", "..", 5, None, True, ["x"]], ids=repr)
-async def test_a_picture_with_a_bad_file_name_is_not_shown_or_requested(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer, file_name: Any
-) -> None:
-    _record(server, 1, 30, _picture(file_name))
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert _state(hass, LATEST) == "unknown"
-    assert server.picture_requests == []
-
-
-async def test_a_pictures_entry_that_is_not_a_picture_is_skipped(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    _record(server, 1, 30, "x", 5, None, ["y"], _picture("PICTURE-1"))
-    server.pictures["PICTURE-1.jpg"] = JPEG
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, LATEST) == JPEG
-
-
-async def test_another_babys_picture_is_not_shown(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    _record(server, 1, 30, _picture("PICTURE-1"), baby=BABY_TWO)
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert _state(hass, LATEST) == "unknown"
-    assert server.picture_requests == []
-
-
-async def test_a_record_without_a_time_is_skipped(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    _record(server, 1, 30, _picture("PICTURE-1"), time=None)
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert _state(hass, LATEST) == "unknown"
-
-
-async def test_the_latest_picture_has_empty_attributes_without_a_picture(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry
-) -> None:
-    await _setup(hass, mock_config_entry, latest=True)
-
-    state = hass.states.get(LATEST)
-    assert state is not None
-    assert state.state == "unknown"
-    assert state.attributes["record_type"] is None
-    assert state.attributes["record_id"] is None
-    assert state.attributes["time"] is None
-
-
-async def test_the_same_file_shown_twice_is_downloaded_once(
-    hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
-) -> None:
-    """Test the photo and the latest picture share one download of one file."""
-    _with_photo(server, "SHARED")
-    _record(server, 1, 30, _picture("SHARED"))
-    server.pictures["SHARED.jpg"] = JPEG
-    await _setup(hass, mock_config_entry, latest=True)
-
-    assert await _image(hass, PHOTO) == JPEG
-    assert await _image(hass, LATEST) == JPEG
-    assert server.picture_requests == ["SHARED.jpg"]
-
-
-async def test_a_new_latest_picture_replaces_the_old_one(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    server: FakeServer,
-    freezer: FrozenDateTimeFactory,
-) -> None:
-    _record(server, 1, 10, _picture("PICTURE-1"))
-    server.pictures |= {"PICTURE-1.jpg": JPEG, "PICTURE-2.jpg": OTHER_JPEG}
-    await _setup(hass, mock_config_entry, latest=True)
-    assert await _image(hass, LATEST) == JPEG
-
-    freezer.tick(timedelta(minutes=5))
-    _record(server, 2, 30, _picture("PICTURE-2"))
-    await tick(hass)
-
-    assert _state(hass, LATEST) == dt_util.utcnow().isoformat()
-    assert await _image(hass, LATEST) == OTHER_JPEG
-
-
 async def test_downloaded_pictures_do_not_pile_up_in_memory(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
@@ -656,13 +419,13 @@ async def test_the_downloads_still_running_stop_when_the_entry_unloads(
     assert cache.downloads == {}
 
 
-async def test_the_cache_holds_two_files_for_each_baby(
+async def test_the_cache_holds_a_file_for_each_baby(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry, server: FakeServer
 ) -> None:
-    for number in range(4, 9):
+    for number in range(4, 14):
         server.add_payload(
             DEVICE_A,
-            baby_payload(f"Baby {number}", f"{number}0000000-AAAA-4AAA-8AAA-00000000000{number}"),
+            baby_payload(f"Baby {number}", f"{number:08d}-AAAA-4AAA-8AAA-{number:012d}"),
         )
     await _setup(hass, mock_config_entry)
     cache = mock_config_entry.runtime_data.pictures
@@ -670,8 +433,8 @@ async def test_the_cache_holds_two_files_for_each_baby(
         server.pictures[f"P-{number}.jpg"] = JPEG
         await cache.async_get(f"P-{number}.jpg")
 
-    # Two babies from the fixtures and five more: seven babies, fourteen files.
-    assert len(cache.files) == 14
+    # Two babies from the fixtures and ten more: twelve babies, twelve files.
+    assert len(cache.files) == 12
 
 
 async def test_a_finished_download_does_not_forget_a_newer_one_for_the_same_file() -> None:
@@ -703,7 +466,7 @@ async def test_the_cache_drops_the_oldest_files_when_a_baby_leaves(
 ) -> None:
     await _setup(hass, mock_config_entry)
     cache = mock_config_entry.runtime_data.pictures
-    cache.set_babies(7)
+    cache.set_babies(14)
     for number in range(14):
         server.pictures[f"P-{number}.jpg"] = JPEG
         await cache.async_get(f"P-{number}.jpg")

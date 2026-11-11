@@ -63,15 +63,6 @@
       "last_nursing": {
         "default": "mdi:mother-nurse"
       },
-      "last_nursing_duration": {
-        "default": "mdi:timer-outline"
-      },
-      "last_nursing_left_time": {
-        "default": "mdi:timer-outline"
-      },
-      "last_nursing_right_time": {
-        "default": "mdi:timer-outline"
-      },
       "last_sleep_duration": {
         "default": "mdi:sleep"
       },
@@ -83,12 +74,6 @@
       },
       "last_breast": {
         "default": "mdi:mother-nurse"
-      },
-      "last_milestone": {
-        "default": "mdi:star"
-      },
-      "last_vaccine": {
-        "default": "mdi:needle"
       },
       "last_medicine": {
         "default": "mdi:pill"
@@ -131,9 +116,6 @@
       }
     },
     "image": {
-      "latest_picture": {
-        "default": "mdi:image"
-      },
       "photo": {
         "default": "mdi:account-box"
       }
