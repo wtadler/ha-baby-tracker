@@ -13,7 +13,10 @@ from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
-from homeassistant.const import CONF_EMAIL
+from homeassistant.const import (
+    CONF_EMAIL,
+    UnitOfTemperature,  # Core PR 29
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
@@ -25,6 +28,9 @@ from pybabytracker import (
     DIAPER_WET,
     SIDE_LEFT,
     SIDE_RIGHT,
+    TEMPERATURE_RANGES,  # Core PR 29
+    UNIT_CELSIUS,  # Core PR 29
+    UNIT_FAHRENHEIT,  # Core PR 29
     AmbiguousSelectionError,  # Core PR 26
     AmountTooSmallError,
     AuthenticationError,
@@ -33,6 +39,7 @@ from pybabytracker import (
     EndBeforeStartError,
     InvalidAmountError,
     InvalidSelectionNameError,  # Core PR 26
+    Measurement,  # Core PR 29
     MinutesTooLongError,
     NotOwnRecordError,
     NoUsualDoseError,  # Core PR 26
@@ -74,6 +81,13 @@ _LOGGER = logging.getLogger(__name__)
 DIAPER_STATUS = {"wet": DIAPER_WET, "dirty": DIAPER_DIRTY, "mixed": DIAPER_MIXED}
 
 FINISH_SIDES = {"left": SIDE_LEFT, "right": SIDE_RIGHT}
+
+# Core PR 29
+# Home Assistant's temperature units, and the library's.
+TEMPERATURE_UNITS = {
+    UnitOfTemperature.FAHRENHEIT.value: UNIT_FAHRENHEIT,
+    UnitOfTemperature.CELSIUS.value: UNIT_CELSIUS,
+}
 
 
 def _error(key: str, **placeholders: str) -> HomeAssistantError:
@@ -398,6 +412,57 @@ async def async_log_activity(
         except ValueError as err:
             # The action's schema checks the minutes, so what's left is not about them (the
             # engine can't write, a time without a zone): a write error, as for any other.
+            raise _error("write_failed", error=str(err)) from err
+
+    await _add(coordinator, object_id, add)
+
+
+# Core PR 29
+async def async_log_temperature(
+    coordinator: BabyTrackerCoordinator,
+    baby_id: str,
+    temperature: float,
+    *,
+    unit: str | None = None,
+    time: datetime | None = None,
+    note: str = "",
+    object_id: str | None = None,
+) -> None:
+    """Add a temperature in °F or °C (default the unit system's), as taken: it isn't converted.
+
+    A reading no body could have in that unit is refused before anything is sent. Most often it is
+    a reading in one unit given as the other.
+    """
+    chosen = unit if unit is not None else coordinator.hass.config.units.temperature_unit
+    if chosen not in TEMPERATURE_UNITS:
+        raise validation_error("invalid_temperature_unit")
+    library_unit = TEMPERATURE_UNITS[chosen]
+    low, high = TEMPERATURE_RANGES[library_unit]
+    if not (math.isfinite(temperature) and low <= temperature <= high):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="temperature_out_of_range",
+            translation_placeholders={"low": f"{low:g}", "high": f"{high:g}", "unit": chosen},
+        )
+    reading = Measurement(temperature, library_unit)
+    moment, offset = _in_home_assistant_time(time)
+
+    async def add(engine: SyncEngine, client: BabyTrackerClient, object_id: str | None) -> object:
+        try:
+            return await engine.add_temperature(
+                client,
+                baby_id,
+                reading,
+                time=moment,
+                timezone_offset=offset,
+                note=_note(note),
+                object_id=object_id,
+            )
+        except ObjectIdInUseError:
+            raise
+        except ValueError as err:
+            # The checks above cover every reading the library refuses, so what's left is not
+            # about the reading (the engine can't write, a time without a zone): a write error.
             raise _error("write_failed", error=str(err)) from err
 
     await _add(coordinator, object_id, add)

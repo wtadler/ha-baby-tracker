@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math  # Core PR 29
 from collections.abc import Awaitable, Callable  # Core PR 9
 from dataclasses import dataclass
 from datetime import datetime, timedelta  # Core PR 7
@@ -30,7 +31,9 @@ from pybabytracker import (
     BabyTrackerError,
     DayTotals,  # Core PR 7
     Formula,
+    Growth,  # Core PR 29
     LastBreast,  # Core PR 7
+    Measurement,  # Core PR 29
     Medication,  # Core PR 26
     Nursing,
     NursingTimer,  # Core PR 18
@@ -40,6 +43,7 @@ from pybabytracker import (
     Record,
     Sleep,  # Core PR 8
     SyncEngine,
+    Temperature,  # Core PR 29
     day_totals,  # Core PR 7
     last_breast,  # Core PR 7
 )
@@ -90,6 +94,13 @@ class BabyData:
     # Core PR 28
     # The newest activity of each activity type the baby has one of, by the type's ID.
     activities: dict[str, OtherActivity] | None = None
+    # Core PR 29
+    # The newest temperature with a reading, and the newest growth record with each measurement.
+    # A checkup can record a weight alone, so each measurement has its own newest record.
+    temperature: Record | None = None
+    weight: Record | None = None  # Core PR 29
+    length: Record | None = None  # Core PR 29
+    head: Record | None = None  # Core PR 29
     # Core PR 4
     # The newest nursing, whatever feed came after it, so its minutes stay visible.
     last_nursing: Record | None = None
@@ -164,6 +175,46 @@ def _activity_order(activity: OtherActivity) -> tuple[float, float, str]:
         assert activity.time is not None
     stamp = activity.timestamp.timestamp() if activity.timestamp is not None else 0.0
     return (activity.time.timestamp(), stamp, activity.object_id)
+
+
+# Core PR 29
+def _finite(reading: Measurement | None) -> Measurement | None:
+    """Return a reading whose number is finite: a payload's JSON can carry NaN or Infinity."""
+    return reading if reading is not None and math.isfinite(reading.value) else None
+
+
+# Core PR 29
+def temperature_reading(record: Record | None) -> Measurement | None:
+    """Return a temperature record's reading in °F or °C, or None when it has none."""
+    return _finite(record.reading) if isinstance(record, Temperature) else None
+
+
+# Core PR 29
+def weight_reading(record: Record | None) -> Measurement | None:
+    """Return a growth record's weight in pounds or kilograms, or None when it has none."""
+    return _finite(record.weight_reading) if isinstance(record, Growth) else None
+
+
+# Core PR 29
+def length_reading(record: Record | None) -> Measurement | None:
+    """Return a growth record's length in inches or centimeters, or None when it has none."""
+    return _finite(record.length_reading) if isinstance(record, Growth) else None
+
+
+# Core PR 29
+def head_reading(record: Record | None) -> Measurement | None:
+    """Return a growth record's head circumference in inches or centimeters, or None."""
+    return _finite(record.head_reading) if isinstance(record, Growth) else None
+
+
+# Core PR 29
+def _reading_order(record: Record) -> tuple[float, float, str]:
+    """Order readings by time, then when they were saved, then by record ID."""
+    if TYPE_CHECKING:
+        # Only records with a time are ordered.
+        assert record.time is not None
+    stamp = record.timestamp.timestamp() if record.timestamp is not None else 0.0
+    return (record.time.timestamp(), stamp, record.object_id)
 
 
 def _newest(records: list[Record]) -> Record | None:
@@ -324,6 +375,10 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
                 medicine=latest.get("Medication"),  # Core PR 26
                 medicine_doses=self._medicine_doses(baby_id),  # Core PR 26
                 activities=self._activities(baby_id),  # Core PR 28
+                temperature=self._newest_reading(baby_id, temperature_reading),  # Core PR 29
+                weight=self._newest_reading(baby_id, weight_reading),  # Core PR 29
+                length=self._newest_reading(baby_id, length_reading),  # Core PR 29
+                head=self._newest_reading(baby_id, head_reading),  # Core PR 29
                 last_nursing=self._last_nursing(latest),  # Core PR 4
             )
         return BabyTrackerData(
@@ -332,6 +387,23 @@ class BabyTrackerCoordinator(DataUpdateCoordinator[BabyTrackerData]):
             pump=self.timers.pump,  # Core PR 21
             last_breast=last_breast(self.engine.records.values(), dt_util.utcnow()),  # Core PR 7
             activity_names=self._activity_names(babies),  # Core PR 28
+        )
+
+    # Core PR 29
+    def _newest_reading(
+        self, baby_id: str, reading: Callable[[Record | None], Measurement | None]
+    ) -> Record | None:
+        """Return the baby's newest record that has the reading, or None."""
+        return max(
+            (
+                record
+                for record in self.engine.records.values()
+                if record.baby_id == baby_id
+                and record.time is not None
+                and reading(record) is not None
+            ),
+            key=_reading_order,
+            default=None,
         )
 
     # Core PR 28

@@ -19,6 +19,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,  # Core PR 7
 )
 from homeassistant.const import (  # Core PR 4
+    UnitOfLength,  # Core PR 29
+    UnitOfMass,  # Core PR 29
+    UnitOfTemperature,  # Core PR 29
     UnitOfTime,
     UnitOfVolume,  # Core PR 7
 )
@@ -30,12 +33,20 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval  # Core PR 19
 from homeassistant.util import dt as dt_util  # Core PR 19
 from homeassistant.util.unit_conversion import VolumeConverter  # Core PR 7
+from homeassistant.util.unit_system import UnitSystem  # Core PR 29
 from pybabytracker import (
     SIDE_LEFT,  # Core PR 4
     SIDE_RIGHT,  # Core PR 4
+    UNIT_CELSIUS,  # Core PR 29
+    UNIT_CENTIMETERS,  # Core PR 29
+    UNIT_FAHRENHEIT,  # Core PR 29
+    UNIT_INCHES,  # Core PR 29
+    UNIT_KILOGRAMS,  # Core PR 29
+    UNIT_POUNDS,  # Core PR 29
     DayTotals,  # Core PR 7
     Diaper,  # Core PR 4
     Formula,  # Core PR 4
+    Measurement,  # Core PR 29
     Medication,  # Core PR 26
     Nursing,  # Core PR 4
     OtherActivity,  # Core PR 28
@@ -47,7 +58,15 @@ from pybabytracker import (
 )
 from pybabytracker.timers import LEFT, RIGHT  # Core PR 19
 
-from .coordinator import BabyData, BabyTrackerConfigEntry, BabyTrackerCoordinator
+from .coordinator import (
+    BabyData,
+    BabyTrackerConfigEntry,
+    BabyTrackerCoordinator,
+    head_reading,  # Core PR 29
+    length_reading,  # Core PR 29
+    temperature_reading,  # Core PR 29
+    weight_reading,  # Core PR 29
+)
 from .entity import (
     BabyTrackerAccountEntity,  # Core PR 5
     BabyTrackerBabyEntity,
@@ -759,6 +778,141 @@ class BabyTrackerLastActivitySensor(BabyTrackerBabyEntity, SensorEntity):
         return {"duration_minutes": duration if whole else None, "note": _note(activity)}
 
 
+# Core PR 29
+# Home Assistant's unit for each unit the library reads a temperature or growth measurement in.
+READING_UNITS = {
+    UNIT_FAHRENHEIT: UnitOfTemperature.FAHRENHEIT,
+    UNIT_CELSIUS: UnitOfTemperature.CELSIUS,
+    UNIT_POUNDS: UnitOfMass.POUNDS,
+    UNIT_KILOGRAMS: UnitOfMass.KILOGRAMS,
+    UNIT_INCHES: UnitOfLength.INCHES,
+    UNIT_CENTIMETERS: UnitOfLength.CENTIMETERS,
+}
+
+
+# Core PR 29
+def _weight_unit(units: UnitSystem) -> str:
+    return UnitOfMass.POUNDS if units.mass_unit == UnitOfMass.POUNDS else UnitOfMass.KILOGRAMS
+
+
+# Core PR 29
+def _length_unit(units: UnitSystem) -> str:
+    return (
+        UnitOfLength.INCHES if units.length_unit == UnitOfLength.MILES else UnitOfLength.CENTIMETERS
+    )
+
+
+# Core PR 29
+@dataclass(frozen=True, kw_only=True)
+class BabyTrackerReadingSensorDescription(SensorEntityDescription):
+    """A baby's newest temperature, weight, length, or head circumference."""
+
+    record_fn: Callable[[BabyData], Record | None]
+    reading_fn: Callable[[Record | None], Measurement | None]
+    # The unit system's unit, used to show a reading in and as the unit before the first one.
+    system_unit_fn: Callable[[UnitSystem], str]
+    # Whether Home Assistant should show readings in the unit system's unit. Temperatures always
+    # are, so only weights and lengths ask.
+    suggest_system_unit: bool = True
+
+
+# Core PR 29
+READING_SENSORS: tuple[BabyTrackerReadingSensorDescription, ...] = (
+    BabyTrackerReadingSensorDescription(
+        key="last_temperature",
+        translation_key="last_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        record_fn=lambda baby: baby.temperature,
+        reading_fn=temperature_reading,
+        system_unit_fn=lambda units: units.temperature_unit,
+        suggest_system_unit=False,
+    ),
+    BabyTrackerReadingSensorDescription(
+        key="weight",
+        translation_key="weight",
+        device_class=SensorDeviceClass.WEIGHT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        record_fn=lambda baby: baby.weight,
+        reading_fn=weight_reading,
+        system_unit_fn=_weight_unit,
+    ),
+    BabyTrackerReadingSensorDescription(
+        key="length",
+        translation_key="length",
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        record_fn=lambda baby: baby.length,
+        reading_fn=length_reading,
+        system_unit_fn=_length_unit,
+    ),
+    BabyTrackerReadingSensorDescription(
+        key="head_circumference",
+        translation_key="head_circumference",
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        record_fn=lambda baby: baby.head,
+        reading_fn=head_reading,
+        system_unit_fn=_length_unit,
+    ),
+)
+
+
+# Core PR 29
+class BabyTrackerReadingSensor(BabyTrackerBabyEntity, SensorEntity):
+    """A baby's newest temperature or growth measurement, in the unit it was recorded in.
+
+    Each follows the newest record that has its own reading, so a weight logged alone doesn't hide
+    the length from an earlier checkup. Home Assistant shows the reading in the unit system's unit.
+    """
+
+    entity_description: BabyTrackerReadingSensorDescription
+
+    @property
+    def _reading(self) -> tuple[Measurement, datetime] | None:
+        baby = self._baby
+        record = self.entity_description.record_fn(baby) if baby is not None else None
+        reading = self.entity_description.reading_fn(record)
+        if record is None or reading is None or record.time is None:
+            return None
+        return reading, record.time
+
+    @property
+    @override
+    def native_value(self) -> float | None:
+        """Return the reading, to the two decimals the app writes (the apps sync 32-bit floats)."""
+        found = self._reading
+        return round(found[0].value, 2) if found is not None else None
+
+    @property
+    @override
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the reading's unit, or the unit system's before the first reading."""
+        found = self._reading
+        if found is not None and found[0].unit in READING_UNITS:
+            return READING_UNITS[found[0].unit]
+        return self.entity_description.system_unit_fn(self.hass.config.units)
+
+    @property
+    @override
+    def suggested_unit_of_measurement(self) -> str | None:
+        """Return the unit system's unit for a weight or length, so a graph keeps one unit."""
+        if not self.entity_description.suggest_system_unit:
+            return None
+        return self.entity_description.system_unit_fn(self.hass.config.units)
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return when the reading was taken."""
+        found = self._reading
+        return {"time": found[1].isoformat() if found is not None else None}
+
+
 # One row per kind of sensor: its descriptions and the entity class built from each.
 # Core PR 5
 ACCOUNT_SENSORS: tuple[
@@ -779,6 +933,7 @@ BABY_SENSORS: tuple[
     ((LAST_MEDICINE,), BabyTrackerLastMedicineSensor),  # Core PR 26
     ((NEXT_MEDICINE_DOSE,), BabyTrackerNextMedicineDoseSensor),  # Core PR 26
     (LAST_DETAIL_SENSORS, BabyTrackerLastDetailSensor),  # Core PR 4
+    (READING_SENSORS, BabyTrackerReadingSensor),  # Core PR 29
 )
 
 

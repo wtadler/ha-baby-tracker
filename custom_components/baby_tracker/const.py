@@ -87,3 +87,4 @@ class BabyTrackerService(StrEnum):
     DISCARD_NURSING = "discard_nursing"  # Core PR 18
     LOG_MEDICINE = "log_medicine"  # Core PR 26
     LOG_ACTIVITY = "log_activity"  # Core PR 28
+    LOG_TEMPERATURE = "log_temperature"  # Core PR 29

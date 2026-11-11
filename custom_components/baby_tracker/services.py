@@ -22,6 +22,7 @@ from .coordinator import BabyTrackerCoordinator
 from .writes import (
     DIAPER_STATUS,
     FINISH_SIDES,  # Core PR 10
+    TEMPERATURE_UNITS,  # Core PR 29
     async_discard_nursing,  # Core PR 18
     async_log_activity,  # Core PR 28
     async_log_bottle,  # Core PR 10
@@ -30,6 +31,7 @@ from .writes import (
     async_log_nursing,  # Core PR 10
     async_log_pump,  # Core PR 12
     async_log_sleep,  # Core PR 10
+    async_log_temperature,  # Core PR 29
     async_start_nursing,  # Core PR 18
     async_start_pump,  # Core PR 21
     async_start_sleep,  # Core PR 16
@@ -68,6 +70,7 @@ class BabyTrackerServiceArgument(StrEnum):
     SIDE = "side"  # Core PR 18
     MEDICINE = "medicine"  # Core PR 26
     ACTIVITY = "activity"  # Core PR 28
+    TEMPERATURE = "temperature"  # Core PR 29
 
 
 def _uuid_upper(value: object) -> str:
@@ -155,6 +158,22 @@ LOG_ACTIVITY_SCHEMA = _baby_schema(
         probatio.Optional(BabyTrackerServiceArgument.MINUTES, default=0): probatio.All(
             _whole_minutes, probatio.Range(max=MAX_ACTIVITY_MINUTES)
         ),
+        probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
+        probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
+        probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
+    }
+)
+
+
+# Core PR 29
+# The range is checked in writes.py, against the unit, so a reading out of it gets a translated
+# message.
+LOG_TEMPERATURE_SCHEMA = _baby_schema(
+    {
+        probatio.Required(BabyTrackerServiceArgument.TEMPERATURE): probatio.All(
+            _not_a_bool, probatio.Coerce(float)
+        ),
+        probatio.Optional(BabyTrackerServiceArgument.UNIT): probatio.In(list(TEMPERATURE_UNITS)),
         probatio.Optional(BabyTrackerServiceArgument.TIME): cv.datetime,
         probatio.Optional(BabyTrackerServiceArgument.NOTE, default=""): cv.string,
         probatio.Optional(BabyTrackerServiceArgument.OBJECT_ID): _uuid_upper,
@@ -425,6 +444,20 @@ async def _log_activity(call: ServiceCall) -> None:
     )
 
 
+# Core PR 29
+async def _log_temperature(call: ServiceCall) -> None:
+    coordinator, baby_id = _baby(call)
+    await async_log_temperature(
+        coordinator,
+        baby_id,
+        call.data[BabyTrackerServiceArgument.TEMPERATURE],
+        unit=call.data.get(BabyTrackerServiceArgument.UNIT),
+        time=call.data.get(BabyTrackerServiceArgument.TIME),
+        note=call.data[BabyTrackerServiceArgument.NOTE],
+        object_id=call.data.get(BabyTrackerServiceArgument.OBJECT_ID),
+    )
+
+
 # Core PR 10
 async def _log_bottle(call: ServiceCall) -> None:
     coordinator, baby_id = _baby(call)
@@ -615,4 +648,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(  # Core PR 28
         DOMAIN, BabyTrackerService.LOG_ACTIVITY, _log_activity, schema=LOG_ACTIVITY_SCHEMA
+    )
+    hass.services.async_register(  # Core PR 29
+        DOMAIN, BabyTrackerService.LOG_TEMPERATURE, _log_temperature, schema=LOG_TEMPERATURE_SCHEMA
     )

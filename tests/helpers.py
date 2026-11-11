@@ -338,6 +338,9 @@ ALL_ACTIONS.append("log_medicine")
 # Core PR 28
 # An activity needs a type the account has, so log_activity has its own tests.
 ALL_ACTIONS.append("log_activity")
+# Core PR 29
+# A temperature has its own range and unit checks, so log_temperature has its own tests.
+ALL_ACTIONS.append("log_temperature")
 
 
 # A ``scan_interval`` option in a saved entry is not a setting, so these tests spell it out.
